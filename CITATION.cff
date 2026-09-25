@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use benchsiDE, please cite it as below."
 title: "benchsiDE: validated, client-side RNA-seq differential expression and discovery analysis"
-version: 0.19.4-beta
-date-released: "2026-09-24"
+version: 0.19.5-beta
+date-released: "2026-09-25"
 abstract: >-
   benchsiDE is a single-file web application for bulk RNA-seq analysis that runs
   entirely in the browser; expression data are not transmitted. It implements TMM

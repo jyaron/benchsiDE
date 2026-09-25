@@ -645,7 +645,7 @@ const AXX=()=>({title:NUMERIC?FACTOR:"", tickvals:GROUPS.map(g=>GX[g]), ticktext
 /* global figure font scaling: every render path (live plots, SVG download, summary
    and panel exports) goes through Plotly.react, so one wrapper scales them all.
    Trace/layout objects are rebuilt on every draw, so in-place scaling is safe. */
-const APP_VERSION="0.19.4-beta (2026-09-24)";
+const APP_VERSION="0.19.5-beta (2026-09-25)";
 document.getElementById("appver").textContent="v"+APP_VERSION;
 let FONTSCALE=1;
 function fontWalk(o){
@@ -3209,7 +3209,20 @@ function runSelfTest(){
     n2i:nameToIdx,i2i:idToIdx,vals:VALS,dlog:DATALOG,nn:NORMNOTE,unm:UNMAPPED,
     cg:curGene,cl:compareList.slice(),cog:coGene,cop:coPartner,cok:coKey,sck:scorrKey,ps:patState,
     selA:el("selA").value,selB:el("selB").value,selFDR:el("selFDR").value,fcthr:el("fcthr").value,
-    dcv:DECOVSEL.slice()} : null;
+    dcv:DECOVSEL.slice(), bd:BATCHDISP, go:(GROUPORDER&&GROUPORDER.slice?GROUPORDER.slice():GROUPORDER)} : null;
+  // On-screen state that analyzeNow() rewrites. Content panels are moved aside as live nodes and
+  // moved back afterwards, so their click handlers survive; the self-test leaves no visible trace.
+  const UI_CONTENT=["hdrsub","methodsnote","qcwarn","gmtinfo","enrinfo","enrtable","decov","batchdisp"];
+  const UI_DISPLAY=["qcwarn","batchdispwrap","decovwrap","enrexport","voombtn","reportbtn","savesess","sumfigbtn",
+    "reupload","loadsesslbl","dashwrap","tabs","pane-upload","fontsel","expsize"];
+  const UI_VALUE=["normsel","fmode","cosearch"];
+  const UIS=hadData? {
+    content:UI_CONTENT.map(id=>{ const e=el(id); if(!e) return null;
+      if(typeof e.removeChild==="function" && e.firstChild!==undefined){ const nodes=[]; while(e.firstChild) nodes.push(e.removeChild(e.firstChild)); return {e,nodes}; }
+      return {e,html:e.innerHTML}; }).filter(Boolean),
+    display:UI_DISPLAY.map(id=>{ const e=el(id); return e? {e,d:e.style.display} : null; }).filter(Boolean),
+    value:UI_VALUE.map(id=>{ const e=el(id); return e? {e,v:e.value} : null; }).filter(Boolean)
+  } : null;
   try{
     loadFromText(lines.join("\n"), "sample\tgroup\nS1\tA\nS2\tA\nS3\tA\nS4\tB\nS5\tB\nS6\tB");
     GROUPTYPE="categorical"; el("normsel").value="tmm"; analyzeNow();
@@ -3324,6 +3337,13 @@ function runSelfTest(){
     buildSampleBar(); buildDESelectors(); buildCCSelectors();
     el("selA").value=ST.selA; el("selB").value=ST.selB; el("selFDR").value=ST.selFDR; el("fcthr").value=ST.fcthr;
     if(ST.dcv!==undefined) DECOVSEL=ST.dcv.slice();
+    BATCHDISP=ST.bd; LADJKEY=""; GROUPORDER=ST.go;
+    for(const u of UIS.content){
+      if(u.nodes){ while(u.e.firstChild) u.e.removeChild(u.e.firstChild); u.nodes.forEach(n=>u.e.appendChild(n)); }
+      else u.e.innerHTML=u.html;
+    }
+    for(const u of UIS.display) u.e.style.display=u.d;
+    for(const u of UIS.value) u.e.value=u.v;
     el("genesearch").value=curGene!==null?GENES[curGene]:"";
     genMethods();
   }

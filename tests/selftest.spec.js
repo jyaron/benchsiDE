@@ -73,3 +73,27 @@ test("UI smoke: self-test button renders a passing evidence panel", async ({ pag
   await expect(page.locator("#selftestout")).toContainText(
     `All ${N_COMPONENTS} components reproduce their references`, { timeout: 30000 });
 });
+
+test("self-test leaves the user's analysis and its displays unchanged", async ({ page }) => {
+  await page.goto(PAGE);
+  const matrix = fs.readFileSync(path.join(__dirname, "..", "demo", "GSE63310_counts.tsv"), "utf8");
+  const design = fs.readFileSync(path.join(__dirname, "..", "demo", "GSE63310_design.tsv"), "utf8");
+  const ids = ["hdrsub", "methodsnote", "qcwarn", "enrtable", "decov", "batchdisp"];
+  const snap = () => page.evaluate((ids) => ids.map(id => document.getElementById(id).innerHTML), ids);
+  await page.evaluate(([m, d]) => {
+    document.getElementById("normsel").value = "tmm";
+    document.getElementById("fmode").value = "fbe";
+    loadFromText(m, d); GROUPTYPE = "auto"; analyzeNow();
+    // a live control inside a content panel: its handler must survive the self-test
+    const b = document.createElement("button"); b.id = "probe";
+    b.addEventListener("click", () => { window.__probe = (window.__probe || 0) + 1; });
+    document.getElementById("enrtable").appendChild(b);
+  }, [matrix, design]);
+  const before = await snap();
+  await page.click("#selftestbtn");
+  await expect(page.locator("#selftestout")).toContainText("All 16 components reproduce their references", { timeout: 30000 });
+  expect(await snap()).toEqual(before);
+  await page.evaluate(() => document.getElementById("probe").click());
+  expect(await page.evaluate(() => window.__probe)).toBe(1);
+  await expect(page.locator("#hdrsub")).toContainText("9 samples");
+});

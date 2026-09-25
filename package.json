@@ -1,6 +1,6 @@
 {
   "name": "benchside",
-  "version": "0.19.4-beta",
+  "version": "0.19.5-beta",
   "description": "Validated, client-side RNA-seq differential expression and discovery analysis in a single HTML file",
   "scripts": {
     "test": "playwright test",

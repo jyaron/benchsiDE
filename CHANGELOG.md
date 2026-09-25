@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.5-beta (2026-09-25)
+- FIXED: running **Validate statistics** left the header summary, the methods filter sentence and the QC notes describing the self-test's synthetic dataset (6 samples, 2,000 genes) in place of the loaded data. The statistics themselves were restored correctly. The self-test also reset the normalization selector, the batch-adjusted display setting and a custom group order. It now saves and restores every display the analysis step rewrites; content panels are moved aside as live elements, so their click handlers keep working.
+- New CI test: the self-test must leave the analysis displays unchanged and a control inside a content panel must remain functional.
+
 ## 0.19.4-beta (2026-09-24)
 Validation release.
 - VALIDATION.md rewritten. It now reports only checks that can be reproduced from this repository: the in-app self-test (16 components on a deterministic synthetic dataset) and a new external validation on the public demo dataset GSE63310 (33 checks against edgeR, limma, RRHO, RNASeqPower and stats). The previous record cited datasets that are not distributed with benchsiDE; it has been removed, together with the corresponding figures in this changelog.
