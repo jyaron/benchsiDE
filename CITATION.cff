@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use benchsiDE, please cite it as below."
+title: "benchsiDE: validated, client-side RNA-seq differential expression and discovery analysis"
+version: 0.19.4-beta
+date-released: "2026-09-24"
+abstract: >-
+  benchsiDE is a single-file web application for bulk RNA-seq analysis that runs
+  entirely in the browser; expression data are not transmitted. It implements TMM
+  normalization, filterByExpr filtering, moderated t, voom and covariate models,
+  moderated F, gene-set testing (over-representation, preranked GSEA, CAMERA, FRY),
+  module discovery and cross-dataset comparison. Each statistical routine is validated
+  against its reference implementation (edgeR, limma, RRHO, RNASeqPower, scipy,
+  statsmodels) by an in-browser self-test and by an external validation on a public
+  dataset (GEO GSE63310).
+authors:
+  - family-names: "Yaron"
+    given-names: "Jordan R."
+    orcid: "https://orcid.org/0000-0002-4133-474X"
+    affiliation: "Arizona State University"
+repository-code: "https://github.com/jyaron/benchsiDE"
+url: "https://www.benchside.org"
+license: MIT
+keywords:
+  - RNA-seq
+  - differential expression
+  - gene-set testing
+  - client-side
+  - limma
+  - edgeR
+  - reproducibility

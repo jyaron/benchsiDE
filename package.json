@@ -1,0 +1,20 @@
+{
+  "name": "benchside",
+  "version": "0.19.4-beta",
+  "description": "Validated, client-side RNA-seq differential expression and discovery analysis in a single HTML file",
+  "scripts": {
+    "test": "playwright test",
+    "build:offline": "python3 scripts/build_offline.py",
+    "build:guide": "python3 scripts/build_guide.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jyaron/benchsiDE.git"
+  },
+  "homepage": "https://www.benchside.org",
+  "private": true
+}
