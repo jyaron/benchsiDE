@@ -203,9 +203,18 @@ On the Overview & QC tab, look at the PCA. To see the data with the batch effect
 
 If a covariate is confounded with the groups (for example, every control in batch 1 and every treated sample in batch 2), benchsiDE refuses to fit the model and explains why. No statistical method can separate the two effects in that case.
 
+The **Design check** (review step, and under the sample list after analysis) shows this before you fit anything. It tabulates each factor against the groups and lists, for each pair of groups, whether the factor can be adjusted for or is confounded. For a confounded comparison you can:
+
+1. restrict the samples to one level of the factor with the **Include samples with …** checkboxes under the sample list;
+2. group by a combined factor (for example `Type × Diag`) in the review step and compare within one level;
+3. compare only groups in which the factor varies, with the factor under **adjust for**; or
+4. report the comparison as confounded.
+
+Example: in GEO GSE186063 every normal-skin sample is from an ankylosing spondylitis patient, and lesional and non-lesional samples are from psoriasis and psoriatic arthritis patients. Diagnosis can be adjusted for in lesion vs non-lesion, but a comparison of lesion with normal skin is also a comparison of diagnoses.
+
 ### Step 5. Paired designs
 
-For paired samples (the same subject before and after treatment), add a column identifying the subject and select it under **adjust for**. This fits subject as a blocking factor.
+For paired samples (the same subject before and after treatment, or lesional and non-lesional biopsies from each patient), add a column identifying the subject and select it under **adjust for**. This fits subject as a blocking factor. If the design file has no subject column, add one on the review step: open **Edit the design**, type the column name, click **Add column**, and fill in each sample's subject.
 
 ---
 
@@ -324,15 +333,15 @@ Choose X and Y and click **Compare pair**. You will see:
 
 ### Step 4. Summarize across all datasets
 
-Click **Compute across all datasets** for the correlation matrix and consensus table. Type a gene symbol in the **forest plot** field and click **Draw** for its effect in every dataset.
+Click **Compute across all datasets** for the correlation matrix and consensus table. Type a gene symbol in the **forest plot** field and click **Draw** for its effect in every dataset. The axis always includes 0, so effect sizes are compared on a common scale. Gene Explorer also shows the selected gene in every comparison dataset, each with its own groups and statistics.
 
 ### Step 5. Score homology families (cross-species)
 
 Many genes have no one-to-one ortholog (for example the mouse Serpinb3a to Serpinb3d genes and human SERPINB3 and SERPINB4). These families are excluded from gene-level matching but are not lost:
 
-1. Choose the comparison dataset in the family panel's **Dataset** selector.
+1. Choose the two datasets in the family panel's **X** and **Y** selectors: the session and a comparison dataset, or two comparison datasets. They must be of different species.
 2. Click **Score families**. Each family is scored as a module in each dataset.
-3. The **family concordance scatter** shows one point per family (x: effect in your session, y: effect in the other dataset). Red and blue points are concordant and significant in both datasets; amber diamonds are significant in both but opposite in direction.
+3. The **family concordance scatter** shows one point per family (x: effect in dataset X, y: effect in dataset Y). Red and blue points are concordant and significant in both datasets; amber diamonds are significant in both but opposite in direction.
 4. Click a point, or **plot** in a table row, for per-sample scores in both datasets.
 5. **Clear** resets the panel.
 
@@ -347,8 +356,10 @@ Under **Signature transfer**, choose a module from dataset A (up- or down-regula
 ### 9.1 Figure exports
 
 - Set the export shape with the **export** selector (as shown; single column 4:3 or 1:1; double column 7:4 or wide).
-- Set the type size with the font selector: **screen fonts**, **paper fonts (1.5×)** or **poster fonts (2×)**. Margins adjust automatically, and labels too long for the margin are shortened in the middle (the full name remains in the hover text).
+- Set the type size with the font selector: **screen fonts**, **paper fonts (1.5×)** or **poster fonts (2×)**. Margins adjust automatically.
+- Set axis labels with the three label selectors: orientation (auto, horizontal, 45°, vertical), label size, and long-label handling (wrap, full length, or shortened). With wrap or full length, labels are never cut off; the figure margin grows instead.
 - The camera icon on any plot saves it as SVG, the recommended format for publication.
+- The **Download data** icon on any plot saves an Excel workbook of the plotted values, with a sheet laid out as a GraphPad Prism table (Column, Grouped or XY) so the figure can be redrawn in the same style as your other figures. In Prism, create a table of the type named on the Notes sheet and paste or import the Prism sheet.
 - **Summary figure** (header) composes a four-panel overview with a caption.
 - In the Gene Explorer, add genes with **+ Add to comparison**, then choose **Export panel figure** for a multi-panel figure with statistics.
 

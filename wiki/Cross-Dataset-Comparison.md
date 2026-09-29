@@ -31,7 +31,11 @@ Identifiers are decoded with each dataset's own species annotation. If matching 
 
 ## All datasets
 
-**Compute across all datasets** produces the correlation matrix and a consensus table. The **forest plot** shows one gene's log₂FC with confidence intervals in every dataset.
+**Compute across all datasets** produces the correlation matrix and a consensus table. The **forest plot** shows one gene's log₂FC with confidence intervals in every dataset; its axis always includes 0 and is symmetric about it.
+
+## Gene Explorer in comparison datasets
+
+When comparison datasets are loaded, Gene Explorer shows the selected gene in each of them, one panel per dataset, using that dataset's groups, normalization and statistics (ANOVA, Welch tests with Holm adjustment, and the dataset's selected contrast). Genes are matched as in the table above. A symbol can be typed to show a gene that is not in the session.
 
 ## Signature transfer
 

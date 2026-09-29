@@ -2,7 +2,7 @@
 
 ## Co-expression
 
-Enter a query gene. benchsiDE computes the Pearson correlation between the query and every other gene across the included samples, on log₂ values, and lists the 30 most positively and 30 most negatively correlated genes. Click a partner to plot the pair with an ordinary least-squares fit and its 95% confidence band.
+Enter a query gene. benchsiDE computes the Pearson correlation between the query and every other gene across the included samples, on log₂ values, and lists the most positively and most negatively correlated genes (30, 100 or 300 per direction). Each row gives r, the slope of the ordinary least-squares regression of the gene on the query gene (log₂ units per log₂ unit), and the p-value for r = 0 (t test with n − 2 degrees of freedom). Click a column header to sort; **Export all (CSV)** writes every gene. Click a partner to plot the pair with the least-squares fit and its 95% confidence band. r, slope and p are validated against R `cor`, `lm` and `cor.test` (VALIDATION.md).
 
 With few samples, correlations are imprecise: at n = 8, a correlation of 0.7 has a 95% confidence interval (Fisher z) of approximately −0.01 to 0.94. Treat co-expression lists as hypotheses.
 

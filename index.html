@@ -94,6 +94,25 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
       <option value="1.5">paper fonts (1.5&times;)</option>
       <option value="2">poster fonts (2&times;)</option>
     </select>
+    <span id="lblwrap" style="display:none">
+      <select id="lblang" class="act ghost" title="Orientation of axis tick labels in every plot and export. Auto chooses horizontal, wrapped, 45&deg; or vertical so that no label is cut off.">
+        <option value="auto" selected>labels: auto</option>
+        <option value="0">labels: horizontal</option>
+        <option value="45">labels: 45&deg;</option>
+        <option value="90">labels: vertical</option>
+      </select>
+      <select id="lblsize" class="act ghost" title="Font size of axis tick labels (before the screen/paper/poster scaling).">
+        <option value="auto" selected>label size: auto</option>
+        <option value="8">label size: 8</option><option value="9">label size: 9</option><option value="10">label size: 10</option>
+        <option value="11">label size: 11</option><option value="12">label size: 12</option><option value="14">label size: 14</option>
+        <option value="16">label size: 16</option>
+      </select>
+      <select id="lbllong" class="act ghost" title="Long labels: wrap onto several lines (default), keep at full length on one line, or shorten with an ellipsis. Wrap and full length never cut a label off; the figure grows instead.">
+        <option value="wrap" selected>long labels: wrap</option>
+        <option value="full">long labels: full length</option>
+        <option value="short">long labels: shorten</option>
+      </select>
+    </span>
     <button class="act" id="sumfigbtn" style="display:none">Summary figure</button>
     <button class="act" id="reportbtn" style="display:none">Generate report</button>
     <button class="act ghost" id="savesess" style="display:none">Save session</button>
@@ -179,8 +198,9 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
         <button class="act" id="analyze">Analyze &rarr;</button>
       </div>
       <div id="grouptypenote" class="footer-note" style="margin-bottom:8px"></div>
+      <div id="setupcheck" style="margin:0 0 8px"></div>
       <details>
-        <summary style="cursor:pointer;font-size:13px;color:var(--muted)">Edit sample &rarr; group assignments</summary>
+        <summary style="cursor:pointer;font-size:13px;color:var(--muted)">Edit the design: sample groups and other columns (for example a patient column for paired samples)</summary>
         <div id="groupeditor" style="margin-top:8px"></div>
       </details>
     </div>
@@ -192,6 +212,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
   <div class="card">
     <h3>Samples included in all statistics (toggle to recompute everything live)</h3>
     <div id="samplebar"></div>
+    <div id="dashcheck" style="margin-top:8px"></div>
   </div>
 
   <div id="pane-overview" class="tabpane active">
@@ -266,6 +287,15 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
       </div>
       <div class="footer-note">ANOVA and Kruskal&ndash;Wallis on log&#8322; values across included samples; groups need &ge;2 included samples.
         Trend = Spearman correlation with numeric group value (shown only when group labels are numeric, e.g. time or dose).</div>
+    </div>
+    <div class="card" id="genebcard" style="display:none">
+      <h3>This gene in the comparison datasets</h3>
+      <div class="controls">
+        gene: <input type="text" id="genebq" placeholder="follows the gene above" style="width:170px">
+        <button class="act ghost" id="genebbtn">Show</button>
+        <span class="footer-note">Each panel uses that dataset's own normalization, groups and statistics; values are never merged across datasets. Genes are matched by symbol, by ortholog for another species, or through a custom ID map. Type a symbol to look up a gene that is not in the session.</span>
+      </div>
+      <div id="genebout"></div>
     </div>
     <div class="card" id="comparecard" style="display:none">
       <h3>Multi-gene comparison (group means)
@@ -350,11 +380,13 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
           <input type="text" id="cosearch" placeholder="Search gene" autocomplete="off" style="width:260px">
           <div id="cosuggest" class="suggest"></div>
         </div>
+        show top <select id="coN"><option value="30" selected>30</option><option value="100">100</option><option value="300">300</option></select> per direction
+        <button class="act ghost" id="coexp" style="display:none" title="All genes with r, slope and p for the current query gene">Export all (CSV)</button>
         <span id="coinfo" class="footer-note"></span>
       </div>
       <div class="grid2">
         <div>
-          <h3 style="font-size:13px">Most correlated genes across included samples (click to plot pair)</h3>
+          <h3 style="font-size:13px">Most correlated genes across included samples (click a gene to plot the pair; click a column header to sort)</h3>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div id="copos" style="max-height:430px;overflow-y:auto"></div>
             <div id="coneg" style="max-height:430px;overflow-y:auto"></div>
@@ -573,7 +605,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
     <div class="card" id="cmpfam" style="display:none">
       <h3>Homology families: many-to-many orthologs, scored as modules</h3>
       <div class="controls">
-        Dataset: <select id="famds"></select>
+        X: <select id="famx"></select> &nbsp; Y: <select id="famds"></select>
         <button class="act" id="famrun">Score families</button>
         <button class="act ghost" id="famclear" style="display:none">Clear</button>
         <button class="act ghost" id="famexp" style="display:none">Export CSV</button>
@@ -635,6 +667,17 @@ const PAL=["#4C78A8","#F58518","#54A24B","#E45756","#72B7B2","#9467bd","#8c564b"
 const PL={displayModeBar:"hover", displaylogo:false, responsive:true,
   modeBarButtonsToRemove:["select2d","lasso2d","autoScale2d","zoomIn2d","zoomOut2d"],
   toImageButtonOptions:{format:"svg", filename:"benchside_plot"}};
+["lblang","lblsize","lbllong"].forEach(id=>el(id).addEventListener("change",()=>{
+  LABELCFG={angle:el("lblang").value, size:el("lblsize").value, long:el("lbllong").value};
+  if(S&&S.length) refreshTab(curTab);
+}));
+el("coN").addEventListener("change",()=>{ if(coGene!==null) drawCoexp(); });
+el("coexp").addEventListener("click",()=>{
+  if(coGene===null||!coR) return;
+  const rows=["gene,r,slope,p"];
+  for(let g=0;g<nG;g++) if(g!==coGene) rows.push([GENES[g].replace(/,/g,";"), coR[g].toFixed(5), coB[g].toFixed(5), coP[g].toExponential(4)].join(","));
+  downloadCSV(rows.join("\n"), "coexpression_"+GENES[coGene].split(" (")[0]+".csv");
+});
 function applyExpSize(){
   const v=el("expsize").value;
   if(v){ const [w,h]=v.split("x").map(Number);
@@ -645,9 +688,10 @@ const AXX=()=>({title:NUMERIC?FACTOR:"", tickvals:GROUPS.map(g=>GX[g]), ticktext
 /* global figure font scaling: every render path (live plots, SVG download, summary
    and panel exports) goes through Plotly.react, so one wrapper scales them all.
    Trace/layout objects are rebuilt on every draw, so in-place scaling is safe. */
-const APP_VERSION="0.19.5-beta (2026-09-25)";
+const APP_VERSION="0.20.0-beta (2026-09-29)";
 document.getElementById("appver").textContent="v"+APP_VERSION;
 let FONTSCALE=1;
+let LABELCFG={angle:"auto", size:"auto", long:"wrap"};   // axis tick-label controls (header)
 function fontWalk(o){
   if(Array.isArray(o)){ o.forEach(fontWalk); return; }
   if(!o||typeof o!=="object"||ArrayBuffer.isView(o)) return;
@@ -684,6 +728,24 @@ function truncToPx(s, size, px){
   let lo=2, hi=s.length-1;
   while(lo<hi){ const md=(lo+hi+1)>>1; if(textW(cut(md),size)<=px) lo=md; else hi=md-1; }
   return cut(lo);
+}
+function wrapLabel(s, size, px){
+  // greedy line filling at spaces, underscores, hyphens, slashes and dots (the break character stays on
+  // the first line); a single token wider than the line is split by characters
+  s=String(s);
+  if(textW(s,size)<=px) return s;
+  const toks=s.match(/[^\s_\-\/.]+[\s_\-\/.]*|[\s_\-\/.]+/g)||[s];
+  const lines=[]; let cur="";
+  for(let t of toks){
+    if(cur&&textW((cur+t).trimEnd(),size)>px){ lines.push(cur.trimEnd()); cur=""; }
+    while(textW(t.trimEnd(),size)>px&&t.length>1){
+      let k=t.length; while(k>1&&textW(t.slice(0,k),size)>px) k--;
+      lines.push(t.slice(0,k)); t=t.slice(k);
+    }
+    cur+=t;
+  }
+  if(cur.trim()) lines.push(cur.trimEnd());
+  return lines.join("<br>");
 }
 function truncAll(cats, size, px){
   let out=cats.map(c=>truncToPx(c,size,px));
@@ -738,58 +800,90 @@ function layoutGuard(div, traces, L){
   const ya=L.yaxis||{}, xa=L.xaxis||{};
   const onY=t=>!t.yaxis||t.yaxis==="y", onX=t=>!t.xaxis||t.xaxis==="x";
   if(ya.showticklabels!==false&&ya.visible!==false){
-    const ys=(ya.tickfont&&ya.tickfont.size)||base;
-    let yw=0;
-    if(Array.isArray(ya.ticktext)&&ya.ticktext.length) yw=Math.max(...ya.ticktext.map(v=>textW(v,ys)));
+    const LC=LABELCFG;
+    let ys=(ya.tickfont&&ya.tickfont.size)||base;
+    const Y={};
+    if(LC.size!=="auto"){ ys=+LC.size*(FONTSCALE||1); Y.tickfont=Object.assign({}, ya.tickfont||{}, {size:ys}); }
+    const authY=Array.isArray(ya.ticktext)&&ya.ticktext.length;
+    let labs=null;
+    if(authY) labs=ya.ticktext.map(String);
     else {
       const cats=[]; tr.filter(onY).forEach(t=>{ if(Array.isArray(t.y)) for(const v of t.y){ if(typeof v==="string"){ cats.push(v); if(cats.length>600) break; } } });
-      yw= cats.length? Math.max(...cats.map(v=>textW(v,ys))) : 4.5*0.58*ys;
+      if(cats.length) labs=[...new Set(cats)];
     }
     const yt=ya.title? (typeof ya.title==="string"?ya.title:ya.title.text) : "";
     const extra=6+(yt? base*1.15+8 : 0);
-    const need=yw+extra;
-    if(need>M.l) M.l=Math.min(360, Math.ceil(need));
-    if(need>360){
-      // cap reached: truncate displayed labels (full names stay in hover)
-      const ys=(ya.tickfont&&ya.tickfont.size)||base;
-      if(Array.isArray(ya.ticktext)&&ya.ticktext.length){
-        L.yaxis=Object.assign({}, ya, {ticktext:truncAll(ya.ticktext.map(String), ys, 360-extra)});
-      } else {
-        const cats=[...new Set([].concat(...tr.filter(onY).map(t=>Array.isArray(t.y)? t.y.filter(v=>typeof v==="string") : [])))];
-        if(cats.length) L.yaxis=Object.assign({}, ya, {tickmode:"array", tickvals:cats, ticktext:truncAll(cats, ys, 360-extra)});
-      }
+    const divW=(div&&div.clientWidth)||620;
+    const CAPL = LC.long==="short"? 360 : Math.max(200, Math.min(520, divW-260));
+    const widest=a=>Math.max(...a.map(v=>Math.max(...String(v).split("<br>").map(p=>textW(p,ys)))));
+    let yw = labs? widest(labs) : 4.5*0.58*ys;
+    if(labs && yw+extra>CAPL && LC.long!=="short"){
+      // wrap long category labels onto up to three lines instead of shortening them
+      const w=labs.map(v=>wrapLabel(String(v).replace(/<br>/g," "), ys, CAPL-extra));
+      if(widest(w)<yw){ labs=w; yw=widest(w);
+        if(authY) Y.ticktext=labs; else { const orig=[...new Set([].concat(...tr.filter(onY).map(t=>Array.isArray(t.y)? t.y.filter(v=>typeof v==="string") : [])))]; Y.tickmode="array"; Y.tickvals=orig; Y.ticktext=labs; } }
     }
+    const need=yw+extra;
+    if(need>M.l) M.l=Math.min(CAPL, Math.ceil(need));
+    if(need>CAPL&&labs){
+      const tl=truncAll(labs.map(v=>String(v).replace(/<br>/g," ")), ys, CAPL-extra);
+      if(authY) Y.ticktext=tl;
+      else { const orig=[...new Set([].concat(...tr.filter(onY).map(t=>Array.isArray(t.y)? t.y.filter(v=>typeof v==="string") : [])))]; Y.tickmode="array"; Y.tickvals=orig; Y.ticktext=tl; }
+    }
+    if(Object.keys(Y).length) L.yaxis=Object.assign({}, ya, Y);
   }
-  // ---- bottom: first x axis tick labels (auto-angle aware) + title ----
+  // ---- bottom: first x axis tick labels ----
+  // The angle is decided here and written to the layout, so the margin computed below matches what
+  // Plotly draws. Long labels are wrapped (or kept at full length) and the margin and figure grow to fit;
+  // they are shortened only when the user chooses "shortened".
   if(xa.showticklabels!==false&&xa.visible!==false){
-    const xs=(xa.tickfont&&xa.tickfont.size)||base;
+    const LC=LABELCFG;
+    let xs=(xa.tickfont&&xa.tickfont.size)||base;
+    const X={}; // changes to write
+    if(LC.size!=="auto"){ xs=+LC.size*(FONTSCALE||1); X.tickfont=Object.assign({}, xa.tickfont||{}, {size:xs}); }
     let xh=xs+4;
     const authTT=Array.isArray(xa.ticktext)&&xa.ticktext.length;
     const cats=[]; if(!authTT) tr.filter(onX).forEach(t=>{ if(Array.isArray(t.x)) for(const v of t.x){ if(typeof v==="string"){ cats.push(v); if(cats.length>300) break; } } });
     const uc= authTT? xa.ticktext.map(String) : [...new Set(cats)];
+    const CAP = LC.long==="short"? 320 : 640;
     if(uc.length){
-      const mw=Math.max(...uc.map(v=>textW(v,xs)));
-      let ang=xa.tickangle;
-      if(ang===undefined||ang==="auto"){
-        if(uc.length*(mw+6)<=plotW) ang=0;
-        else if(uc.length*2*xs<=plotW) ang=30;
-        else ang=90;
+      const plain=uc.map(v=>String(v).replace(/<br>/g," "));
+      const slot=Math.max(40, plotW/uc.length-18);   // leaves at least ~18 px between neighbouring labels
+      let labs=uc.slice(), ang;
+      const userAng = LC.angle!=="auto"? +LC.angle : (xa.tickangle!==undefined&&xa.tickangle!=="auto"? +xa.tickangle : null);
+      const widest=a=>Math.max(...a.map(v=>Math.max(...String(v).split("<br>").map(p=>textW(p,xs)))));
+      if(userAng!==null){
+        ang=userAng;
+        if(ang===0&&LC.long==="wrap") labs=plain.map(v=>wrapLabel(v,xs,slot));
+        else if(ang===0&&LC.long==="short"&&widest(plain)>slot) labs=truncAll(plain, xs, slot);
+      } else if(uc.length*(widest(uc)+6)<=plotW){ ang=0; }
+      else {
+        const w=LC.long==="wrap"? plain.map(v=>wrapLabel(v,xs,slot)) : null;
+        if(w&&widest(w)<=slot&&Math.max(...w.map(v=>v.split("<br>").length))<=3){ labs=w; ang=0; }
+        else ang = uc.length*2*xs<=plotW? 45 : 90;
       }
       const a=Math.abs(ang)*Math.PI/180;
-      xh=mw*Math.sin(a)+xs*Math.cos(a)+4;
+      const lines=Math.max(...labs.map(v=>String(v).split("<br>").length));
+      xh = ang===0? lines*xs*1.25+4 : widest(labs)*Math.sin(a)+xs*Math.cos(a)+4;
+      X.tickangle=ang;
+      if(labs.some((v,i)=>v!==uc[i])){ if(authTT) X.ticktext=labs; else { X.tickmode="array"; X.tickvals=uc; X.ticktext=labs; } }
+      const xt=xa.title? (typeof xa.title==="string"?xa.title:xa.title.text) : "";
+      const extra=6+(xt? base*1.15+10 : 0);
+      const need=xh+extra;
+      if(need>M.b) M.b=Math.min(CAP, Math.ceil(need));
+      if(need>CAP){
+        // only reachable with "shortened", or with labels longer than the 640 px ceiling
+        const s2=Math.max(0.35, Math.sin(Math.abs(ang||90)*Math.PI/180));
+        const budget=(CAP-extra-xs-4)/s2;
+        X.ticktext=truncAll(plain, xs, budget);
+        if(!authTT){ X.tickmode="array"; X.tickvals=uc; }
+      }
+    } else {
+      const xt=xa.title? (typeof xa.title==="string"?xa.title:xa.title.text) : "";
+      const need=xh+6+(xt? base*1.15+10 : 0);
+      if(need>M.b) M.b=Math.min(CAP, Math.ceil(need));
     }
-    const xt=xa.title? (typeof xa.title==="string"?xa.title:xa.title.text) : "";
-    const extra=6+(xt? base*1.15+10 : 0);
-    const need=xh+extra;
-    if(need>M.b) M.b=Math.min(320, Math.ceil(need));
-    if(need>320&&uc.length){
-      const xs=(xa.tickfont&&xa.tickfont.size)||base;
-      let ang=xa.tickangle; if(ang===undefined||ang==="auto") ang=90;
-      const s=Math.max(0.35, Math.sin(Math.abs(ang)*Math.PI/180));
-      const budget=(320-extra-xs-4)/s;
-      L.xaxis= authTT? Object.assign({}, xa, {ticktext:truncAll(uc, xs, budget), tickangle:ang})
-                     : Object.assign({}, xa, {tickmode:"array", tickvals:uc, ticktext:truncAll(uc, xs, budget), tickangle:ang});
-    }
+    if(Object.keys(X).length) L.xaxis=Object.assign({}, xa, X);
   }
 }
 function plotAreaGuard(div, L){
@@ -808,11 +902,187 @@ function plotAreaGuard(div, L){
     M.l=Math.max(40, Math.min(M.l, spare));
   }
 }
+/* ================= figure data export: Excel workbook laid out for GraphPad Prism ================= */
+const CRC_T=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC_T[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function utf8(str){
+  if(typeof TextEncoder!=="undefined") return new TextEncoder().encode(str);
+  const out=[]; for(const ch of String(str)){ let c=ch.codePointAt(0);
+    if(c<0x80) out.push(c); else if(c<0x800) out.push(0xc0|c>>6, 0x80|c&63);
+    else if(c<0x10000) out.push(0xe0|c>>12, 0x80|c>>6&63, 0x80|c&63);
+    else out.push(0xf0|c>>18, 0x80|c>>12&63, 0x80|c>>6&63, 0x80|c&63); }
+  return Uint8Array.from(out); }
+function zipStore(files){
+  // files: [{name, data:Uint8Array}] -> Uint8Array of a ZIP archive (stored, no compression)
+  const parts=[], central=[]; let off=0;
+  const u16=v=>[v&255,(v>>>8)&255], u32=v=>[v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];
+  for(const f of files){
+    const nm=utf8(f.name), crc=crc32(f.data), sz=f.data.length;
+    const hdr=[0x50,0x4b,0x03,0x04, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(sz), ...u32(sz), ...u16(nm.length), ...u16(0)];
+    parts.push(Uint8Array.from(hdr), nm, f.data);
+    central.push(Uint8Array.from([0x50,0x4b,0x01,0x02, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(sz), ...u32(sz), ...u16(nm.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), nm);
+    off+=hdr.length+nm.length+sz;
+  }
+  const cdSize=central.reduce((a,p)=>a+p.length,0);
+  const end=Uint8Array.from([0x50,0x4b,0x05,0x06, ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cdSize), ...u32(off), ...u16(0)]);
+  const all=parts.concat(central,[end]); const n=all.reduce((a,p)=>a+p.length,0);
+  const out=new Uint8Array(n); let p=0; for(const a of all){ out.set(a,p); p+=a.length; } return out;
+}
+function xmlEsc(v){ return String(v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function xlsxColName(i){ let s2=""; i++; while(i>0){ const m=(i-1)%26; s2=String.fromCharCode(65+m)+s2; i=Math.floor((i-1)/26); } return s2; }
+function xlsxBytes(sheets){
+  // sheets: [{name, rows:[[cell,...],...]}]; numbers are written as numbers, everything else as text
+  const safe=nm=>String(nm).replace(/[\[\]:*?\/\\]/g," ").slice(0,31)||"Sheet";
+  const files=[];
+  const sheetXml=rows=>{
+    let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+    rows.forEach((row,r)=>{ x+=`<row r="${r+1}">`;
+      row.forEach((v,c)=>{ if(v===null||v===undefined||v==="") return; const ref=xlsxColName(c)+(r+1);
+        if(typeof v==="number"){ if(isFinite(v)) x+=`<c r="${ref}"><v>${v}</v></c>`; }
+        else x+=`<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`; });
+      x+="</row>"; });
+    return x+"</sheetData></worksheet>"; };
+  files.push({name:"[Content_Types].xml", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+    sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")+'</Types>')});
+  files.push({name:"_rels/.rels", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')});
+  const used=new Set(); const names=sheets.map(sh=>{ let n=safe(sh.name), k=2; while(used.has(n.toLowerCase())) n=safe(sh.name).slice(0,28)+" "+(k++); used.add(n.toLowerCase()); return n; });
+  files.push({name:"xl/workbook.xml", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+
+    names.map((n,i)=>`<sheet name="${xmlEsc(n)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")+'</sheets></workbook>')});
+  files.push({name:"xl/_rels/workbook.xml.rels", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    names.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")+
+    `<Relationship Id="rId${names.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`)});
+  files.push({name:"xl/styles.xml", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')});
+  sheets.forEach((sh,i)=>files.push({name:`xl/worksheets/sheet${i+1}.xml`, data:utf8(sheetXml(sh.rows))}));
+  return zipStore(files);
+}
+function plainText(v){ return String(v===undefined||v===null?"":v).replace(/<br>/g," ").replace(/<[^>]+>/g,"").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").trim(); }
+function axisTitle(ax){ return ax&&ax.title? plainText(typeof ax.title==="string"? ax.title : ax.title.text) : ""; }
+function plotToSheets(data, layout){
+  // Converts the traces behind a figure into (1) a sheet laid out as a GraphPad Prism data table,
+  // (2) every plotted value in long format, (3) notes on the layout and how to import it.
+  const L=layout||{}, xa=L.xaxis||{}, ya=L.yaxis||{};
+  // helper traces: CI bands, fitted/reference lines, hidden traces (all still listed under 'All values')
+  const isHelper=t=>t.hoverinfo==="skip"||t.fill==="toself"||(t.marker&&t.marker.opacity===0)||t.visible===false||t.visible==="legendonly"||(t.mode==="lines"&&t.showlegend===false);
+  const tr=(data||[]).filter(t=>t&&!isHelper(t));
+  const title=plainText(L.title&&(L.title.text||L.title)), xt=axisTitle(xa), yt=axisTitle(ya);
+  const catMap=ax=>{ if(!Array.isArray(ax.tickvals)||!Array.isArray(ax.ticktext)||!ax.tickvals.every(v=>typeof v==="number")) return null;
+    const tv=ax.tickvals, tt=ax.ticktext.map(plainText);
+    return v=>{ if(typeof v!=="number") return plainText(v); let b=-1, bd=Infinity; tv.forEach((u,i)=>{ const d=Math.abs(u-v); if(d<bd){ bd=d; b=i; } });
+      const gap=tv.length>1? Math.min(...tv.slice(1).map((u,i)=>Math.abs(u-tv[i]))) : 1; return bd<=gap*0.5? tt[b] : null; }; };
+  const cx=catMap(xa), cy=catMap(ya);
+  const errOf=(e,i,minus)=>{ if(!e||e.visible===false) return null; const arr=minus&&e.arrayminus? e.arrayminus : e.array; return Array.isArray(arr)? arr[i] : null; };
+  const lab=(t,i)=>{ const x=Array.isArray(t.text)? t.text[i] : (Array.isArray(t.hovertext)? t.hovertext[i] : null); return x!==null&&x!==undefined? plainText(x) : ""; };
+  // long format: every value in the figure
+  const long=[["series","type","label","x","x category","y","y category","x error -","x error +","y error -","y error +"]];
+  const heat=tr.filter(t=>t.type==="heatmap");
+  (data||[]).filter(t=>t&&t.type!=="heatmap"&&t.visible!==false&&t.fill!=="toself").forEach(t=>{
+    const nm=plainText(t.name||""), n=Math.max(Array.isArray(t.x)?t.x.length:0, Array.isArray(t.y)?t.y.length:0);
+    for(let i=0;i<n;i++){
+      const x=Array.isArray(t.x)? t.x[i] : (t.type==="box"||t.type==="violin"? nm : null), y=Array.isArray(t.y)? t.y[i] : null;
+      long.push([nm, t.type||"scatter", lab(t,i), typeof x==="number"?x:null, typeof x==="number"? (cx?cx(x):"") : plainText(x), typeof y==="number"?y:null,
+        typeof y==="number"? (cy?cy(y):"") : plainText(y), errOf(t.error_x,i,true)??(errOf(t.error_x,i,false)), errOf(t.error_x,i,false), errOf(t.error_y,i,true)??(errOf(t.error_y,i,false)), errOf(t.error_y,i,false)]);
+    }
+  });
+  heat.forEach(t=>{ const xs=t.x||[], ys=t.y||[]; (t.z||[]).forEach((row,r)=>row.forEach((v,c)=>long.push([plainText(t.name||"heatmap"),"heatmap","",null,plainText(xs[c]!==undefined?xs[c]:c),typeof v==="number"?v:null,plainText(ys[r]!==undefined?ys[r]:r),null,null,null,null]))); });
+  let prism=null, kind="", howto="";
+  // (a) heatmap -> matrix
+  if(heat.length){
+    const t=heat[0]; const cyh=catMap(ya);
+    const xs=(t.x||[]).map(v=>typeof v==="number"&&cx? (cx(v)||String(v)) : plainText(v)), ys=(t.y||[]).map(v=>typeof v==="number"&&cyh? (cyh(v)||String(v)) : plainText(v));
+    prism=[[""].concat(xs.length?xs:(t.z[0]||[]).map((_,c)=>String(c+1)))].concat((t.z||[]).map((row,r)=>[ys[r]!==undefined?ys[r]:String(r+1)].concat(row.map(v=>typeof v==="number"?v:null))));
+    kind="Grouped (row titles = first column, one column per sample or group)"; howto="Create a Grouped table with one replicate per cell, then import or paste the sheet with row titles.";
+  }
+  // (b) one column per group: box/violin traces, or point clouds that sit on a single category
+  const pointCol=t=>{ if(t.type==="box"||t.type==="violin") return plainText(t.name||t.x0||"");
+    if(t.type==="bar"||!Array.isArray(t.x)||!Array.isArray(t.y)||t.error_y&&t.error_y.visible!==false&&t.y.length===1) return null;
+    if(typeof t.x[0]==="string"){ return t.x.every(v=>v===t.x[0])? plainText(t.x[0]) : null; }
+    if(!cx) return null; const c0=cx(t.x[0]); return c0&&t.x.every(v=>cx(v)===c0)? c0 : null; };
+  const summary=t=>/^(mean|median)/i.test(String(t.name||""))||(t.type==="bar"&&t.error_y&&t.error_y.visible!==false);
+  const cols=[];
+  if(!prism){
+    const raw=tr.filter(t=>!summary(t));
+    const pc=raw.map(t=>({t, c:pointCol(t)}));
+    if(pc.length&&pc.every(o=>o.c)){
+      const order=[]; const byC={}, labC={};
+      pc.forEach(o=>{ if(!byC[o.c]){ byC[o.c]=[]; labC[o.c]=[]; order.push(o.c); }
+        o.t.y.forEach((v,i)=>{ if(typeof v==="number"){ byC[o.c].push(v); labC[o.c].push(lab(o.t,i)); } }); });
+      const nMax=Math.max(...order.map(c=>byC[c].length));
+      prism=[order].concat(Array.from({length:nMax},(_,r)=>order.map(c=>byC[c][r]!==undefined?byC[c][r]:null)));
+      cols.push({name:"Sample IDs", rows:[order].concat(Array.from({length:nMax},(_,r)=>order.map(c=>labC[c][r]||null)))});
+      kind="Column"; howto="Create a Column table (enter replicate values stacked into columns), then import or paste the sheet with the first row as column titles.";
+    }
+  }
+  // (c) bars with categorical x, one value per category -> grouped table (row = category, column = series)
+  if(!prism){
+    const bars=tr.filter(t=>t.type==="bar"&&Array.isArray(t.x)&&Array.isArray(t.y));
+    if(bars.length&&bars.length===tr.length){
+      const catOf=(t,i)=>typeof t.x[i]==="string"? plainText(t.x[i]) : (cx?cx(t.x[i]):String(t.x[i]));
+      const cats=[]; bars.forEach(t=>t.x.forEach((_,i)=>{ const c=catOf(t,i); if(!cats.includes(c)) cats.push(c); }));
+      const hdr=[""]; bars.forEach(t=>{ hdr.push(plainText(t.name||"value")); if(t.error_y&&t.error_y.visible!==false) hdr.push(plainText(t.name||"value")+" error"); });
+      prism=[hdr].concat(cats.map(c=>{ const row=[c]; bars.forEach(t=>{ const i=t.x.findIndex((_,k)=>catOf(t,k)===c);
+        row.push(i>=0?t.y[i]:null); if(t.error_y&&t.error_y.visible!==false) row.push(i>=0?errOf(t.error_y,i,false):null); }); return row; }));
+      kind="Grouped"; howto="Create a Grouped table (one value per cell; add an error column format if error values are present), then import the sheet with row titles.";
+    }
+  }
+  // (c2) categories on the y axis, values on x (forest plots, horizontal dot plots) -> grouped table
+  if(!prism&&cy){
+    const hz=tr.filter(t=>Array.isArray(t.x)&&Array.isArray(t.y)&&t.x.every(v=>typeof v==="number")&&t.y.every(v=>typeof v==="number"));
+    if(hz.length&&hz.length===tr.length){
+      const hdr=[""]; hz.forEach(t=>{ const nm=plainText(t.name||xt||"value"); hdr.push(nm);
+        if(t.error_x&&t.error_x.visible!==false){ hdr.push(nm+" lower"); hdr.push(nm+" upper"); } });
+      prism=[hdr];
+      const cats=[]; hz.forEach(t=>t.y.forEach(v=>{ const c=cy(v); if(c!==null&&!cats.includes(c)) cats.push(c); }));
+      cats.forEach(c=>{ const row=[c];
+        hz.forEach(t=>{ const i=t.y.findIndex(v=>cy(v)===c); const x=i>=0?t.x[i]:null; row.push(x);
+          if(t.error_x&&t.error_x.visible!==false){ const em=errOf(t.error_x,i,true), ep=errOf(t.error_x,i,false);
+            row.push(x!==null&&em!==null?x-em:null); row.push(x!==null&&ep!==null?x+ep:null); } });
+        prism.push(row); });
+      kind="Grouped"; howto="Create a Grouped table; the value columns and their lower/upper limits can be entered in Prism's 'Mean, lower limit, upper limit' format (or plotted directly as a horizontal scatter with error bars).";
+    }
+  }
+  // (d) XY: one X column, one Y column per series, stacked; row titles from point labels
+  if(!prism){
+    const xy=tr.filter(t=>Array.isArray(t.x)&&Array.isArray(t.y)&&t.x.every(v=>typeof v==="number"||v===null));
+    if(xy.length){
+      const names=xy.map((t,k)=>plainText(t.name||(xy.length===1&&yt? yt : (yt? yt+" "+(k+1) : "series "+(k+1)))));
+      const hasErr=xy.map(t=>!!(t.error_y&&t.error_y.visible!==false));
+      const hdr=["Label", xt||"X"]; names.forEach((n,k)=>{ hdr.push(n); if(hasErr[k]) hdr.push(n+" error"); });
+      prism=[hdr];
+      xy.forEach((t,k)=>t.x.forEach((x,i)=>{ const row=[lab(t,i)||(cy&&typeof t.y[i]==="number"?cy(t.y[i]):"")||"", x];
+        names.forEach((_,k2)=>{ row.push(k2===k&&typeof t.y[i]==="number"?t.y[i]:null); if(hasErr[k2]) row.push(k2===k?errOf(t.error_y,i,false):null); });
+        prism.push(row); }));
+      kind="XY"; howto="Create an XY table (X values, one Y data set per series; choose row titles if you want the labels), then import the sheet with the first row as column titles.";
+    }
+  }
+  const notes=[["Figure", title],["X axis", xt],["Y axis", yt],["Prism table type", kind||"(no single Prism layout; use the long-format sheet)"],["Import", howto||"Use the long-format sheet."],
+    ["Source", "benchsiDE "+APP_VERSION],["Exported", new Date().toISOString().slice(0,19).replace("T"," ")],
+    ["Notes", "The 'Prism' sheet holds the plotted data in the layout of the Prism table type above. 'All values' lists every plotted point with its series, label and error values. Summary traces (means, error bars) are reported in 'All values'; the Prism sheet holds the individual values so Prism can compute its own summaries."]];
+  const sheets=[];
+  if(prism) sheets.push({name:"Prism", rows:prism});
+  cols.forEach(c=>sheets.push(c));
+  sheets.push({name:"All values", rows:long});
+  sheets.push({name:"Notes", rows:notes});
+  return {sheets, kind};
+}
+function exportPlotData(gd){
+  const data=gd.data||[], layout=gd.layout||{};
+  const {sheets}=plotToSheets(data, layout);
+  const bytes=xlsxBytes(sheets);
+  const base=(plainText(layout.title&&(layout.title.text||layout.title))||gd.id||"figure").replace(/[^\w\-]+/g,"_").replace(/^_+|_+$/g,"").slice(0,60)||"figure";
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+  a.download=base+"_data.xlsx"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+const DATA_BTN={name:"Download data (Excel, GraphPad Prism layout)", icon:{width:1000, height:1000,
+  path:"M100 100h800v800H100z M160 160v160h300V160z M540 160v160h300V160z M160 400v160h300V400z M540 400v160h300V400z M160 640v160h300V640z M540 640v160h300V640z"},
+  click:gd=>exportPlotData(gd)};
 const _plreact=Plotly.react.bind(Plotly);
 Plotly.react=function(div,traces,layout,cfg){
   if(FONTSCALE!==1){ fontWalk(traces); fontWalk(layout); }
   const d0=typeof div==="string"? document.getElementById(div) : div;
   try{ layoutGuard(d0, traces, layout); plotAreaGuard(d0, layout); }catch(e){}
+  if(cfg&&cfg.displayModeBar!==false&&!(cfg.modeBarButtonsToAdd||[]).includes(DATA_BTN))
+    cfg=Object.assign({}, cfg, {modeBarButtonsToAdd:(cfg.modeBarButtonsToAdd||[]).concat([DATA_BTN])});
   return _plreact(div,traces,layout,cfg);
 };
 const jitterGap=()=>{ const xs=GROUPS.map(g=>GX[g]).sort((a,b)=>a-b);
@@ -1201,6 +1471,15 @@ function parseDesignText(text, sampleNames){
       factors[fname]=m;
     }
   } else throw "Design file: no sample names match the matrix columns.";
+  // GEO series-matrix exports prefix every value with its characteristic name ("diagnosis: Psoriasis");
+  // when every value of a factor carries the same "key: " prefix, drop it
+  for(const fn of Object.keys(factors)){
+    const vals=Object.values(factors[fn]).filter(v=>v!=="NA"&&v!=="");
+    const m0=vals.length? /^([^:]{1,40}):\s+\S/.exec(vals[0]) : null;
+    if(m0 && vals.every(v=>v.startsWith(m0[1]+":"))){
+      for(const k of Object.keys(factors[fn])){ const v=factors[fn][k]; if(v.startsWith(m0[1]+":")) factors[fn][k]=v.slice(m0[1].length+1).trim(); }
+    }
+  }
   if(!Object.keys(factors).length)
     throw "Design file: sample names matched, but no factor rows/columns were found. If the file has only one visible line, it may use bare carriage-return line endings (classic Mac/Excel export): re-save with standard line endings, or re-drop it (this version normalizes them automatically).";
   return factors;
@@ -1237,10 +1516,33 @@ function onMatrixLoaded(text,fname){
   pending.groups=inferGroups(mx.sampleNames);
   renderSetup();
 }
+const COMBO_SEP=" \u00d7 ";
+function isCombo(fname){ return String(fname).indexOf(COMBO_SEP)>=0; }
+function baseFactorNames(){ return (pending&&pending.factorNames||[]).filter(f=>!isCombo(f)); }
+function rebuildCombos(){
+  // every pair of base factors is also offered as a combined grouping ("lesion \u00b7 Psoriasis")
+  if(!pending||!pending.factors) return;
+  Object.keys(pending.factors).forEach(f=>{ if(isCombo(f)) delete pending.factors[f]; });
+  const base=Object.keys(pending.factors);
+  const names=base.slice();
+  const nS0=pending.matrix.sampleNames.length;
+  const nLev=f=>new Set(Object.values(pending.factors[f]).filter(v=>v!=="NA")).size;
+  const combinable=base.filter(f=>nLev(f)>=2&&nLev(f)<Math.max(3,Math.floor(nS0/3)));
+  if(combinable.length>=2&&combinable.length<=6){
+    const base2=combinable;
+    for(let a=0;a<base2.length;a++) for(let b=a+1;b<base2.length;b++){
+      const fa=pending.factors[base2[a]], fb=pending.factors[base2[b]], m={};
+      pending.matrix.sampleNames.forEach(sn=>{ m[sn]=String(fa[sn]!==undefined?fa[sn]:"NA")+" \u00b7 "+String(fb[sn]!==undefined?fb[sn]:"NA"); });
+      const nm=base2[a]+COMBO_SEP+base2[b]; pending.factors[nm]=m; names.push(nm);
+    }
+  }
+  pending.factorNames=names;
+}
 function onDesignLoaded(text){
   if(!pending){ throw "Load the expression matrix first."; }
   pending.factors=parseDesignText(text,pending.matrix.sampleNames);
   pending.factorNames=Object.keys(pending.factors);
+  rebuildCombos();
   if(pending.factorNames.length){ applyFactor(pending.factorNames[0]); }
   renderSetup();
 }
@@ -1260,9 +1562,12 @@ function renderSetup(){
     (pending.factors?` · design factors: <b>${pending.factorNames.join(", ")}</b>`:" · no design file; groups guessed from sample names (edit below)");
   if(pending.factorNames.length>1){
     el("factorwrap").style.display="inline";
-    el("factorsel").innerHTML=pending.factorNames.map(f=>`<option>${f}</option>`).join("");
+    el("factorsel").innerHTML=pending.factorNames.map(f=>`<option>${esc(f)}</option>`).join("");
+    if(pending.factorNames.includes(FACTOR)) el("factorsel").value=FACTOR;
     el("factorsel").onchange=()=>{ applyFactor(el("factorsel").value); renderSetup(); };
   }
+  // other design columns (editable), so a subject/patient column can be added for paired designs
+  const cols=pending.factors? baseFactorNames().filter(f=>f!==FACTOR&&!(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(f))) : [];
   el("groupeditor").innerHTML=`
     <div class="controls" style="margin-bottom:6px" id="grpassign">
       <label><input type="checkbox" id="geall"> select all</label>
@@ -1273,10 +1578,160 @@ function renderSetup(){
       <button class="act ghost" id="gereset" title="re-infer groups from sample names">Reset to inferred</button>
       <span id="gecount" class="footer-note"></span>
     </div>
-    <table class="tbl"><tr><th></th><th>Sample</th><th>Group</th></tr>`+
-    mx.sampleNames.map((s,i)=>`<tr><td><input type="checkbox" class="gesel" data-q="${i}"></td><td style="cursor:pointer" class="gerow" data-q="${i}">${s}</td><td><input type="text" data-q="${i}" value="${pending.groups[i]}"></td></tr>`).join("")+`</table>`;
+    <div class="controls" style="margin-bottom:6px">
+      add a design column: <input type="text" id="gecolname" placeholder="e.g. Patient" style="width:110px">
+      <button class="act ghost" id="gecoladd" title="Adds an editable column, for example a patient or batch identifier. Samples that share a value are treated as coming from the same subject or block when the column is used as a covariate.">Add column</button>
+      <span class="footer-note">Other design columns can be edited in the table; the grouping factor is chosen above.</span>
+    </div>
+    <div style="max-height:460px;overflow:auto"><table class="tbl"><tr><th></th><th>Sample</th><th>Group</th>${cols.map(f=>`<th>${esc(f)}</th>`).join("")}</tr>`+
+    mx.sampleNames.map((s,i)=>`<tr><td><input type="checkbox" class="gesel" data-q="${i}"></td><td style="cursor:pointer" class="gerow" data-q="${i}">${s}</td><td><input type="text" data-q="${i}" value="${esc(pending.groups[i])}"></td>`+
+      cols.map(f=>`<td><input type="text" class="gefac" data-f="${esc(f)}" data-s="${esc(s)}" value="${esc(pending.factors[f][s]===undefined||pending.factors[f][s]==="NA"?"":pending.factors[f][s])}" style="width:110px"></td>`).join("")+`</tr>`).join("")+`</table></div>`;
   wireGroupAssign(mx);
+  wireDesignColumns(mx);
+  renderDesignCheck("setupcheck", pending.groups, designFactorsFor(mx.sampleNames, cols), {groupName:FACTOR});
   updateGroupTypeNote();
+}
+function designCheck(groups, facs){
+  // groups: grouping label per sample; facs: {factor: [value per sample]} (same sample order).
+  // For every pair of groups and every other factor, decide whether the factor can be adjusted for
+  // in that comparison (a design ~ group + factor restricted to the two groups has full rank).
+  const G=[...new Set(groups)].filter(g=>g!=="NA");
+  const out={groups:G, factors:[], notes:[]};
+  for(const f of Object.keys(facs)){
+    const v=facs[f];
+    const lv=[...new Set(v)].filter(x=>x!=="NA");
+    if(lv.length<2) continue;
+    const numeric=lv.length>2&&lv.every(x=>isFinite(Number(x)));
+    const tab={}; G.forEach(g=>{ tab[g]={}; lv.forEach(l=>tab[g][l]=0); });
+    groups.forEach((g,i)=>{ if(tab[g]&&v[i]!=="NA") tab[g][v[i]]++; });
+    const pairs=[];
+    for(let a=0;a<G.length;a++) for(let b=a+1;b<G.length;b++){
+      const A=G[a], B=G[b];
+      const vi=groups.map((g,i)=>(g===A||g===B)&&v[i]!=="NA"?i:-1).filter(i=>i>=0);
+      const vals=[...new Set(vi.map(i=>v[i]))];
+      let status;
+      if(vals.length<2) status="constant";
+      else if(numeric){
+        const within=g=>{ const x=vi.filter(i=>groups[i]===g).map(i=>Number(v[i])); return x.length&&x.some(y=>y!==x[0]); };
+        status=(within(A)||within(B))? "ok" : "confounded";
+      } else {
+        const lA=new Set(vi.filter(i=>groups[i]===A).map(i=>v[i])), lB=new Set(vi.filter(i=>groups[i]===B).map(i=>v[i]));
+        status=[...lA].some(l=>lB.has(l))? "ok" : "confounded";
+      }
+      pairs.push({a:A,b:B,status});
+    }
+    // groups whose samples all carry one level that no other group has
+    const aliased=[];
+    G.forEach(g=>{
+      const ls=lv.filter(l=>tab[g][l]>0);
+      if(!numeric&&ls.length===1&&G.every(h=>h===g||tab[h][ls[0]]===0)) aliased.push({group:g, level:ls[0]});
+    });
+    const manyLevels=!numeric&&lv.length>=Math.max(3,Math.floor(groups.length/3));
+    out.factors.push({name:f, levels:lv, numeric, table:tab, pairs, aliased, subjectLike:manyLevels});
+  }
+  const counts=G.map(g=>groups.filter(x=>x===g).length);
+  out.pairingHint = G.length>=2 && !out.factors.some(F=>F.subjectLike);
+  return out;
+}
+function renderDesignCheck(target, groups, facs, opts){
+  const box=el(target); if(!box) return;
+  const dc=designCheck(groups, facs);
+  opts=opts||{};
+  if(!dc.factors.length&&!dc.pairingHint&&!Object.keys(opts.allLevels||{}).length){ box.innerHTML=""; return; }
+  const bad=[], lines=[];
+  dc.factors.forEach(F=>{
+    F.aliased.forEach(al=>lines.push(`All <b>${esc(al.group)}</b> samples have ${esc(F.name)} = <b>${esc(al.level)}</b>, and no other group does. Every comparison involving ${esc(al.group)} is therefore also a comparison of ${esc(F.name)}, and ${esc(F.name)} cannot be adjusted for in those comparisons.`));
+    F.pairs.filter(p=>p.status==="confounded").forEach(p=>bad.push(`${esc(p.a)} vs ${esc(p.b)}: ${esc(F.name)}`));
+  });
+  const ok=[]; dc.factors.forEach(F=>F.pairs.filter(p=>p.status==="ok").forEach(p=>ok.push(`${esc(p.a)} vs ${esc(p.b)}: ${esc(F.name)}`)));
+  const tabs=dc.factors.map(F=>F.numeric? `<div class="footer-note">${esc(F.name)}: numeric covariate (${F.levels.length} distinct values).</div>` :
+    `<table class="tbl" style="width:auto;margin:4px 0"><tr><th>${esc(F.name)} \u2192</th>${F.levels.map(l=>`<th>${esc(l)}</th>`).join("")}</tr>`+
+    dc.groups.map(g=>`<tr><td><b>${esc(g)}</b></td>${F.levels.map(l=>{ const n=F.table[g][l];
+      const al=F.aliased.some(a=>a.group===g&&a.level===l);
+      return `<td style="text-align:center${al?";background:#fee2e2":n?"":";color:#cbd5e1"}">${n}</td>`; }).join("")}</tr>`).join("")+`</table>`).join("");
+  const restrict = opts.restrict? Object.keys(opts.allLevels||{}).map(f=>({name:f, levels:opts.allLevels[f]})).map(F=>
+    `<div class="controls" style="margin:2px 0">Include samples with ${esc(F.name)} = `+
+    F.levels.map(l=>`<label style="margin-right:8px"><input type="checkbox" class="dcrestrict" data-f="${esc(F.name)}" data-l="${esc(l)}" ${opts.isOn(F.name,l)?"checked":""}> ${esc(l)}</label>`).join("")+`</div>`).join("") : "";
+  box.innerHTML=`<div style="border:1px solid ${bad.length?"#fca5a5":"var(--border)"};background:${bad.length?"#fef2f2":"#f8fafc"};border-radius:8px;padding:8px 12px">
+    <b>Design check</b>${bad.length?` <span style="color:#b91c1c">(confounding found)</span>`:""}
+    ${lines.length?`<ul style="margin:4px 0 4px 18px">${lines.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}
+    ${bad.length?`<div class="footer-note"><b>Cannot adjust</b> (factor fully confounded with the comparison): ${bad.join("; ")}.</div>`:""}
+    ${ok.length?`<div class="footer-note"><b>Can adjust</b> (choose the factor under "adjust for" on the Differential Expression tab): ${ok.join("; ")}.</div>`:""}
+    ${dc.pairingHint?`<div class="footer-note">If the samples come from the same individuals (for example lesional and non-lesional biopsies from each patient), add a patient column ${opts.restrict?"in the review step (Load different data, then Edit the design)":"in the design editor below"} and use it as a covariate. This gives a paired analysis.</div>`:""}
+    ${(bad.length)?`<div class="footer-note">Options for a confounded comparison: restrict the samples to one level of the confounding factor${opts.restrict?" (below)":" (Overview tab, after analysis)"}, compare other groups, group by a combined factor in the review step (for example ${esc((opts.groupName||"group")+" \u00d7 "+(dc.factors[0]?dc.factors[0].name:"factor"))}), or report the comparison as confounded.</div>`:""}
+    <details style="margin-top:4px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">sample counts by group and factor</summary>${tabs}</details>
+    ${restrict}
+  </div>`;
+}
+function buildCovars(){
+  COVARS={};
+  if(pending&&pending.factors) for(const fn2 of (pending.factorNames||[])){
+    if(fn2===FACTOR||isCombo(fn2)||(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(fn2))) continue;
+    const fm=pending.factors[fn2];
+    COVARS[fn2]=S.map(s=>String(fm&&fm[s.id]!==undefined?fm[s.id]:"NA"));
+  }
+  const cvn=Object.keys(COVARS);
+  el("decovwrap").style.display=cvn.length?"inline":"none";
+  DECOVSEL=DECOVSEL.filter(f=>cvn.includes(f));
+  el("batchdispwrap").style.display=cvn.length?"inline":"none";
+  el("batchdisp").innerHTML='<option value="">off</option>'+cvn.map(f=>`<option>${f}</option>`).join("");
+  if(!cvn.includes(BATCHDISP)) BATCHDISP="";
+  el("decov").innerHTML=cvn.map(f=>`<label style="margin-right:8px"><input type="checkbox" class="decovbox" value="${f}" ${DECOVSEL.includes(f)?"checked":""}> ${f}</label>`).join("");
+}
+function dashDesignCols(){
+  if(!pending||!pending.factors) return [];
+  return baseFactorNames().filter(f=>f!==FACTOR&&!(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(f))&&pending.factors[f]);
+}
+function renderDashDesignCheck(){
+  if(!S||!S.length) return;
+  const cols=dashDesignCols();
+  const inc=S.map((s,i)=>i).filter(i=>included[i]);
+  const valOf=(f,i)=>{ const v=pending.factors[f][S[i].id]; return v===undefined||v===""?"NA":String(v); };
+  const facs={}; cols.forEach(f=>{ facs[f]=inc.map(i=>valOf(f,i)); });
+  const allLevels={};
+  cols.forEach(f=>{ const lv=[...new Set(S.map((s,i)=>valOf(f,i)))].filter(x=>x!=="NA");
+    if(lv.length>=2&&lv.length<Math.max(3,Math.floor(S.length/3))&&!(lv.length>2&&lv.every(x=>isFinite(Number(x))))) allLevels[f]=lv; });
+  renderDesignCheck("dashcheck", inc.map(i=>S[i].group), facs, {restrict:true, groupName:FACTOR, allLevels,
+    isOn:(f,l)=>{ const m=S.map((s,i)=>i).filter(i=>valOf(f,i)===l); return m.length>0&&m.every(i=>included[i]); }});
+  // levels whose samples are all excluded still need a checkbox: add them from the full sample set
+  const box=el("dashcheck");
+  if(box&&!box._wired){ box._wired=true;
+    box.addEventListener("change",e=>{
+      const t=e.target; if(!t||!t.classList||!t.classList.contains("dcrestrict")) return;
+      S.forEach((s,i)=>{ if(valOf(t.dataset.f,i)===t.dataset.l) included[i]=t.checked; });
+      buildSampleBar(); deKey=""; coKey=""; scorrKey=""; refreshTab(curTab);
+    });
+  }
+}
+function designFactorsFor(sampleNames, cols){
+  const out={};
+  cols.forEach(f=>{ out[f]=sampleNames.map(sn=>{ const v=pending.factors[f][sn]; return v===undefined||v===""?"NA":String(v); }); });
+  return out;
+}
+function wireDesignColumns(mx){
+  const add=el("gecoladd");
+  if(add) add.addEventListener("click",()=>{
+    const nm=(el("gecolname").value||"").trim();
+    if(!nm) return;
+    if(!pending.factors){ pending.factors={}; pending.factorNames=[]; }
+    if(!Object.keys(pending.factors).some(f=>!isCombo(f))){
+      // no design file: keep the current groups as a factor so the grouping survives
+      const g={}; mx.sampleNames.forEach((sn,i)=>{ g[sn]=pending.groups[i]; }); pending.factors["group"]=g; FACTOR="group";
+    }
+    if(pending.factors[nm]) return;
+    const m={}; mx.sampleNames.forEach(sn=>{ m[sn]="NA"; }); pending.factors[nm]=m;
+    rebuildCombos(); renderSetup();
+  });
+  const tbl=el("groupeditor");
+  if(tbl&&!tbl._facWired){ tbl._facWired=true;
+    tbl.addEventListener("change",e=>{
+      const t=e.target; if(!t||!t.classList||!t.classList.contains("gefac")) return;
+      pending.factors[t.dataset.f][t.dataset.s]=(t.value||"").trim()||"NA";
+      rebuildCombos();
+      const cols=baseFactorNames().filter(f=>f!==FACTOR&&!(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(f)));
+      renderDesignCheck("setupcheck", pending.groups, designFactorsFor(mx.sampleNames, cols), {groupName:FACTOR});
+    });
+  }
 }
 function wireGroupAssign(mx){
   const boxes=()=>[...document.querySelectorAll("#groupeditor .gesel")];
@@ -1551,24 +2006,12 @@ function analyzeNow(){
   FILTER={thr, minS, ng0, mode:useFBE?"fbe":"cpm"};
   GMT=null; GMTname=""; enrResults=null; el("gmtinfo").textContent=""; el("enrtable").innerHTML=""; el("enrinfo").textContent=""; el("enrexport").style.display="none";
   // build UI
-  COVARS={};
-  if(pending&&pending.factors) for(const fn2 of (pending.factorNames||[])){
-    if(fn2===FACTOR) continue;
-    const fm=pending.factors[fn2];
-    COVARS[fn2]=S.map(s=>String(fm&&fm[s.id]!==undefined?fm[s.id]:"NA"));
-  }
-  const cvn=Object.keys(COVARS);
-  el("decovwrap").style.display=cvn.length?"inline":"none";
-  DECOVSEL=DECOVSEL.filter(f=>cvn.includes(f));
-  el("batchdispwrap").style.display=cvn.length?"inline":"none";
-  el("batchdisp").innerHTML='<option value="">off</option>'+cvn.map(f=>`<option>${f}</option>`).join("");
-  if(!cvn.includes(BATCHDISP)) BATCHDISP="";
-  el("decov").innerHTML=cvn.map(f=>`<label style="margin-right:8px"><input type="checkbox" class="decovbox" value="${f}" ${DECOVSEL.includes(f)?"checked":""}> ${f}</label>`).join("");
+  buildCovars();
   buildSampleBar(); buildDESelectors(); buildCCSelectors();
   el("pane-upload").style.display="none";
   el("dashwrap").style.display="block"; el("tabs").style.display="flex"; el("reupload").style.display="inline-block";
   el("reportbtn").style.display="inline-block"; el("savesess").style.display="inline-block"; el("loadsesslbl").style.display="inline-block";
-  el("sumfigbtn").style.display="inline-block"; el("fontsel").style.display="inline-block"; el("expsize").style.display="inline-block";
+  el("sumfigbtn").style.display="inline-block"; el("fontsel").style.display="inline-block"; el("lblwrap").style.display="inline"; el("expsize").style.display="inline-block";
   curGene=null; el("genesearch").value="";
   coGene=null; coPartner=null; el("cosearch").value="";
   compareList=[];
@@ -1620,6 +2063,7 @@ function buildSampleBar(){
     bar.appendChild(div);
   });
   bar.querySelectorAll(".gmove").forEach(sp=>sp.addEventListener("click",()=>moveGroup(sp.dataset.g,+sp.dataset.d)));
+  renderDashDesignCheck();
 }
 el("samplebar").addEventListener("change",e=>{
   if(e.target.classList&&e.target.classList.contains("grpall")){
@@ -1635,6 +2079,7 @@ el("samplebar").addEventListener("change",e=>{
   const grp=S[+e.target.dataset.i].group;
   const boxes=el("samplebar").querySelectorAll(".grpall");
   boxes.forEach(b=>{ if(b.dataset.g===grp) b.checked=S.every((s,i)=>s.group!==grp||included[i]); });
+  renderDashDesignCheck();
   deKey=""; coKey=""; scorrKey=""; refreshTab(curTab);
 });
 function buildDESelectors(){
@@ -2031,7 +2476,64 @@ function drawGene(){
       fr+=`<tr><td>${d} vs ${base}</td><td>${w.d>=0?"+":""}${w.d.toFixed(2)}</td><td>${fmtN(Math.pow(2,Math.abs(w.d)))}${w.d<0?"× down":"× up"}</td><td>${fmtP(w.p)}</td></tr>`; } }
   el("fctable").innerHTML =
     `<table class="tbl"><tr><th>Comparison</th><th>log₂FC</th><th>fold</th><th>Welch p</th></tr>${fr||"<tr><td colspan=4>–</td></tr>"}</table>`;
+  if(DSETS.length){ el("genebq").value=""; drawGeneB(); }
 }
+function geneRowInDataset(d, query){
+  if(query){
+    const q=query.trim().toLowerCase();
+    for(let r=0;r<d.genes.length;r++) if(d.genes[r].split(" (")[0].toLowerCase()===q||String(d.ids[r]).toLowerCase()===q) return r;
+    const gs=nameToIdx[q];                       // a session gene: use the dataset's matching (orthologs, custom map)
+    if(gs!==undefined&&d.matchAtoB[gs]>=0) return d.matchAtoB[gs];
+    return -1;
+  }
+  return curGene!==null&&d.matchAtoB? d.matchAtoB[curGene] : -1;
+}
+function drawGeneB(){
+  const card=el("genebcard");
+  if(!DSETS.length){ card.style.display="none"; return; }
+  card.style.display="block";
+  const query=(el("genebq").value||"").trim();
+  if(!query&&curGene===null){ el("genebout").innerHTML='<div class="footer-note">Select a gene above, or type a symbol.</div>'; return; }
+  el("genebout").innerHTML=DSETS.map((d,i)=>`<div style="margin-top:8px"><div id="p_geneb_${i}" style="height:340px"></div><div id="genebst_${i}"></div></div>`).join("");
+  DSETS.forEach((d,i)=>{
+    const r=geneRowInDataset(d, query);
+    const nm=query||(curGene!==null?geneTitle(curGene):"");
+    if(r<0){ el(`p_geneb_${i}`).style.height="auto";
+      el(`p_geneb_${i}`).innerHTML=`<div class="footer-note"><b>${esc(d.label)}</b>: ${esc(nm)} is not present or not matched in this dataset.</div>`; return; }
+    const gk=Object.keys(d.gi).filter(g=>d.gi[g].length);
+    const vals=gk.map(g=>d.gi[g].map(q=>d.L[r*d.nS+q]));
+    const bars=[], pts=[];
+    gk.forEach((g,k)=>{
+      const ys=vals[k], m=mean(ys), sd=ys.length>1?Math.sqrt(variance(ys,m)):0;
+      const err=errType==="sd"? sd : (ys.length>1? sd/Math.sqrt(ys.length) : 0);
+      const col=PAL[k%PAL.length];
+      bars.push({x:[k],y:[m],type:"bar",width:0.62,marker:{color:col,opacity:0.45,line:{width:1,color:col}},name:g,showlegend:false,
+        error_y:{type:"data",array:[err],visible:true,color:"#334155",thickness:1.4,width:6},
+        hovertemplate:`mean %{y:.3g} \u00b1 ${err.toPrecision(3)} (${errType.toUpperCase()})<extra>${esc(g)}</extra>`});
+      const jit=Math.min(0.14, 0.44/Math.max(ys.length-1,1));
+      pts.push({x:ys.map((_,q)=>k+(q-(ys.length-1)/2)*jit),y:ys,mode:"markers",type:"scatter",name:g,
+        text:d.gi[g].map(q=>d.sampleNames[q]),marker:{size:8,color:col,line:{width:1,color:"#fff"}},showlegend:false,
+        hovertemplate:"%{text}<br>%{y:.3g}<extra>"+esc(g)+"</extra>"});
+    });
+    Plotly.react(el(`p_geneb_${i}`), bars.concat(pts), {margin:{t:40,b:45,l:60,r:10}, font:{size:12}, barmode:"overlay",
+      title:{text:`${esc(d.label)}: ${esc(d.genes[r].split(" (")[0])}`, font:{size:13}},
+      xaxis:{tickmode:"array", tickvals:gk.map((_,k)=>k), ticktext:gk, range:[-0.6, gk.length-0.4]},
+      yaxis:{title:"log\u2082 expression", rangemode:"tozero"}}, PL);
+    // statistics within this dataset only
+    const tested=gk.map((g,k)=>({g, v:vals[k]})).filter(o=>o.v.length>=2);
+    const an=tested.length>=2? anova(tested.map(o=>o.v)) : null;
+    const pr=[]; for(let a=0;a<tested.length;a++) for(let b=a+1;b<tested.length;b++){ const w=welch(tested[a].v, tested[b].v); if(w) pr.push({a:tested[a].g, b:tested[b].g, d:w.d, p:w.p}); }
+    const adj=holm(pr.map(x=>x.p)); pr.forEach((x,k)=>x.padj=adj[k]);
+    let de="";
+    const rr=dsResult(i+1);
+    if(rr&&!rr.err&&rr.lfc) de=` \u00b7 dataset contrast ${esc(d.selB)} vs ${esc(d.selA)}: log\u2082FC ${rr.lfc[r].toFixed(2)}, FDR ${fmtP(rr.q[r])}`;
+    el(`genebst_${i}`).innerHTML=`<div class="footer-note">ANOVA p ${an?fmtP(an.p):"\u2013"}${de}</div>`+
+      (pr.length?`<table class="tbl" style="width:auto"><tr><th>Comparison</th><th>log\u2082FC</th><th>Welch p</th><th>Holm-adj p</th></tr>`+
+        pr.map(x=>`<tr${x.padj<0.05?' style="background:#f0fdf4"':""}><td>${esc(x.b)} vs ${esc(x.a)}</td><td>${x.d>=0?"+":""}${x.d.toFixed(2)}</td><td>${fmtP(x.p)}</td><td>${fmtP(x.padj)}</td></tr>`).join("")+`</table>`:"");
+  });
+}
+el("genebbtn").addEventListener("click",drawGeneB);
+el("genebq").addEventListener("keydown",e=>{ if(e.key==="Enter") drawGeneB(); });
 /* multi-gene comparison */
 el("addcompare").addEventListener("click",()=>{
   if(curGene===null) return;
@@ -2226,7 +2728,7 @@ function computeDE(){
     const XtX=Array.from({length:p0},(_,r2)=>Array.from({length:p0},(_,c2)=>{
       let s=0; for(let q=0;q<nT;q++)s+=X[q][r2]*X[q][c2]; return s; }));
     const inv=invMat(XtX);
-    if(!inv){ deCache={err:`Covariate set (${covNames.join(", ")}) is confounded with the ${el("selA").value} vs ${el("selB").value} contrast (design matrix is singular); it cannot be adjusted for in this comparison.`}; deKey=key; return deCache; }
+    if(!inv){ deCache={err:`Covariate set (${covNames.join(", ")}) is confounded with the ${el("selA").value} vs ${el("selB").value} contrast (design matrix is singular); it cannot be adjusted for in this comparison. The Design check under the sample list shows which comparisons each factor can be adjusted in.`}; deKey=key; return deCache; }
     // M = (X'X)^-1 X'   (p0 × nT)
     const M=Array.from({length:p0},(_,r2)=>new Float64Array(nT));
     for(let r2=0;r2<p0;r2++)for(let q=0;q<nT;q++){ let s=0; for(let c2=0;c2<p0;c2++)s+=inv[r2][c2]*X[q][c2]; M[r2][q]=s; }
@@ -2353,6 +2855,29 @@ function drawDE(){
 
 /* ================= co-expression ================= */
 makeAutocomplete(el("cosearch"),el("cosuggest"),i=>{ coGene=i; coPartner=null; drawCoexp(); });
+let coB=null, coP=null;
+const COSORT={copos:{col:"r",dir:-1}, coneg:{col:"r",dir:1}};
+function coSortRows(rows, col, dir){
+  const key={gene:g=>GENES[g].toLowerCase(), r:g=>coR[g], slope:g=>coB[g], p:g=>coP[g]}[col];
+  return rows.slice().sort((a,b)=>{ const x=key(a), y=key(b); return (x<y?-1:x>y?1:0)*dir; });
+}
+function renderCoTable(target, title, rows){
+  const st=COSORT[target];
+  const box=el(target); box._rows=rows; box._title=title;
+  const sorted=coSortRows(rows, st.col, st.dir);
+  const hd=(col,lab,tip)=>`<th data-sort="${col}" style="cursor:pointer;white-space:nowrap" title="${tip}">${lab}${st.col===col?(st.dir>0?" \u25b2":" \u25bc"):""}</th>`;
+  box.innerHTML=`<table class="tbl"><tr>${hd("gene",title,"sort by gene name")}${hd("r","r","Pearson correlation with the query gene across included samples")}${hd("slope","slope","OLS slope of this gene on the query gene (log\u2082 units per log\u2082 unit)")}${hd("p","p","p-value for r \u2260 0 (t test, n\u22122 df)")}</tr>`+
+    sorted.map(g=>`<tr class="clickable" data-g="${g}"><td>${GENES[g]}</td><td>${coR[g].toFixed(3)}</td><td>${coB[g].toFixed(3)}</td><td>${fmtP(coP[g])}</td></tr>`).join("")+`</table>`;
+  box.querySelectorAll("tr.clickable").forEach(tr=>tr.addEventListener("click",()=>{ coPartner=+tr.dataset.g; drawCoScatter(); }));
+  if(!box._sortWired){ box._sortWired=true;
+    box.addEventListener("click",e=>{
+      const c=e.target&&e.target.dataset&&e.target.dataset.sort; if(!c) return;
+      const s2=COSORT[target];
+      if(s2.col===c) s2.dir=-s2.dir; else { s2.col=c; s2.dir=(c==="gene"||c==="p")?1:-1; }
+      renderCoTable(target, box._title, box._rows);
+    });
+  }
+}
 function drawCoexp(){
   if(coGene===null){
     el("coinfo").textContent="Search for a query gene to compute co-expression.";
@@ -2367,23 +2892,26 @@ function drawCoexp(){
   if(coKey!==key){
     const qv=idx.map(j=>L[coGene*nS+j]), mq=mean(qv);
     const dq=qv.map(v=>v-mq), sq=Math.sqrt(dq.reduce((s,v)=>s+v*v,0));
-    coR=new Float64Array(nG);
+    coR=new Float64Array(nG); coB=new Float64Array(nG); coP=new Float64Array(nG);
+    const sqq=sq*sq;
     for(let g=0;g<nG;g++){
       let m=0; for(const j of idx)m+=L[g*nS+j]; m/=n;
       let sxy=0,sxx=0,k2=0;
       for(const j of idx){ const dv=L[g*nS+j]-m; sxy+=dv*dq[k2++]; sxx+=dv*dv; }
-      coR[g]=(sq>0&&sxx>0)?sxy/(Math.sqrt(sxx)*sq):0;
+      const r=(sq>0&&sxx>0)?sxy/(Math.sqrt(sxx)*sq):0;
+      coR[g]=r;
+      coB[g]=sqq>0? sxy/sqq : 0;   // OLS slope of this gene on the query gene (the scatter's y on x)
+      coP[g]= Math.abs(r)>=1? 0 : tPval(Math.abs(r)*Math.sqrt((n-2)/(1-r*r)), n-2);
     }
     coKey=key;
   }
   const ord=Array.from(coR.keys()).sort((a,b)=>coR[b]-coR[a]).filter(g=>g!==coGene);
-  const pos=ord.slice(0,30), neg=ord.slice(-30).reverse();
+  const N=Math.min(parseInt(el("coN").value,10)||30, Math.floor(ord.length/2));
+  const pos=ord.slice(0,N), neg=ord.slice(-N).reverse();
   el("coinfo").textContent=`vs ${GENES[coGene]} across ${n} samples`;
-  const mk=g=>`<tr class="clickable" data-g="${g}"><td>${GENES[g]}</td><td>${coR[g].toFixed(3)}</td></tr>`;
-  el("copos").innerHTML=`<table class="tbl"><tr><th>Positive</th><th>r</th></tr>${pos.map(mk).join("")}</table>`;
-  el("coneg").innerHTML=`<table class="tbl"><tr><th>Negative</th><th>r</th></tr>${neg.map(mk).join("")}</table>`;
-  document.querySelectorAll("#copos tr.clickable, #coneg tr.clickable").forEach(tr=>
-    tr.addEventListener("click",()=>{ coPartner=+tr.dataset.g; drawCoScatter(); }));
+  el("coexp").style.display="inline-block";
+  renderCoTable("copos", "Positive", pos);
+  renderCoTable("coneg", "Negative", neg);
   if(coPartner===null||coPartner===coGene) coPartner=pos[0];
   drawCoScatter();
 }
@@ -3638,11 +4166,17 @@ function refreshCmpUI(){
   const show=DSETS.length>0;
   el("cmpcards").style.display=show?"block":"none";
   el("cmpsig").style.display=show?"block":"none";
-  el("cmpfam").style.display=(show&&DSETS.some(d2=>d2.cross))?"block":"none";
-  const fsel=el("famds"), fPrev=fsel.value;
-  fsel.innerHTML=DSETS.map((d2,i2)=>d2.cross?`<option value="${i2}">${d2.label} (${d2.species})</option>`:"").join("");
-  if([...fsel.querySelectorAll("option")].some(o=>o.value===fPrev)) fsel.value=fPrev;
+  const sps=[el("species").value].concat(DSETS.map(d2=>d2.species)).filter(sp=>famList(sp));
+  el("cmpfam").style.display=(show&&new Set(sps.map(famList)).size>=2)?"block":"none";
+  const opts=`<option value="s">session (${esc(el("species").value)})</option>`+DSETS.map((d2,i2)=>`<option value="${i2}">${esc(d2.label)} (${esc(d2.species)})</option>`).join("");
+  const fx=el("famx"), fy=el("famds"), px=fx.value, py=fy.value;
+  fx.innerHTML=opts; fy.innerHTML=opts;
+  const vals=["s"].concat(DSETS.map((_,i2)=>String(i2)));
+  fx.value=vals.includes(px)? px : "s";
+  const spOf=v=>v==="s"? el("species").value : DSETS[+v].species;
+  fy.value=vals.includes(py)&&py!==fx.value? py : (vals.find(v=>v!==fx.value&&famList(spOf(v))&&famList(spOf(v))!==famList(spOf(fx.value)))||vals.find(v=>v!==fx.value)||"s");
   el("cmpmulti").style.display=DSETS.length>=2?"block":"none";
+  el("genebcard").style.display=DSETS.length?"block":"none";
   if(show){
     ["xds","yds"].forEach(id=>{ const s=el(id); s.innerHTML="";
       for(let i=0;i<=DSETS.length;i++) s.add(new Option(dsLabel(i), String(i))); });
@@ -3777,7 +4311,7 @@ function renderCmpGeneTable(){
   el("cmpgenetable").querySelectorAll(".glink2").forEach(s=>s.addEventListener("click",()=>{
     const i2=nameToIdx[s.dataset.n.toLowerCase()]; if(i2!==undefined){ jumpToGene(i2); } }));
 }
-let FAMROWS=null, FAMDS=null;
+let FAMROWS=null, FAMDS=null, FAMX=null;
 function scoreSessionRows(rows2){
   // mean z of member rows across included samples (z within session); the validated module scorer
   const idx=S.map((s,i)=>i).filter(i=>included[i]);
@@ -3792,7 +4326,7 @@ function scoreSessionRows(rows2){
   return {sc, idx};
 }
 function drawFamScatter(){
-  if(!FAMROWS||!FAMDS) return;
+  if(!FAMROWS||!FAMDS||!FAMX) return;
   const sig=r=>Math.max(r.qS,r.qB)<=0.05;
   const grp={concUp:[],concDn:[],disc:[],ns:[]};
   FAMROWS.forEach((r,k2)=>{
@@ -3805,7 +4339,7 @@ function drawFamScatter(){
     text:arr.map(t=>FAMROWS[t.k].label),mode:"markers",type:"scatter",name,
     marker:{size:arr.map(t=>Math.min(16,6+2*Math.sqrt(t.s))),color,opacity:name==="not significant"?0.35:0.85,
       symbol:sym||"circle",line:{width:0.5,color:"#fff"}},
-    hovertemplate:"%{text}<br>\u0394 session %{x:.2f} \u00b7 \u0394 "+esc(FAMDS.label)+" %{y:.2f}<extra>click: per-sample scores</extra>"});
+    hovertemplate:"%{text}<br>\u0394 "+esc(FAMX.label)+" %{x:.2f} \u00b7 \u0394 "+esc(FAMDS.label)+" %{y:.2f}<extra>click: per-sample scores</extra>"});
   const traces=[mk(grp.ns,"#94a3b8","not significant"),
                 mk(grp.disc,"#b45309","discordant (both FDR\u22640.05)","diamond"),
                 mk(grp.concDn,"#2563eb","concordant down"),
@@ -3823,7 +4357,7 @@ function drawFamScatter(){
   Plotly.react(el("p_famscatter"), traces,
     {margin:{t:34,b:46,l:60,r:10}, height:400, font:{size:11},
      title:{text:"Family concordance: one point per homology family, size \u221d matched members; diagonal = identical effect", font:{size:11}},
-     xaxis:{title:"\u0394 module score: session", range:[-ext,ext], zeroline:true},
+     xaxis:{title:"\u0394 module score: "+FAMX.label, range:[-ext,ext], zeroline:true},
      yaxis:{title:"\u0394 module score: "+FAMDS.label, range:[-ext,ext], zeroline:true},
      shapes:[{type:"line",x0:-ext,y0:-ext,x1:ext,y1:ext,line:{color:"#e2e8f0",width:1}}],
      legend:{orientation:"h",y:1.08,yanchor:"bottom",x:1,xanchor:"right"},
@@ -3834,105 +4368,105 @@ function drawFamScatter(){
   });
 }
 function drawFamDetail(k2){
-  const r=FAMROWS[k2]; if(!r||!FAMDS) return;
-  const d=FAMDS;
-  // session-side per-sample family score (validated scorer)
-  const {sc, idx}=scoreSessionRows(r.sessRows);
-  const sesTr=[], gksS=GROUPS.filter(g=>groupsIdx()[g]&&groupsIdx()[g].length);
-  const pos={}; idx.forEach((q,i2)=>pos[q]=i2);
-  gksS.forEach(g=>{
-    const ys=groupsIdx()[g].filter(q=>pos[q]!==undefined).map(q=>sc[pos[q]]);
-    sesTr.push({y:ys, type:"box", name:g, boxpoints:"all", jitter:0.5, pointpos:0,
-      marker:{color:GCOL[g], size:6}, line:{color:GCOL[g]}, xaxis:"x", yaxis:"y", showlegend:false});
-  });
-  // dataset-side
-  const scB=sigScoreInB(d, r.bRows);
-  const dsTr=[];
-  Object.keys(d.gi).forEach((g,gi2)=>{
-    const ys=d.gi[g].map(q=>scB[q]);
-    dsTr.push({y:ys, type:"box", name:g, boxpoints:"all", jitter:0.5, pointpos:0,
-      marker:{color:PAL[gi2%PAL.length], size:6}, line:{color:PAL[gi2%PAL.length]}, xaxis:"x2", yaxis:"y2", showlegend:false});
-  });
-  Plotly.react(el("p_famdetail"), sesTr.concat(dsTr),
+  const r=FAMROWS[k2]; if(!r||!FAMDS||!FAMX) return;
+  const X=FAMX, Y=FAMDS;
+  const box=(Z, rows, ax)=>{ const sc=Z.scoreGroups(rows);
+    return Z.groupsList.map(g=>({y:sc[g], type:"box", name:g, boxpoints:"all", jitter:0.5, pointpos:0,
+      marker:{color:Z.color(g), size:6}, line:{color:Z.color(g)}, xaxis:ax, yaxis:ax==="x"?"y":"y2", showlegend:false})); };
+  Plotly.react(el("p_famdetail"), box(X, r.xRows, "x").concat(box(Y, r.yRows, "x2")),
     {margin:{t:88,b:60,l:60,r:16}, height:370, font:{size:11},
      grid:{rows:1, columns:2, pattern:"independent"},
      title:{text:r.label+": family module score per sample (z within each dataset; never merged)", font:{size:11.5}},
      annotations:[
-       {text:`session \u00b7 ${r.kS}/${r.tS} members \u00b7 \u0394 = ${r.dS.toFixed(2)}, FDR ${fmtP(r.qS)}`, xref:"x domain", yref:"paper", x:0.5, y:1.0, yanchor:"bottom", showarrow:false, font:{size:10}},
-       {text:`${esc(d.label)} \u00b7 ${r.kB}/${r.tB} members \u00b7 \u0394 = ${r.dB.toFixed(2)}, FDR ${fmtP(r.qB)}`, xref:"x2 domain", yref:"paper", x:0.5, y:1.0, yanchor:"bottom", showarrow:false, font:{size:10}}],
+       {text:`${esc(X.label)} \u00b7 ${r.kS}/${r.tS} members \u00b7 \u0394 = ${r.dS.toFixed(2)}, FDR ${fmtP(r.qS)}`, xref:"x domain", yref:"paper", x:0.5, y:1.0, yanchor:"bottom", showarrow:false, font:{size:10}},
+       {text:`${esc(Y.label)} \u00b7 ${r.kB}/${r.tB} members \u00b7 \u0394 = ${r.dB.toFixed(2)}, FDR ${fmtP(r.qB)}`, xref:"x2 domain", yref:"paper", x:0.5, y:1.0, yanchor:"bottom", showarrow:false, font:{size:10}}],
      yaxis:{title:"module score (z)"}, yaxis2:{title:""}}, PL);
 }
 function famReset(){
-  FAMROWS=null; FAMDS=null;
+  FAMROWS=null; FAMDS=null; FAMX=null;
   el("famtable").innerHTML=""; el("faminfo").innerHTML="";
   Plotly.purge&&Plotly.purge(el("p_famscatter")); el("p_famscatter").innerHTML="";
   Plotly.purge&&Plotly.purge(el("p_famdetail")); el("p_famdetail").innerHTML="";
   el("famexp").style.display="none"; el("famclear").style.display="none";
 }
+function famSide(v){
+  // one side of a homology-family comparison: the session ("s") or a comparison dataset (index)
+  if(v==="s"){
+    const gi=groupsIdx();
+    return {key:"s", label:"session", sp:el("species").value, isSession:true,
+      byName:n=>nameToIdx[n.toLowerCase()], name:r=>GENES[r].split(" (")[0],
+      A:el("selA").value, B:el("selB").value,
+      groupsList:GROUPS.filter(g=>gi[g]&&gi[g].length), color:g=>GCOL[g],
+      scoreGroups(rows){ const {sc, idx}=scoreSessionRows(rows); const pos={}; idx.forEach((q,k)=>pos[q]=k);
+        const out={}; this.groupsList.forEach(g=>{ out[g]=gi[g].filter(q=>pos[q]!==undefined).map(q=>sc[pos[q]]); }); return out; }};
+  }
+  const d=DSETS[+v]; if(!d) return null;
+  const by={}; d.genes.forEach((nm,k2)=>{ const key=nm.split(" (")[0].toLowerCase(); if(by[key]===undefined) by[key]=k2; });
+  const gl=Object.keys(d.gi).filter(g=>d.gi[g].length);
+  return {key:String(v), label:d.label, sp:d.species, isSession:false, d,
+    byName:n=>by[n.toLowerCase()], name:r=>d.genes[r].split(" (")[0],
+    A:d.selA, B:d.selB, groupsList:gl, color:g=>PAL[gl.indexOf(g)%PAL.length],
+    scoreGroups(rows){ const sc=sigScoreInB(d, rows); const out={}; gl.forEach(g=>{ out[g]=d.gi[g].map(q=>sc[q]); }); return out; }};
+}
+function famList(sp){ return sp==="mouse"? "m" : sp==="human"? "h" : null; }
 function runFamilies(){
   famReset();   // never leave a previous run's table under a failed or different run
-  const crossDs=DSETS.filter(d=>d.cross);
-  if(!crossDs.length){ el("faminfo").innerHTML='<span class="warnchip">Add a cross-species dataset first.</span>'; return; }
-  const sessSp=el("species").value;
-  const sessList=sessSp==="mouse"? "m":"h", otherList=sessSp==="mouse"? "h":"m";
-  const a=groupsIdx()[el("selA").value], b2=groupsIdx()[el("selB").value];
-  if(!a||!b2||a.length<2||b2.length<2){ el("faminfo").innerHTML='<span class="warnchip">Pick the session contrast (two groups, n>=2) on the DE tab first.</span>'; return; }
+  const X=famSide(el("famx").value), Y=famSide(el("famds").value);
+  const warn=m=>{ el("faminfo").innerHTML='<span class="warnchip">'+m+'</span>'; };
+  if(!X||!Y) return warn("Choose two datasets.");
+  if(X.key===Y.key) return warn("Choose two different datasets.");
+  const lx=famList(X.sp), ly=famList(Y.sp);
+  if(!lx||!ly) return warn("Homology families are available for mouse and human datasets.");
+  if(lx===ly) return warn(`${esc(X.label)} and ${esc(Y.label)} are both ${esc(X.sp)}. Homology families compare two species; for two datasets of the same species use Compare pair above.`);
+  for(const Z of [X,Y]){
+    if(!Z.A||!Z.B||Z.A===Z.B) return warn(`${esc(Z.label)}: choose a contrast of two groups first${Z.isSession?" (Differential Expression tab)":" (dataset slot above)"}.`);
+  }
   const rowsOut=[];
-  const di=parseInt(el("famds").value,10);
-  const d=(DSETS[di]&&DSETS[di].cross)? DSETS[di] : crossDs[0];
-  FAMDS=d;
-  const bByName={};
-  d.genes.forEach((nm,k2)=>{ const key=nm.split(" (")[0].toLowerCase(); if(bByName[key]===undefined) bByName[key]=k2; });
   ORTHO_FAM.forEach(f=>{
-    const sessRows=f[sessList].map(s=>nameToIdx[s.toLowerCase()]).filter(g=>g!==undefined);
-    const bRows=f[otherList].map(s=>bByName[s.toLowerCase()]).filter(g=>g!==undefined);
-    if(sessRows.length<1||bRows.length<1) return;
-    // session family score + contrast
-    const {sc, idx}=scoreSessionRows(sessRows);
-    const pos={}; idx.forEach((q,k2)=>pos[q]=k2);
-    const sA=a.filter(q=>pos[q]!==undefined).map(q=>sc[pos[q]]), sB=b2.filter(q=>pos[q]!==undefined).map(q=>sc[pos[q]]);
-    const wA=welch(sA,sB);
-    // dataset-side family score + its contrast (validated scorer)
-    if(!(d.selA&&d.selB&&d.selA!==d.selB)) return;
-    const scB=sigScoreInB(d, bRows);
-    const bA=d.gi[d.selA].map(q=>scB[q]), bB=d.gi[d.selB].map(q=>scB[q]);
-    const wB=welch(bA,bB);
+    const xRows=f[lx].map(n=>X.byName(n)).filter(g=>g!==undefined);
+    const yRows=f[ly].map(n=>Y.byName(n)).filter(g=>g!==undefined);
+    if(xRows.length<1||yRows.length<1) return;
+    const sx=X.scoreGroups(xRows), sy=Y.scoreGroups(yRows);
+    const wA=welch(sx[X.A]||[], sx[X.B]||[]), wB=welch(sy[Y.A]||[], sy[Y.B]||[]);
     if(!wA||!wB) return;
-    rowsOut.push({label:f[sessList].join("/")+" \u2194 "+f[otherList].join("/"),
-      sessRows, bRows, kS:sessRows.length, tS:f[sessList].length, kB:bRows.length, tB:f[otherList].length,
+    rowsOut.push({label:f[lx].join("/")+" \u2194 "+f[ly].join("/"),
+      xRows, yRows, kS:xRows.length, tS:f[lx].length, kB:yRows.length, tB:f[ly].length,
       dS:wA.d, pS:wA.p, dB:wB.d, pB:wB.p, conc:Math.sign(wA.d)===Math.sign(wB.d)});
   });
-  if(!rowsOut.length){ el("faminfo").innerHTML='<span class="warnchip">No family had members present in both datasets.</span>'; return; }
+  if(!rowsOut.length) return warn("No family had members present in both datasets, or a contrast group has fewer than 2 samples.");
   // BH within each side across the tested families
   const bh=(ps)=>{ const n2=ps.length, ord2=Array.from(ps.keys()).sort((x,y)=>ps[x]-ps[y]); const q2=new Array(n2); let mn=1;
     for(let r2=n2-1;r2>=0;r2--){ mn=Math.min(mn, ps[ord2[r2]]*n2/(r2+1)); q2[ord2[r2]]=mn; } return q2; };
   const qS=bh(rowsOut.map(r=>r.pS)), qB=bh(rowsOut.map(r=>r.pB));
   rowsOut.forEach((r,k2)=>{ r.qS=qS[k2]; r.qB=qB[k2]; });
   rowsOut.sort((x,y)=>Math.max(x.qS,x.qB)-Math.max(y.qS,y.qB));
-  FAMROWS=rowsOut;
-  el("faminfo").innerHTML=`<b>${rowsOut.length}</b> families have members in both datasets (of ${ORTHO_FAM.length} MGI many-to-many families). `+
-    `Each family is scored as a module (mean z of its members) WITHIN each dataset; raw values are never merged, and no arbitrary 1:1 pick is made. `+
-    `A family is cross-species concordant when both datasets move it in the same direction; BH-FDR within each dataset's column across the ${rowsOut.length} tested families.`;
-    const chipCap=(arr, mk)=>arr.slice(0,6).map(mk).join(" ")+(arr.length>6?` <span class="footer-note">+${arr.length-6} more (CSV has all)</span>`:"");
-  el("famtable").innerHTML=`<div style="max-height:440px;overflow:auto;border:1px solid var(--border);border-radius:6px"><table class="tbl"><tr><th style="min-width:150px">family</th><th>members (session)</th><th>members (${d.label})</th><th>\u0394 session</th><th>FDR</th><th>\u0394 ${d.label}</th><th>FDR</th><th></th></tr>`+
+  FAMROWS=rowsOut; FAMX=X; FAMDS=Y;
+  el("faminfo").innerHTML=`<b>${rowsOut.length}</b> families have members in both ${esc(X.label)} and ${esc(Y.label)} (of ${ORTHO_FAM.length} MGI many-to-many families). `+
+    `Contrasts: ${esc(X.label)} ${esc(X.B)} vs ${esc(X.A)}; ${esc(Y.label)} ${esc(Y.B)} vs ${esc(Y.A)}. `+
+    `Each family is scored as a module (mean z of its members) within each dataset; raw values are never merged, and no arbitrary 1:1 pick is made. `+
+    `A family is concordant when both datasets move it in the same direction; BH-FDR within each dataset's column across the ${rowsOut.length} tested families.`;
+  const chipCap=(arr, mk)=>arr.slice(0,6).map(mk).join(" ")+(arr.length>6?` <span class="footer-note">+${arr.length-6} more (CSV has all)</span>`:"");
+  const chip=(Z,g)=>Z.isSession? `<span class="glink" data-g="${g}" style="cursor:pointer;color:#2563eb">${Z.name(g)}</span>` : `<span>${Z.name(g)}</span>`;
+  el("famtable").innerHTML=`<div style="max-height:440px;overflow:auto;border:1px solid var(--border);border-radius:6px"><table class="tbl"><tr><th style="min-width:150px">family</th><th>members (${esc(X.label)})</th><th>members (${esc(Y.label)})</th><th>\u0394 ${esc(X.label)}</th><th>FDR</th><th>\u0394 ${esc(Y.label)}</th><th>FDR</th><th></th></tr>`+
     rowsOut.slice(0,40).map(r=>`<tr${r.conc&&Math.max(r.qS,r.qB)<=0.05?' style="background:#f0fdf4"':''}>
       <td style="max-width:210px;word-break:break-word">${r.label}</td>
-      <td>${chipCap(r.sessRows, g=>`<span class="glink" data-g="${g}" style="cursor:pointer;color:#2563eb">${GENES[g].split(" (")[0]}</span>`)} (${r.kS}/${r.tS})</td>
-      <td>${chipCap(r.bRows, g=>`<span>${d.genes[g].split(" (")[0]}</span>`)} (${r.kB}/${r.tB})</td>
+      <td>${chipCap(r.xRows, g=>chip(X,g))} (${r.kS}/${r.tS})</td>
+      <td>${chipCap(r.yRows, g=>chip(Y,g))} (${r.kB}/${r.tB})</td>
       <td>${r.dS.toFixed(2)}</td><td>${fmtP(r.qS)}</td><td>${r.dB.toFixed(2)}</td><td>${fmtP(r.qB)}</td>
       <td>${r.conc?'<span style="color:#059669">concordant</span>':'<span style="color:#b45309">discordant</span>'} <span class="famplot" data-k="${rowsOut.indexOf(r)}" style="cursor:pointer;color:#2563eb">plot</span></td></tr>`).join("")+`</table></div>`+
     (rowsOut.length>40?`<div class="footer-note">top 40 shown; all ${rowsOut.length} in the CSV export</div>`:"");
   el("famclear").style.display="inline-block";
   drawFamScatter();
-  el("famtable").querySelectorAll(".glink").forEach(s=>s.addEventListener("click",()=>jumpToGene(+s.dataset.g)));
-  el("famtable").querySelectorAll(".famplot").forEach(s=>s.addEventListener("click",()=>drawFamDetail(+s.dataset.k)));
+  el("famtable").querySelectorAll(".glink").forEach(s2=>s2.addEventListener("click",()=>jumpToGene(+s2.dataset.g)));
+  el("famtable").querySelectorAll(".famplot").forEach(s2=>s2.addEventListener("click",()=>drawFamDetail(+s2.dataset.k)));
   el("famexp").style.display="inline-block";
 }
 el("famrun").addEventListener("click",runFamilies);
 el("famclear").addEventListener("click",famReset);
 el("famexp").addEventListener("click",()=>{
   if(!FAMROWS) return;
-  const rows=["family,members_session,members_dataset,delta_session,fdr_session,delta_dataset,fdr_dataset,concordant"];
+  const cx=FAMX?FAMX.label.replace(/[, ]/g,"_"):"x", cy=FAMDS?FAMDS.label.replace(/[, ]/g,"_"):"y";
+  const rows=[`family,members_${cx},members_${cy},delta_${cx},fdr_${cx},delta_${cy},fdr_${cy},concordant`];
   FAMROWS.forEach(r=>rows.push([r.label.replace(/,/g,";"),r.kS+"/"+r.tS,r.kB+"/"+r.tB,r.dS.toFixed(4),r.qS.toExponential(3),r.dB.toFixed(4),r.qB.toExponential(3),r.conc].join(",")));
   downloadCSV(rows.join("\n"),"homology_families.csv");
 });
@@ -4009,6 +4543,8 @@ function drawForest(g){
   }
   const drawn=rows.filter(r=>!r.skip);
   const ys=drawn.map((_,k2)=>drawn.length-1-k2);
+  // the axis always contains 0 and is symmetric about it, so magnitudes compare on a common scale
+  const ext=Math.max(0.5, ...drawn.map(r=>Math.max(Math.abs(isFinite(r.lo)?r.lo:r.lfc), Math.abs(isFinite(r.hi)?r.hi:r.lfc))))*1.1;
   Plotly.react(el("p_forest"), [
     {x:drawn.map(r=>r.lfc), y:ys, mode:"markers", type:"scatter",
      marker:{size:9, color:drawn.map(r=>r.q<=0.05?"#dc2626":"#64748b"), symbol:"square"},
@@ -4018,7 +4554,7 @@ function drawForest(g){
      text:drawn.map(r=>r.lab), hovertemplate:"%{text}<br>log₂FC %{x:.2f}<extra></extra>", showlegend:false}],
     {margin:{t:26,b:44,l:230,r:16}, height:Math.max(180, 60+34*drawn.length), font:{size:11},
      title:{text:`${GENES[g].split(" (")[0]}: per-dataset effect (95% CI)`, font:{size:12}},
-     xaxis:{title:"log₂ fold change", zeroline:true, zerolinecolor:"#94a3b8", zerolinewidth:1.5},
+     xaxis:{title:"log₂ fold change", range:[-ext, ext], zeroline:true, zerolinecolor:"#94a3b8", zerolinewidth:1.5},
      yaxis:{tickmode:"array", tickvals:ys, ticktext:drawn.map(r=>r.lab), range:[-0.6, drawn.length-0.4]}}, PL);
   el("forestnote").textContent=`Each interval is that dataset's own moderated-t 95% CI (log₂FC ± t₀.₉₇₅,df·SE with the empirical-Bayes posterior df, the limma topTable confidence-interval convention). Red squares pass FDR ≤ 0.05 within their dataset. No pooled estimate is drawn: pooling effect sizes across studies is a meta-analytic model with its own assumptions, which this tab deliberately avoids.`+(rows.some(r=>r.skip)?" Datasets where the gene is unmatched are omitted.":"");
 }
@@ -6177,9 +6713,10 @@ async function makeSummaryFigure(){
 
 /* ================= session save / restore ================= */
 function sessionState(){
-  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fontScale:FONTSCALE, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
+  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fontScale:FONTSCALE, labelCfg:LABELCFG, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
     disco:{fam:el("dscfam").checked, cur:el("dsccur").checked, gmt:el("dscgmt").checked, mn:el("dscmin").value, mx:el("dscmax").value, B:el("dscperm").value},
     matrixName:pending&&pending.matrixName||"", nG0:FILTER.ng0, factor:FACTOR,
+    factors:(pending&&pending.factors)? Object.fromEntries(baseFactorNames().map(f=>[f,pending.factors[f]])) : null,
     design:S.map((s,i)=>({id:s.id, group:s.group, included:included[i]})),
     filter:{thr:FILTER.thr, minS:FILTER.minS},
     de:{A:el("selA").value, B:el("selB").value, fdr:el("selFDR").value, thr:el("fcthr").value, method:deMethod},
@@ -6271,6 +6808,7 @@ function applySession(ss){
   GROUPTYPE=ss.groupType||"auto"; el("grouptype").value=GROUPTYPE;
   if(ss.norm) el("normsel").value=ss.norm;
   if(ss.fontScale){ FONTSCALE=ss.fontScale; el("fontsel").value=String(ss.fontScale); }
+  if(ss.labelCfg){ LABELCFG=Object.assign({angle:"auto",size:"auto",long:"wrap"}, ss.labelCfg); el("lblang").value=LABELCFG.angle; el("lblsize").value=LABELCFG.size; el("lbllong").value=LABELCFG.long; }
   if(ss.expSize!==undefined){ el("expsize").value=ss.expSize; applyExpSize(); }
   if(ss.deCov!==undefined){
     DECOVSEL=Array.isArray(ss.deCov)? ss.deCov.slice() : (ss.deCov? [ss.deCov] : []);
@@ -6283,6 +6821,12 @@ function applySession(ss){
   if(ss.appVersion && ss.appVersion!==APP_VERSION)
     el("qcwarn").innerHTML+=`<div class="warn">Session was saved with app version ${esc(ss.appVersion)}; this file is ${APP_VERSION}. Statistics may differ between versions.</div>`;
   GROUPORDER=ss.groupOrder||null;
+  if(ss.factors&&pending){
+    // design columns saved with the session (includes columns added in the review step)
+    pending.factors=Object.assign({}, pending.factors||{}, ss.factors);
+    pending.factorNames=Object.keys(pending.factors).filter(f=>!isCombo(f));
+    rebuildCombos(); if(ss.factor) FACTOR=ss.factor; buildCovars();
+  }
   deriveGroups(S.map(s=>s.group));
   buildSampleBar(); buildDESelectors(); buildCCSelectors();
   el("selA").value=ss.de.A; el("selB").value=ss.de.B;

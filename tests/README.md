@@ -6,7 +6,7 @@
 2. The demo dataset (GSE63310) analyzed with TMM normalization and voom, under both filter modes, against results pinned from an independent R analysis.
 3. An interface test of the **Validate statistics** button.
 
-`validation.spec.js` runs the external validation: the demo dataset is analyzed by the application and compared with the R reference values in `validation/gse63310_reference.json` (33 checks; see `VALIDATION.md`).
+`validation.spec.js` runs the external validation: the demo dataset is analyzed by the application and compared with the R reference values in `validation/gse63310_reference.json` (36 checks; see `VALIDATION.md`).
 
 Run locally:
 

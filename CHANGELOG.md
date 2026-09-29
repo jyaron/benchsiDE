@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.20.0-beta (2026-09-29)
+- FIXED: long group names were cut off at the edge of plots and exports. Axis tick labels are now never cut off. By default, long labels wrap onto several lines, or are angled when wrapping is not enough, and the figure margin grows to fit them. New header controls set the label orientation (auto, horizontal, 45°, vertical), the label font size, and the treatment of long labels (wrap, full length, or shortened with an ellipsis). The settings apply to every plot and export and are saved with the session.
+- NEW: every plot has a **Download data** button in its toolbar. It saves an Excel workbook: a sheet in GraphPad Prism table layout (Column, Grouped or XY, chosen from the plot type), a sheet listing every plotted value with its series, label and error values, and a notes sheet with axis titles, the Prism table type and import instructions. Where points carry sample names, a sheet of sample IDs is included.
+- CHANGED: forest plots always include 0 on the x axis, and the axis is symmetric about 0, so effect sizes can be compared by magnitude.
+- CHANGED: homology-family comparison works between any two uploaded datasets of different species (for example two comparison datasets), not only between the session and one dataset. The table, scatter plot, per-sample panels and CSV export are labeled with the chosen datasets.
+- NEW: Gene Explorer shows the selected gene in every comparison dataset. Each dataset gets its own panel with its own groups, normalization and statistics (ANOVA, Welch tests with Holm adjustment, and the dataset's selected contrast). Matching is by symbol, by ortholog, or by custom ID map. A symbol can be typed to look up a gene that is not in the session. Values are never merged across datasets.
+- CHANGED: the co-expression tables show the slope (OLS, gene on query gene) and the p-value for r = 0 beside r. Click a column header to sort by gene, r, slope or p. A selector sets how many genes are shown (30, 100 or 300 per direction), and **Export all (CSV)** writes every gene.
+- NEW: **Design check**, shown in the review step and under the sample list. For each design factor it shows sample counts by group and reports, for each pair of groups, whether the factor can be adjusted for or is fully confounded with the comparison. For example, in GSE186063 all normal-skin samples are from ankylosing spondylitis patients, so diagnosis cannot be adjusted for in comparisons with normal skin, but it can in lesion vs non-lesion. The check lists the options for a confounded comparison.
+- NEW: samples can be included or excluded by factor level under the sample list (for example, analyze psoriasis patients only).
+- NEW: every pair of design factors is offered as a combined grouping factor (for example Type × Diag, giving groups such as "lesion · Psoriasis").
+- NEW: design columns can be added and edited in the review step, for example a patient column for paired samples. Added columns are available as covariates and are saved with the session.
+- FIXED: design values exported from GEO with a characteristic prefix (for example "diagnosis: Psoriasis") are read without the prefix.
+- The error for a covariate that is confounded with the comparison now refers to the Design check.
+- Validation: the external validation has three new checks, for the co-expression table (Pearson r, slope and p against stats::cor, stats::lm and stats::cor.test), bringing it to 36.
+
 ## 0.19.5-beta (2026-09-25)
 - FIXED: running **Validate statistics** left the header summary, the methods filter sentence and the QC notes describing the self-test's synthetic dataset (6 samples, 2,000 genes) in place of the loaded data. The statistics themselves were restored correctly. The self-test also reset the normalization selector, the batch-adjusted display setting and a custom group order. It now saves and restores every display the analysis step rewrites; content panels are moved aside as live elements, so their click handlers keep working.
 - New CI test: the self-test must leave the analysis displays unchanged and a control inside a content panel must remain functional.

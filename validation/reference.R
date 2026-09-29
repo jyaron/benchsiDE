@@ -77,6 +77,7 @@ ora_p <- phyper(k - 1, ms, N - ms, q, lower.tail = FALSE)
 # regression of gene 2 on gene 1 (all samples)
 ols <- summary(lm(lg[2, ] ~ lg[1, ]))$coefficients
 
+
 # density of sample 1: nrd0 bandwidth and exact-sum Gaussian KDE on the 512-point grid
 x1 <- lg[, 1]; bw <- bw.nrd0(x1)
 grid <- seq(min(x1) - 3 * bw, max(x1) + 3 * bw, length.out = 512)
@@ -96,6 +97,10 @@ pw <- c(n = rnapower(depth = 20, cv = 0.4, effect = 2, alpha = 0.05, power = 0.8
 
 idx <- c(1:25, seq(1000, N, by = 997))   # compared genes: first 25 plus a spread across the matrix
 f12 <- function(x) as.numeric(format(x, digits = 15))
+# co-expression table: every compared gene against gene 1 (Pearson r, OLS slope on gene 1, cor.test p)
+cidx <- setdiff(idx, 1)
+coex <- t(sapply(cidx, function(g) c(cor(lg[g, ], lg[1, ]), coef(lm(lg[g, ] ~ lg[1, ]))[2],
+                                     cor.test(lg[g, ], lg[1, ])$p.value)))
 ref <- list(
   source = "Rscript validation/reference.R",
   packages = list(R = paste(R.version$major, R.version$minor, sep = "."),
@@ -119,6 +124,7 @@ ref <- list(
   fry_cov = list(p = f12(frc$PValue), pm = f12(frc$PValue.Mixed), dir = as.character(frc$Direction)),
   ora = list(k = k, q = q, m = ms, N = N, p = f12(ora_p)),
   ols = f12(c(ols[1, 1], ols[2, 1], ols[2, 2], ols[2, 4])),
+  coexp = list(genes = cidx - 1, r = f12(coex[, 1]), slope = f12(coex[, 2]), p = f12(coex[, 3])),
   kde = list(bw = f12(bw), probes = probes - 1, y = f12(kde)),
   rrho = list(step = step, dim = dim(rr$hypermat), diag = f12(diag(rr$hypermat)),
               row1 = f12(rr$hypermat[1, ]), max = f12(max(rr$hypermat, na.rm = TRUE))),

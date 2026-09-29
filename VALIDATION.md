@@ -3,7 +3,7 @@
 benchsiDE reimplements its statistical methods in JavaScript. Each method is checked against its reference implementation (edgeR, limma, RRHO, RNASeqPower, stats, scipy or statsmodels) on inputs that anyone can obtain. Two independent checks are provided, and both run in continuous integration in Chromium, Firefox and WebKit.
 
 1. **In-app self-test** (16 components). A deterministic synthetic dataset is regenerated in the browser and compared with embedded reference values. Any user can run it with **Validate statistics**.
-2. **External validation on public data** (33 checks). The public demo dataset in this repository (`demo/`, GEO GSE63310) is analyzed by the application and by R, and the results are compared.
+2. **External validation on public data** (36 checks). The public demo dataset in this repository (`demo/`, GEO GSE63310) is analyzed by the application and by R, and the results are compared.
 
 Deviations are the maximum over all compared values. They are absolute unless marked relative. Counts of significant genes and kept genes must agree exactly.
 
@@ -68,6 +68,9 @@ Settings mirrored in R: filterByExpr on all samples (16,624 genes kept); TMM nor
 | FRY with continuous covariate: p and mixed p (relative) | limma::fry(design = ~lcov + group) | 6 | 4.8e-9 | 1.0e-5 |
 | FRY with continuous covariate: direction (exact) | limma::fry(design = ~lcov + group) | 3 | 0 | 0 (exact) |
 | OLS regression: intercept, slope, SE, p | stats::lm | 4 | 6.2e-16 | 1.0e-8 |
+| Co-expression table: Pearson r | stats::cor | 40 | 8.9e-16 | 1.0e-10 |
+| Co-expression table: slope | stats::lm | 40 | 4.0e-15 | 1.0e-10 |
+| Co-expression table: p for r = 0 (relative) | stats::cor.test | 40 | 8.4e-13 | 1.0e-6 |
 | Density: nrd0 bandwidth | stats::bw.nrd0; exact Gaussian kernel sum | 1 | 8.9e-16 | 1.0e-12 |
 | Density: curve values at 9 grid points | stats::bw.nrd0; exact Gaussian kernel sum | 9 | 2.3e-10 | 1.0e-8 |
 | RRHO grid dimensions (exact) | RRHO::RRHO(alternative = "enrichment") | 2 | 0 | 0 (exact) |

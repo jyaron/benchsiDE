@@ -107,6 +107,16 @@ function runExternalValidation(M, D, REF) {
   const f = olsCI(xv, yv);
   ok("OLS regression: intercept, slope, SE, p", 4, absMax([f.a, f.b, f.seB, f.pB], REF.ols), 1e-8);
 
+  // co-expression table: r, slope and p of every compared gene against gene 1
+  if (REF.coexp) {
+    coGene = 0; coKey = ""; drawCoexp();
+    const cg = REF.coexp.genes;
+    ok("co-expression: Pearson r", cg.length, absMax(cg.map(g => coR[g]), REF.coexp.r), 1e-10);
+    ok("co-expression: slope", cg.length, absMax(cg.map(g => coB[g]), REF.coexp.slope), 1e-10);
+    ok("co-expression: p for r = 0 (relative)", cg.length, relMax(cg.map(g => coP[g]), REF.coexp.p), 1e-6);
+    coGene = null; coKey = "";
+  }
+
   // density
   const v1 = Array.from({ length: nG }, (_, g) => L[g * nS]);
   const kd = kdeExact(v1, 512);

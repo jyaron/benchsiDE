@@ -12,7 +12,7 @@ Some gene families expanded independently in each lineage. The mouse genes Serpi
 
 To retain these genes, benchsiDE builds homology families: connected groups of the homology classes, merged by shared members (union–find), so that a whole expanded family forms one unit.
 
-**Score families** (Compare datasets tab) treats each family as a module:
+**Score families** (Compare datasets tab) compares any two loaded datasets of different species, chosen as X and Y: the session and a comparison dataset, or two comparison datasets. Each family is treated as a module:
 
 1. In each dataset separately, the family score is the mean z-score of its members present in that dataset.
 2. The group effect is tested within each dataset by Welch t on the family scores, with BH correction across families.
@@ -20,7 +20,7 @@ To retain these genes, benchsiDE builds homology families: connected groups of t
 
 ## Family concordance scatter
 
-One point per family: x is the effect in the session, y the effect in the comparison dataset. Point size reflects the number of matched members.
+One point per family: x is the effect in dataset X, y the effect in dataset Y. Point size reflects the number of matched members.
 
 | Colour | Meaning |
 |---|---|
