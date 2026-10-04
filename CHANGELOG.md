@@ -10,7 +10,7 @@ Differential expression
 - CHANGED: the captions of the Venn diagram, the all-contrasts table and the contrast comparison state the test, the call rule and the covariates.
 
 Downloads
-- CHANGED: every download (CSV, Excel, images, session, report, gene-set and benchmark files) goes through one routine that attaches the link to the page while it is clicked and releases the file a minute later instead of at once. In Firefox the differential-expression CSV export did not start in the continuous-integration test; Firefox reads the file after the click, and releasing it at once can cancel a large download.
+- CHANGED: every download (CSV, Excel, images, session, report, gene-set and benchmark files) goes through one routine that attaches the link to the page while it is clicked and releases the file a minute later instead of at once. Releasing the file at once can cancel a large download in some browsers.
 
 Validation
 - External validation: 11 checks added (voom with a blocking factor, TREAT with the moderated t, and the analysis of the limma/Glimma/edgeR workflow article: voom adjusted for sequencing lane, ordinary and TREAT, including its Venn counts), 70 in total.
