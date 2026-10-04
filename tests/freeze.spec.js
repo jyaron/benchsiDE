@@ -81,4 +81,15 @@ test("FRY results replace the panels and notes of an earlier GSEA or ORA run", a
   expect(await page.locator("#p_leadedge").innerHTML()).toBe("");
   await expect(page.locator("#enrfootnote")).toBeHidden();
   await expect(page.locator("#enrtable")).toContainText("p (mixed)");
+  // GSEA again, then ORA: the GSEA running-score plot must not remain under the ORA result
+  await page.click('#enrmethod button[data-e="gsea"]'); await page.click("#enrrun");
+  await expect(page.locator("#esplotwrap")).toBeVisible({ timeout: 60000 });
+  await page.click('#enrmethod button[data-e="ora"]'); await page.click("#enrrun");
+  await expect(page.locator("#enrinfo")).toContainText("Query:", { timeout: 60000 });
+  await expect(page.locator("#esplotwrap")).toBeHidden();
+  await expect(page.locator("#enrfootnote")).toBeVisible();
+  // printing: the scrolling result table is printed in full
+  await page.emulateMedia({ media: "print" });
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById("enrtable")).maxHeight)).toBe("none");
+  await page.emulateMedia({ media: "screen" });
 });

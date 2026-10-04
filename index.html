@@ -151,6 +151,12 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
   #figprev .fpbody img { display:block; margin:0 auto; width:auto; height:auto; max-width:100%; max-height:66vh; box-shadow:0 0 0 1px #cbd5e1; background:#fff; }
   #figprev .fpfoot { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:10px 16px; border-top:1px solid var(--border); font-size:13px; }
   #figprev .fpfoot input[type=text] { width:260px; }
+
+@media print {
+  /* scrolling panels (tables with a fixed height) print in full instead of being cut at their height */
+  [style*="max-height"] { max-height:none !important; overflow:visible !important; }
+  .js-plotly-plot, .plot-container { break-inside:avoid; }
+}
 </style>
 </head>
 <body>
@@ -1478,7 +1484,11 @@ function reguardPlots(force){
 }
 let _rgT=null;
 window.addEventListener("resize", ()=>{ clearTimeout(_rgT); _rgT=setTimeout(()=>reguardPlots(false), 250); });
-window.addEventListener("beforeprint", ()=>{ for(const id of PLREG.keys()){ const d=document.getElementById(id); try{ if(d&&d._fullLayout) Plotly.Plots.resize(d); }catch(e){} } reguardPlots(true); });
+// Printing: the print layout (page width) is applied after "beforeprint"; the print media query changes
+// once it is, and the plots are then redrawn at the page width synchronously, before the page is rendered.
+try{ const _pmq=window.matchMedia&&window.matchMedia("print");
+  if(_pmq){ const onP=e=>{ reguardPlots(true); }; if(_pmq.addEventListener) _pmq.addEventListener("change", onP); else if(_pmq.addListener) _pmq.addListener(onP); } }catch(e){}
+window.addEventListener("beforeprint", ()=>reguardPlots(true));
 window.addEventListener("afterprint", ()=>{ setTimeout(()=>reguardPlots(true), 50); });
 Plotly.react=function(div,traces,layout,cfg){
   const d0=typeof div==="string"? document.getElementById(div) : div; const noG=layout&&layout.__noGuard; if(noG) delete layout.__noGuard;
@@ -4435,7 +4445,7 @@ function* runGSEAGen(){
    : `<span class="warnchip">Gene permutation (preranked): ${GSEANOTE}. This null ignores correlation between genes and reports false sets on data with no true difference, so no FDR is reported: the table is a ranking by NES and nominal p only. Use FRY (this tab) for inference.</span>`);
   el("enrgenes").style.display="none";
   el("enrtable").innerHTML=`<table class="tbl"><tr><th>Gene set</th><th>size</th><th>NES</th><th>p</th><th>FDR</th><th>plot</th><th>leading edge (click for kinetics)</th></tr>`+
-    rows.slice(0,60).map((r,ri)=>`<tr${r.q<=GQ?' style="background:#f0fdf4"':''}><td class="setlink" data-r="${ri}">${r.name}</td><td>${r.m}</td><td style="color:${r.NES>0?'#dc2626':'#2563eb'}">${r.NES.toFixed(2)}</td><td>${fmtP(r.p)}</td><td>${isFinite(r.q)?fmtP(r.q):"not reported"}</td><td><span class="curvelink" data-r="${ri}" style="cursor:pointer;color:#2563eb" title="add/remove this set on the enrichment plot">curve</span> <span class="bclink" data-r="${ri}" style="cursor:pointer;color:#7c3aed" title="barcode + ECDF for this set">bc</span></td><td style="font-size:11px;text-align:left">${r.ovIdx.slice(0,10).map(g=>`<span class="glink" data-g="${g}">${GENES[g]}</span>`).join(", ")}${r.k>10?" …":""}</td></tr>`).join("")+`</table>`;
+    rows.slice(0,60).map((r,ri)=>`<tr${r.q<=GQ?' style="background:#f0fdf4"':''}><td class="setlink" data-r="${ri}">${setNameHTML(r.name)}</td><td class="num">${r.m}</td><td class="num" style="color:${r.NES>0?'#dc2626':'#2563eb'}">${r.NES.toFixed(2)}</td><td class="num">${fmtP(r.p)}</td><td class="num">${isFinite(r.q)?fmtP(r.q):"not reported"}</td><td><span class="curvelink" data-r="${ri}" style="cursor:pointer;color:#2563eb" title="add/remove this set on the enrichment plot">curve</span> <span class="bclink" data-r="${ri}" style="cursor:pointer;color:#7c3aed" title="barcode + ECDF for this set">bc</span></td><td style="font-size:11px;text-align:left">${r.ovIdx.slice(0,10).map(g=>`<span class="glink" data-g="${g}">${GENES[g]}</span>`).join(", ")}${r.k>10?" …":""}</td></tr>`).join("")+`</table>`;
   document.querySelectorAll("#enrtable .glink").forEach(s=>s.addEventListener("click",()=>{ jumpToGene(+s.dataset.g); }));
   document.querySelectorAll("#enrtable .setlink").forEach(s=>s.addEventListener("click",()=>renderEnrGenes(enrResults.rows[+s.dataset.r])));
   document.querySelectorAll("#enrtable .bclink").forEach(s=>s.addEventListener("click",()=>{
@@ -4577,7 +4587,7 @@ function* runFRYGen(){
   el("p_enrlolli").style.display="none";
   el("esplotwrap").style.display="none";
   el("enrtable").innerHTML=`<table class="tbl"><tr><th>Gene set</th><th>size</th><th>direction</th><th>p</th><th>FDR</th><th>p (mixed)</th><th>FDR (mixed)</th><th>plot</th></tr>`+
-    rows.slice(0,60).map(r=>`<tr${r.q<=0.05?' style="background:#f0fdf4"':''}><td style="text-align:left">${r.name}</td><td>${r.m}</td><td style="color:${r.dir==="Up"?"#dc2626":"#2563eb"}">${r.dir}</td><td>${fmtP(r.p)}</td><td>${fmtP(r.q)}</td><td>${fmtP(r.pm)}</td><td>${fmtP(r.qm)}</td><td><span class="bclink" data-r="${enrResults.rows.indexOf(r)}" style="cursor:pointer;color:#7c3aed" title="barcode + ECDF">bc</span></td></tr>`).join("")+`</table>`;
+    rows.slice(0,60).map(r=>`<tr${r.q<=0.05?' style="background:#f0fdf4"':''}><td style="text-align:left">${setNameHTML(r.name)}</td><td class="num">${r.m}</td><td style="color:${r.dir==="Up"?"#dc2626":"#2563eb"}">${r.dir}</td><td class="num">${fmtP(r.p)}</td><td class="num">${fmtP(r.q)}</td><td class="num">${fmtP(r.pm)}</td><td class="num">${fmtP(r.qm)}</td><td><span class="bclink" data-r="${enrResults.rows.indexOf(r)}" style="cursor:pointer;color:#7c3aed" title="barcode + ECDF">bc</span></td></tr>`).join("")+`</table>`;
   el("enrexport").style.display="inline-block";
   drawSetJaccard(); drawRidgeline();
   document.querySelectorAll("#enrtable .bclink").forEach(s=>s.addEventListener("click",()=>{
@@ -4594,6 +4604,7 @@ function clearEnrDisplay(msg){
   el("enrtable").innerHTML="";
   el("enrexport").style.display="none";
 }
+function setNameHTML(n){ return esc(String(n)).replace(/_/g,"_<wbr>"); }   // long set names wrap at underscores, not mid-word
 function enrMethodText(m){
   if(m==="gsea") return "GSEA ranks all kept genes by the current DE contrast's moderated t (no significance cutoff) and asks whether a set's genes lie towards the top or the bottom of the ranking. Use it when few or no genes pass the FDR threshold. By default the sample labels are permuted, which gives a valid FDR but needs about 7 samples per group and no covariates; otherwise the genes are permuted and the result is a ranking by NES and nominal p, without FDR. NES = ES divided by the mean ES of the same-sign permutations.";
   if(m==="fry") return "FRY (limma) tests each set on the model of the current DE contrast, including any covariates, using every gene. The directional p asks whether the set's genes change together in one direction; the mixed p asks whether they change in either direction. It is a self-contained test: with many samples or a strong treatment most sets are significant, so compare with CAMERA (Discovery tab) or GSEA to see which sets change more than the other genes.";
@@ -4608,6 +4619,7 @@ function setEnrMethodUI(){
 function resetEnrPanels(mode){
   for(const id of ["p_barcode","p_setecdf","p_leadedge"]){ const d=el(id); if(!d) continue; try{ if(window.Plotly&&Plotly.purge) Plotly.purge(d); }catch(e){} d.innerHTML=""; }
   el("jaccardgenes").innerHTML="";
+  if(mode!=="gsea") el("esplotwrap").style.display="none";
   el("enrfootnote").style.display= mode==="ora"? "block" : "none";
 }
 function runEnrichment(){
@@ -4643,7 +4655,7 @@ function runEnrichment(){
   el("enrinfo").innerHTML=`Query: <b>${qs.label}</b>, ${q} of ${qAll} genes annotated in the library, against a universe of the ${N.toLocaleString()} ${srcE==="meta"?"genes tested in the meta-analysis":patU?"pattern-analysis genes":"filtered genes"} annotated in ${GMTname}; ${rows.length} testable sets. <b>${nsig}</b> sets at FDR ≤ 0.05. <span class="footer-note">The hypergeometric test treats genes as independent; for lists of co-regulated genes (for example the top of a ranking) it is anti-conservative, and FRY or CAMERA (Discovery tab) are the appropriate tests.</span>`;
   el("enrgenes").style.display="none";
   el("enrtable").innerHTML=`<table class="tbl"><tr><th>Gene set</th><th>size</th><th>overlap</th><th>ratio</th><th>p</th><th>FDR</th><th>leading genes (click for kinetics)</th></tr>`+
-    rows.slice(0,60).map((r,ri)=>`<tr${r.q<=0.05?' style="background:#f0fdf4"':''}><td class="setlink" data-r="${ri}">${r.name}</td><td>${r.m}</td><td>${r.k}</td><td>${r.ratio.toFixed(1)}×</td><td>${fmtP(r.p)}</td><td>${fmtP(r.q)}</td><td style="font-size:11px;text-align:left">${r.ovIdx.slice(0,12).map(g=>`<span class="glink" data-g="${g}">${GENES[g]}</span>`).join(", ")}${r.k>12?" …":""}</td></tr>`).join("")+`</table>`;
+    rows.slice(0,60).map((r,ri)=>`<tr${r.q<=0.05?' style="background:#f0fdf4"':''}><td class="setlink" data-r="${ri}">${setNameHTML(r.name)}</td><td class="num">${r.m}</td><td class="num">${r.k}</td><td class="num">${r.ratio.toFixed(1)}×</td><td class="num">${fmtP(r.p)}</td><td class="num">${fmtP(r.q)}</td><td style="font-size:11px;text-align:left">${r.ovIdx.slice(0,12).map(g=>`<span class="glink" data-g="${g}">${GENES[g]}</span>`).join(", ")}${r.k>12?" …":""}</td></tr>`).join("")+`</table>`;
   document.querySelectorAll("#enrtable .glink").forEach(s=>s.addEventListener("click",()=>{ jumpToGene(+s.dataset.g); }));
   document.querySelectorAll("#enrtable .setlink").forEach(s=>s.addEventListener("click",()=>renderEnrGenes(enrResults.rows[+s.dataset.r])));
   drawEnrLolli(rows);
