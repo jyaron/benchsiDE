@@ -72,7 +72,7 @@ test("UI smoke: self-test button renders a passing evidence panel", async ({ pag
   await page.goto(PAGE);
   await page.click("#selftestbtn");
   await expect(page.locator("#selftestout")).toContainText(
-    `All ${N_COMPONENTS} components reproduce their references`, { timeout: 30000 });
+    `\u2713 all ${N_COMPONENTS} components pass`, { timeout: 30000 });
 });
 
 test("self-test leaves the user's analysis and its displays unchanged", async ({ page }) => {
@@ -92,7 +92,7 @@ test("self-test leaves the user's analysis and its displays unchanged", async ({
   }, [matrix, design]);
   const before = await snap();
   await page.click("#selftestbtn");
-  await expect(page.locator("#selftestout")).toContainText("All 21 components reproduce their references", { timeout: 30000 });
+  await expect(page.locator("#selftestout")).toContainText(`\u2713 all ${N_COMPONENTS} components pass`, { timeout: 30000 });
   expect(await snap()).toEqual(before);
   await page.evaluate(() => document.getElementById("probe").click());
   expect(await page.evaluate(() => window.__probe)).toBe(1);
