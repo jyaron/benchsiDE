@@ -51,11 +51,15 @@ test("angled category labels stay inside the figure after the window is narrowed
   await page.waitForTimeout(900);
   const over = await page.evaluate(() => {
     const d = document.getElementById("refittest"), box = d.querySelector(".main-svg").getBoundingClientRect();
-    let worst = -1e9;
-    d.querySelectorAll(".xtick text").forEach((t) => { const r = t.getBoundingClientRect(); worst = Math.max(worst, r.right - box.right, box.left - r.left, r.bottom - box.bottom); });
+    let worst = { px: -1e9, edge: "", label: "" };
+    d.querySelectorAll(".xtick text").forEach((t) => {
+      const r = t.getBoundingClientRect();
+      for (const [edge, px] of [["right", r.right - box.right], ["left", box.left - r.left], ["bottom", r.bottom - box.bottom]])
+        if (px > worst.px) worst = { px, edge, label: t.textContent };
+    });
     return worst;
   });
-  expect(over, "a tick label crosses the figure edge by " + over + " px").toBeLessThanOrEqual(1);
+  expect(over.px, `tick label "${over.label}" crosses the ${over.edge} edge by ${over.px} px`).toBeLessThanOrEqual(1);
 });
 
 test("FRY results replace the panels and notes of an earlier GSEA or ORA run", async ({ page }) => {

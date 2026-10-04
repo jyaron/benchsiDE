@@ -1190,7 +1190,8 @@ function layoutGuard(div, traces, L){
           const pw=Math.max(100, divW-M.l-M.r); let over=0;
           for(let i=0;i<n;i++){
             const xi = ang>0? M.l+(i+0.5)*pw/n : M.l+(i+0.5)*pw/n;
-            const o = ang>0? xi + wl[i]*c + xs*0.5 - divW : wl[i]*c + xs*0.5 - xi;
+            // 3% and 3 px allow for the browser's font metrics differing from the width estimate
+            const o = ang>0? xi + wl[i]*c*1.03 + xs*0.5 + 3 - divW : wl[i]*c*1.03 + xs*0.5 + 3 - xi;
             if(o>over) over=o;
           }
           if(over<=1) break;
@@ -1198,14 +1199,14 @@ function layoutGuard(div, traces, L){
         }
         // margin at its cap and labels still too long: shorten each label to the room left at its position
         const pw=Math.max(100, divW-M.l-M.r);
-        const room=i=>{ const xi=M.l+(i+0.5)*pw/n; return ((ang>0? divW-xi : xi) - xs*0.5 - 2)/c; };
+        const room=i=>{ const xi=M.l+(i+0.5)*pw/n; return ((ang>0? divW-xi : xi) - xs*0.5 - 3)/(c*1.03); };
         if(labs.some((v,i)=>wl[i]>room(i)+0.5)){
           labs=labs.map((v,i)=> wl[i]>room(i)+0.5? truncToPx(String(v).split("<br>").join(" "), xs, Math.max(xs*3, room(i))) : v);
           if(new Set(labs).size<new Set(uc).size) labs=truncAll(uc.map(String), xs, Math.max(xs*3, Math.min(...uc.map((_,i)=>room(i)))));
         }
       }
       const lines=Math.max(...labs.map(v=>String(v).split("<br>").length));
-      xh = ang===0? lines*xs*1.25+4 : widest(labs)*Math.sin(a)+xs*Math.cos(a)+4;
+      xh = ang===0? lines*xs*1.25+4 : widest(labs)*Math.sin(a)*1.03+xs*Math.cos(a)+8;
       X.tickangle=ang;
       if(labs.some((v,i)=>v!==uc[i])){ if(authTT) X.ticktext=labs; else { X.tickmode="array"; X.tickvals=uc; X.ticktext=labs; } }
       const xt=xa.title? (typeof xa.title==="string"?xa.title:xa.title.text) : "";
