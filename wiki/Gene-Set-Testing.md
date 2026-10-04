@@ -5,14 +5,17 @@ Three tests are offered. They answer different questions, so they can disagree w
 | Test | Hypothesis type | Question | Uses |
 |---|---|---|---|
 | ORA (over-representation) | Competitive | Are the significant genes over-represented in the set, relative to all kept genes? | The current DE hit list (up, down or both) |
-| GSEA (preranked) | Competitive | Are the set's genes concentrated at one end of the genome-wide ranking? | All genes ranked by moderated t |
+| GSEA | Competitive | Are the set's genes concentrated at one end of the genome-wide ranking? | All genes ranked by moderated t; significance by sample-label permutation (1,000 permutations for small libraries), which keeps gene–gene correlation. Results are shaded at FDR ≤ 0.25, the GSEA convention. With fewer than about 7 samples per group, or with covariates, the app falls back to gene permutation; because that null gives false sets on data with no true difference, no FDR is reported and the table is a ranking only. |
 | FRY | Self-contained | Is the set, as a whole, differentially expressed between the groups? | Per-sample expression of the set's genes |
 
 A competitive test compares the set with the other genes; a self-contained test compares the set with no change. A self-contained test can be significant for a set that is no more affected than the average gene, which is often the case when a large fraction of the transcriptome responds.
 
+
+**FRY with many covariate columns.** FRY's robust standardization, as in limma, uses the largest squared residual effect, which depends on the basis chosen for the residual space. With a large design (for example 100 columns for a patient covariate in 144 samples), p-values therefore depend on the design parametrisation: in GSE121212, reordering the covariate columns changed limma's own FRY p-values by up to 0.17 (relative), and benchsiDE's differ from limma's by a similar amount. With few covariates, FRY agrees with limma to 2 × 10⁻¹⁰.
+
 ## ORA
 
-One-sided hypergeometric test of the overlap between the hit list and each set. The universe is all genes kept after filtering. FDR by Benjamini–Hochberg across the tested sets.
+One-sided hypergeometric test of the overlap between the hit list and each set. The universe is the filtered genes annotated in at least one set of the loaded library (the convention of limma's goana/kegga and clusterProfiler); for pattern and heatmap clusters it is the clustered genes. The test assumes independent genes and is anti-conservative for lists of co-regulated genes; FRY and CAMERA account for gene–gene correlation. FDR by Benjamini–Hochberg across the tested sets.
 
 ## GSEA
 

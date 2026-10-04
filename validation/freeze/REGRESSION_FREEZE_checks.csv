@@ -1,0 +1,228 @@
+check_id,name,dataset,reference,n_compared,max_deviation,tolerance,pass,note
+BLD-01,sha256 of the application script (last <script> block),index.html,value stated in the task,1.0,0.0,0,True,cadbda80bd67db0e3cb15fcbcf138c23fb75cb24ff17cf6c28a79c68886c7d5b
+DAT-01,count matrix checksum GSE54456,GSE54456,datasets.json sha256,1.0,0.0,0,True,
+DAT-02,count matrix checksum GSE121212,GSE121212,datasets.json sha256,1.0,0.0,0,True,
+DAT-03,count matrix checksum GSE186063,GSE186063,datasets.json sha256,1.0,0.0,0,True,
+DAT-04,count matrix checksum GSE83645,GSE83645,datasets.json sha256,1.0,0.0,0,True,
+DAT-05,count matrix checksum GSE41745,GSE41745,datasets.json sha256,1.0,0.0,0,True,
+DAT-06,count matrix checksum GSE171012,GSE171012,datasets.json sha256,1.0,0.0,0,True,
+DAT-07,count matrix checksum GSE143688_all,GSE143688_all,datasets.json sha256,1.0,0.0,0,True,
+DAT-08,count matrix checksum GSE143688,GSE143688,datasets.json sha256,1.0,0.0,0,True,
+ENG-01,run_checks core: external validation,GSE63310,limma/edgeR reference (gse63310_reference.json),59.0,0.0,0,True,59/59 components pass
+ENG-02,run_checks core: self-test,GSE63310,embedded R references,21.0,0.0,0,True,21/21 components pass; tab errors 0
+ENG-03m,"run_checks interaction mod_all_day: max |dlogFC|, |dt|",GSE143688_all,limma 3.66.0 (interaction_reference_GSE143688.json.gz),15492.0,4.4794390419156116e-11,1e-08,True,p rel 1.28e-11; df0 4.1e-14
+ENG-03v,"run_checks interaction voom_four_day: max |dlogFC|, |dt|",GSE143688_all,limma 3.66.0 (interaction_reference_GSE143688.json.gz),15492.0,5.043521156267161e-12,1e-08,True,p rel 1.14e-11; df0 4.0e-14
+ENG-04,"run_checks cross_dataset (REML+HK default, ORA vs scipy hypergeom)",PSO 4 cohorts + GSE143688,scipy.stats.hypergeom,,5.062950273183168e-11,1e-06,True,signature 1773; canonical genes 20/20; sex genes in signature 0; family datasets 5
+ENG-05,"run_checks figures_and_qc (angled labels, very-low-depth sample, module heatmap, selection, Prism, session)",GSE171012,computed label extents; GEO sample annotation,9.0,0.0,1,True,"selection [95, 95]; prism rows 28934"
+ENG-06,run_checks discovery_text (captions name CAMERA; covariate note),GSE121212,caption text,2.0,0.0,0,True,
+SNP-01,snapshot.py field app (version string),PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,1.0,0,True,0.23.0-beta (2026-10-01) -> 1.0.0-rc.1 (2026-10-03); explained by the version change (CHANGELOG top section 1.0.0-rc.1)
+SNP-02,snapshot.py field de.GSE121212.n,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-03,snapshot.py field de.GSE121212.up,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-04,snapshot.py field de.GSE121212.down,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-05,snapshot.py field de.GSE121212.lfc,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,23168.0,0.0,0,True,identical
+SNP-06,snapshot.py field de.GSE121212.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,23168.0,0.0,0,True,identical
+SNP-07,snapshot.py field de.GSE143688.n,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-08,snapshot.py field de.GSE143688.up,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-09,snapshot.py field de.GSE143688.down,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-10,snapshot.py field de.GSE143688.lfc,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,14885.0,0.0,0,True,identical
+SNP-11,snapshot.py field de.GSE143688.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,14885.0,0.0,0,True,identical
+SNP-12,snapshot.py field de.GSE186063.n,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-13,snapshot.py field de.GSE186063.up,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-14,snapshot.py field de.GSE186063.down,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-15,snapshot.py field de.GSE186063.lfc,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,21112.0,0.0,0,True,identical
+SNP-16,snapshot.py field de.GSE186063.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,21112.0,0.0,0,True,identical
+SNP-17,snapshot.py field de.GSE54456.n,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-18,snapshot.py field de.GSE54456.up,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-19,snapshot.py field de.GSE54456.down,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-20,snapshot.py field de.GSE54456.lfc,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19518.0,0.0,0,True,identical
+SNP-21,snapshot.py field de.GSE54456.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19518.0,0.0,0,True,identical
+SNP-22,snapshot.py field de.GSE83645.n,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-23,snapshot.py field de.GSE83645.up,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-24,snapshot.py field de.GSE83645.down,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-25,snapshot.py field de.GSE83645.lfc,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,20956.0,0.0,0,True,identical
+SNP-26,snapshot.py field de.GSE83645.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,20956.0,0.0,0,True,identical
+SNP-27,snapshot.py field meta.method,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-28,snapshot.py field meta.tested,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-29,snapshot.py field meta.sig,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-30,snapshot.py field meta.up,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,1.0,0.0,0,True,identical
+SNP-31,snapshot.py field meta.sigGenes,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,2151.0,0.0,0,True,identical
+SNP-32,snapshot.py field meta.rows.genes,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19401.0,0.0,0,True,identical
+SNP-33,snapshot.py field meta.rows.mu,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19401.0,0.0,0,True,identical
+SNP-34,snapshot.py field meta.rows.se,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19401.0,0.0,0,True,identical
+SNP-35,snapshot.py field meta.rows.p,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19401.0,0.0,0,True,identical
+SNP-36,snapshot.py field meta.rows.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19401.0,0.0,0,True,identical
+SNP-37,snapshot.py field meta.rows.k,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,19401.0,0.0,0,True,identical
+SNP-38,snapshot.py field fam.keys,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,3172.0,0.0,0,True,identical
+SNP-39,snapshot.py field fam.d,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,3172.0,0.0,0,True,identical
+SNP-40,snapshot.py field fam.p,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,3172.0,0.0,0,True,identical
+SNP-41,snapshot.py field fam.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,3172.0,0.0,0,True,identical
+SNP-42,snapshot.py field fam.k,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,3172.0,0.0,0,True,identical
+SNP-43,snapshot.py field enr.sets,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,50.0,0.0,0,True,identical
+SNP-44,snapshot.py field enr.m,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,50.0,0.0,0,True,identical
+SNP-45,snapshot.py field enr.k,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,50.0,0.0,0,True,identical
+SNP-46,snapshot.py field enr.p,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,50.0,0.0,0,True,identical
+SNP-47,snapshot.py field enr.q,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,50.0,0.0,0,True,identical
+VDZ-de,"DerSimonian-Laird + z (method set back explicitly, browser control defaults): de fields",PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,199293.0,0.0,0,True,"25 fields, 0 differing values"
+VDZ-meta,"DerSimonian-Laird + z (method set back explicitly, browser control defaults): meta fields",PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,118561.0,0.0,0,True,"11 fields, 0 differing values"
+VDZ-fam,"DerSimonian-Laird + z (method set back explicitly, browser control defaults): fam fields",PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,15860.0,0.0,0,True,"5 fields, 0 differing values"
+VDZ-enr,"DerSimonian-Laird + z (method set back explicitly, browser control defaults): enr fields",PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,250.0,0.0,0,True,"5 fields, 0 differing values"
+VRH-de,REML + Hartung-Knapp (new default): de fields unchanged,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,199293.0,0.0,0,True,"25 fields, 0 differing values"
+VRH-fam,REML + Hartung-Knapp (new default): fam fields unchanged,PSO 4 cohorts + GSE143688,baseline_0.23.0.json.gz,15860.0,0.0,0,True,"5 fields, 0 differing values"
+VRH-meta,REML + Hartung-Knapp (new default): meta fields differ from baseline (expected change),PSO 4 cohorts,baseline_0.23.0.json.gz; explained by CHANGELOG 1.0.0-rc.1 meta-analysis default,118561.0,378.0,expected change,True,73173 differing values; signature 2151 -> 1773 (CHANGELOG states 2151 -> 1773); differences verified against metafor (MFR rows)
+VRH-enr,REML + Hartung-Knapp: meta-signature enrichment differs from baseline (follows from the signature change),PSO 4 cohorts,baseline_0.23.0.json.gz,250.0,9.0,expected change,True,"97 differing values; identical under DL+z (VDZ-enr), so the difference is caused only by the meta-analysis model"
+MFR-REML_hk-mu,REML + Hartung-Knapp: mu vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha')",19400.0,9.601952566384853e-11,1e-08,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-DL_z-mu,DerSimonian-Laird + z: mu vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='DL', test='z')",19401.0,7.993605777301127e-15,1e-10,True,
+MFR-REML_hk-p,REML + Hartung-Knapp: p (relative) vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha')",19400.0,1.2697892692018014e-09,1e-06,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-DL_z-p,DerSimonian-Laird + z: p (relative) vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='DL', test='z')",19401.0,9.676753562773577e-13,1e-06,True,
+MFR-REML_hk-tau2,REML + Hartung-Knapp: tau2 vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha')",19400.0,1.060990767465242e-09,1e-08,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-DL_z-tau2,DerSimonian-Laird + z: tau2 vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='DL', test='z')",19401.0,6.217248937900877e-15,1e-10,True,
+MFR-REML_hk-ciLo,REML + Hartung-Knapp: ciLo vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha')",19400.0,1.6375273359514608e-10,1e-08,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-DL_z-ciLo,DerSimonian-Laird + z: ciLo vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='DL', test='z')",19401.0,7.105427357601002e-15,1e-10,True,
+MFR-REML_hk-ciHi,REML + Hartung-Knapp: ciHi vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha')",19400.0,1.9103357784544528e-10,1e-08,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-DL_z-ciHi,DerSimonian-Laird + z: ciHi vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='DL', test='z')",19401.0,4.263256414560601e-14,1e-10,True,
+MFR-REML_hk-piLo_Riley,REML + Hartung-Knapp: piLo_Riley vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha'), predict(predtype='Riley')",19400.0,4.829292521435491e-09,1e-08,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-REML_hk-piHi_Riley,REML + Hartung-Knapp: piHi_Riley vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha'), predict(predtype='Riley')",19400.0,4.637253248063189e-09,1e-08,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-DL_z-piLo_Riley,DerSimonian-Laird + z: piLo_Riley vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='DL', test='z'), predict(predtype='Riley')",19401.0,1.8545165403338615e-12,1e-10,True,
+MFR-DL_z-piHi_Riley,DerSimonian-Laird + z: piHi_Riley vs metafor,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='DL', test='z'), predict(predtype='Riley')",19401.0,1.8616219676914625e-12,1e-10,True,
+MFR-REML_hk-se_test,REML + Hartung-Knapp: standard error of the test (from the CI) vs metafor se,PSO 4 cohorts (minimum 3 datasets),"metafor 5.0.1 rma(method='REML', test='knha')",19400.0,5.574106454186989e-11,1e-08,True,TMEM126B excluded for REML: metafor default Fisher scoring did not converge (MFR-TMEM)
+MFR-TMEM,REML tau2 for TMEM126B is at the restricted-likelihood maximum (metafor default failed to converge),PSO 4 cohorts,bounded 1-D maximisation of the restricted log-likelihood (scipy),1.0,2.8751416551384135e-09,1e-06,True,app tau2 0.00443921 (logL 3.1005039353); metafor with stepadj=0.5 gives tau2 0.005288 (logL 3.1003778731)
+DOC-REML_hk,"genes at meta FDR <= 0.05, REML_hk, minimum 2 datasets, vs META_REML_HK.md",PSO 4 cohorts,validation/freeze/META_REML_HK.md (app and R counts),19518.0,0.0,0,True,app 7010; document 7010 / R 7010; genes tested 19518 (document 19518)
+DOC-REML_z,"genes at meta FDR <= 0.05, REML_z, minimum 2 datasets, vs META_REML_HK.md",PSO 4 cohorts,validation/freeze/META_REML_HK.md (app and R counts),19518.0,0.0,0,True,app 12909; document 12909 / R 12909; genes tested 19518 (document 19518)
+DOC-DL_hk,"genes at meta FDR <= 0.05, DL_hk, minimum 2 datasets, vs META_REML_HK.md",PSO 4 cohorts,validation/freeze/META_REML_HK.md (app and R counts),19518.0,0.0,0,True,app 7007; document 7007 / R 7007; genes tested 19518 (document 19518)
+SES-PRE10,session saved before 1.0 (no meta settings) restores DL + z and reproduces 0.23.0 meta results,PSO 4 cohorts,baseline_0.23.0.json.gz,19401.0,0.0,0,True,restored model REM/z; version warning shown: True; signature 2151
+IX-01,"interaction card (UI path, Day covariate, all eight groups): logFC vs limma",GSE143688_all,interaction_reference_GSE143688.json.gz (limma 3.66.0),15492.0,4.99755792304768e-12,1e-08,True,
+IX-02,interaction card (UI path): p-value relative deviation vs limma,GSE143688_all,interaction_reference_GSE143688.json.gz,15492.0,1.2765649578063308e-11,1e-06,True,
+IX-03,"interaction card: significant genes (FDR <= 0.05, |log2FC| >= 1) vs INTERACTION.md",GSE143688_all,validation/freeze/INTERACTION.md,1.0,0.0,0,True,app 871; document 871
+TAB-1,every tab opened twice (before and after analyses): runtime errors,PSO 4 cohorts + GSE143688 (comparison),no exception expected,20.0,0.0,0,True,
+ACT-1,"all driven actions, exports, report, methods, summary figure: runtime errors (including unhandled preview errors)",PSO 4 cohorts + GSE143688 (comparison),no exception expected,106.0,0.0,0,True,RUNTIME FAIL absent
+XLS-1,Excel/Prism export (plot toolbar) of every plot div with data: workbook parses and contains numeric cells,PSO 4 cohorts + GSE143688 (comparison),zipfile parse of the exported workbook,53.0,0.0,0,True,
+IMG-1,"image export (camera button, preview window, Save) of every plot div: file written",PSO 4 cohorts + GSE143688 (comparison),download record in the stub,56.0,0.0,0,True,stub Plotly.toImage; image content not rendered
+NOD-1,plot divs without data that still offer image and Excel export (export contains no values),PSO 4 cohorts + GSE143688 (comparison),trace data and Plotly config,56.0,3.0,0,False,p_bio (No biotype column in input); p_pat (Need ≥3 groups with included samples); p_upset (Need ≥2 testable contrasts)
+CSV-1,CSV/GMT exports reachable in the interface: files with no data rows,PSO 4 cohorts + GSE143688 (comparison),line count of each exported file,23.0,1.0,0,False,trait_gene_sets_modules.csv
+TOK-1,"text exports (CSV, GMT, R, JSON, HTML, captions): literal undefined / NaN / [object Object]",PSO 4 cohorts + GSE143688 (comparison),regular expression scan,29.0,1.0,0,False,consensus_genes.csv: NaN
+FUI-1,"figure exports: user-interface instructions in title, annotations, axis or legend text",PSO 4 cohorts + GSE143688 (comparison),"pattern scan (click, hover, drag, button, ...)",619.0,2.0,0,False,"p_ridge: log₂FC distributions of the top sets: sorted by median (click a ridge for its barcode); p_setjaccard: Top enriched sets: member overlap, similarity-ordered (click a cell for the shared genes)"
+FLK-1,figure exports: hyperlinks or URLs in figure text or layout,PSO 4 cohorts + GSE143688 (comparison),"pattern scan (http, www, <a, href)",619.0,0.0,0,True,
+FCP-1,figure caption files: user-interface instructions or hyperlinks,PSO 4 cohorts + GSE143688 (comparison),pattern scan,3.0,0.0,0,True,gene_panels_caption.txt; rnaseq_summary_figure_caption.txt; module_heatmap_caption.txt
+GEN-1,individual-gene figure exports show only the decoded gene name (title and file name),PSO 4 cohorts + GSE143688 (comparison),gene symbol without identifier or HTML entity,6.0,0.0,0,True,"p_gene=""SERPINB4""; p_coscatter=""SERPINB3 vs SERPINB4""; p_geneb_0=""GSE121212: SERPINB4""; p_geneb_1=""GSE186063: SERPINB4""; p_geneb_2=""GSE83645: SERPINB4""; p_forest=""SERPINB4: per-dataset effect (95% CI) and pooled e"""
+ZER-1,bar plots and forest plots: value axis includes 0,PSO 4 cohorts + GSE143688 (comparison),"explicit range, rangemode or Plotly bar autorange",13.0,0.0,0,True,"p_compare yaxis: rangemode tozero; p_complexity yaxis: autorange (Plotly bar autorange includes 0); p_det yaxis: autorange (Plotly bar autorange includes 0); p_forest xaxis: range [-11.516920755086685, 11.51692075508668; p_gene yaxis: rangemode tozero; p_geneb_0 yaxis: rangemode tozero; p_geneb_1 yaxis: rangemode tozero; p_geneb_2 yaxis: rangemode tozero; p_hubxforest xaxis: range [-13.487426004652914, 13.48742600465291; p_lib yaxis: autorange (Plotly bar autorange includes 0); p_metaforest xaxis: range [-8.014589136507556, 13.64890155595471]; p_phist yaxis: autorange (Plotly bar autorange inc"
+ANG-1,"angled category labels fit inside the figure (final state of every plot, 620 px)",PSO 4 cohorts + GSE143688 (comparison),label extent from the app's textW (stub metric 7 px per character),9.0,-7.0,1,True,
+ASW-1,"angled labels fit: Gene Explorer bar plot and multi-gene comparison at 45, -45 and auto angle, 620/1000/1460 px",PSO 4 cohorts + GSE143688 (comparison),label extent as in run_checks figures_and_qc,18.0,-93.0,1,True,6 configurations with horizontal labels (no angle chosen)
+REP-1,"report generator: HTML report written, contains the methods text, no undefined/NaN tokens",PSO 4 cohorts + GSE143688 (comparison),content scan,1.0,0.0,0,True,"46475 characters, 11 images (stub), 16 sections"
+MET-1,"methods text: generated, copied to clipboard unchanged, describes the analyses run, no undefined/NaN",PSO 4 cohorts + GSE143688 (comparison),content scan,1.0,0.0,0,True,11112 characters
+TAB-2,every tab opened twice (before and after analyses): runtime errors,GSE143688_all (Cell; interaction),no exception expected,20.0,0.0,0,True,
+ACT-2,"all driven actions, exports, report, methods, summary figure: runtime errors (including unhandled preview errors)",GSE143688_all (Cell; interaction),no exception expected,96.0,0.0,0,True,RUNTIME FAIL absent
+XLS-2,Excel/Prism export (plot toolbar) of every plot div with data: workbook parses and contains numeric cells,GSE143688_all (Cell; interaction),zipfile parse of the exported workbook,41.0,0.0,0,True,
+IMG-2,"image export (camera button, preview window, Save) of every plot div: file written",GSE143688_all (Cell; interaction),download record in the stub,42.0,0.0,0,True,stub Plotly.toImage; image content not rendered
+NOD-2,plot divs without data that still offer image and Excel export (export contains no values),GSE143688_all (Cell; interaction),trace data and Plotly config,42.0,1.0,0,False,p_bio (No biotype column in input)
+CSV-2,CSV/GMT exports reachable in the interface: files with no data rows,GSE143688_all (Cell; interaction),line count of each exported file,20.0,1.0,0,False,trait_gene_sets_modules.csv; hub-across-datasets CSV excluded: its card cannot be opened without comparison datasets (Across datasets button hidden)
+TOK-2,"text exports (CSV, GMT, R, JSON, HTML, captions): literal undefined / NaN / [object Object]",GSE143688_all (Cell; interaction),regular expression scan,27.0,0.0,0,True,
+FUI-2,"figure exports: user-interface instructions in title, annotations, axis or legend text",GSE143688_all (Cell; interaction),"pattern scan (click, hover, drag, button, ...)",400.0,2.0,0,False,"p_ridge: log₂FC distributions of the top sets: sorted by median (click a ridge for its barcode); p_setjaccard: Top enriched sets: member overlap, similarity-ordered (click a cell for the shared genes)"
+FLK-2,figure exports: hyperlinks or URLs in figure text or layout,GSE143688_all (Cell; interaction),"pattern scan (http, www, <a, href)",400.0,0.0,0,True,
+FCP-2,figure caption files: user-interface instructions or hyperlinks,GSE143688_all (Cell; interaction),pattern scan,3.0,0.0,0,True,gene_panels_caption.txt; rnaseq_summary_figure_caption.txt; module_heatmap_caption.txt
+GEN-2,individual-gene figure exports show only the decoded gene name (title and file name),GSE143688_all (Cell; interaction),gene symbol without identifier or HTML entity,3.0,0.0,0,True,"p_gene=""Il22""; p_coscatter=""Il17a vs Il22""; gene stored as ""Pakap (ENSMUSG00000038729)"" exported with title ""Pakap"" and file Pakap.svg"
+ZER-2,bar plots and forest plots: value axis includes 0,GSE143688_all (Cell; interaction),"explicit range, rangemode or Plotly bar autorange",8.0,0.0,0,True,p_compare yaxis: rangemode tozero; p_complexity yaxis: autorange (Plotly bar autorange includes 0); p_det yaxis: autorange (Plotly bar autorange includes 0); p_gene yaxis: rangemode tozero; p_lib yaxis: autorange (Plotly bar autorange includes 0); p_phist yaxis: autorange (Plotly bar autorange includes 0); p_scree yaxis: autorange (Plotly bar autorange includes 0); p_upset yaxis: autorange (Plotly bar autorange includes 0)
+ANG-2,"angled category labels fit inside the figure (final state of every plot, 620 px)",GSE143688_all (Cell; interaction),label extent from the app's textW (stub metric 7 px per character),12.0,-6.0,1,True,
+ASW-2,"angled labels fit: Gene Explorer bar plot and multi-gene comparison at 45, -45 and auto angle, 620/1000/1460 px",GSE143688_all (Cell; interaction),label extent as in run_checks figures_and_qc,18.0,-12.0,1,True,4 configurations with horizontal labels (no angle chosen)
+REP-2,"report generator: HTML report written, contains the methods text, no undefined/NaN tokens",GSE143688_all (Cell; interaction),content scan,1.0,0.0,0,True,"31784 characters, 11 images (stub), 16 sections"
+MET-2,"methods text: generated, copied to clipboard unchanged, describes the analyses run, no undefined/NaN",GSE143688_all (Cell; interaction),content scan,1.0,0.0,0,True,6674 characters
+TAB-3,every tab opened twice (before and after analyses): runtime errors,GSE171012 (Status; whole skin),no exception expected,20.0,0.0,0,True,
+ACT-3,"all driven actions, exports, report, methods, summary figure: runtime errors (including unhandled preview errors)",GSE171012 (Status; whole skin),no exception expected,92.0,0.0,0,True,RUNTIME FAIL absent
+XLS-3,Excel/Prism export (plot toolbar) of every plot div with data: workbook parses and contains numeric cells,GSE171012 (Status; whole skin),zipfile parse of the exported workbook,41.0,0.0,0,True,
+IMG-3,"image export (camera button, preview window, Save) of every plot div: file written",GSE171012 (Status; whole skin),download record in the stub,42.0,0.0,0,True,stub Plotly.toImage; image content not rendered
+NOD-3,plot divs without data that still offer image and Excel export (export contains no values),GSE171012 (Status; whole skin),trace data and Plotly config,42.0,1.0,0,False,p_bio (No biotype column in input)
+CSV-3,CSV/GMT exports reachable in the interface: files with no data rows,GSE171012 (Status; whole skin),line count of each exported file,19.0,1.0,0,False,trait_gene_sets_modules.csv; hub-across-datasets CSV excluded: its card cannot be opened without comparison datasets (Across datasets button hidden)
+TOK-3,"text exports (CSV, GMT, R, JSON, HTML, captions): literal undefined / NaN / [object Object]",GSE171012 (Status; whole skin),regular expression scan,26.0,0.0,0,True,
+FUI-3,"figure exports: user-interface instructions in title, annotations, axis or legend text",GSE171012 (Status; whole skin),"pattern scan (click, hover, drag, button, ...)",337.0,2.0,0,False,"p_ridge: log₂FC distributions of the top sets: sorted by median (click a ridge for its barcode); p_setjaccard: Top enriched sets: member overlap, similarity-ordered (click a cell for the shared genes)"
+FLK-3,figure exports: hyperlinks or URLs in figure text or layout,GSE171012 (Status; whole skin),"pattern scan (http, www, <a, href)",337.0,0.0,0,True,
+FCP-3,figure caption files: user-interface instructions or hyperlinks,GSE171012 (Status; whole skin),pattern scan,3.0,0.0,0,True,gene_panels_caption.txt; rnaseq_summary_figure_caption.txt; module_heatmap_caption.txt
+GEN-3,individual-gene figure exports show only the decoded gene name (title and file name),GSE171012 (Status; whole skin),gene symbol without identifier or HTML entity,2.0,0.0,0,True,"p_gene=""SERPINB4""; p_coscatter=""S100A7A vs SERPINB4"""
+ZER-3,bar plots and forest plots: value axis includes 0,GSE171012 (Status; whole skin),"explicit range, rangemode or Plotly bar autorange",8.0,0.0,0,True,p_compare yaxis: rangemode tozero; p_complexity yaxis: autorange (Plotly bar autorange includes 0); p_det yaxis: autorange (Plotly bar autorange includes 0); p_gene yaxis: rangemode tozero; p_lib yaxis: autorange (Plotly bar autorange includes 0); p_phist yaxis: autorange (Plotly bar autorange includes 0); p_scree yaxis: autorange (Plotly bar autorange includes 0); p_upset yaxis: autorange (Plotly bar autorange includes 0)
+ANG-3,"angled category labels fit inside the figure (final state of every plot, 620 px)",GSE171012 (Status; whole skin),label extent from the app's textW (stub metric 7 px per character),7.0,77.0,1,False,"p_enrmat: +77 px; provisional (stub text metric): right margin 279 px = 45% cap; overflow +19.5 px with the app's fallback metric (0.58 em per character), -22.4 px at 0.5 em"
+ASW-3,"angled labels fit: Gene Explorer bar plot and multi-gene comparison at 45, -45 and auto angle, 620/1000/1460 px",GSE171012 (Status; whole skin),label extent as in run_checks figures_and_qc,18.0,-9.0,1,True,2 configurations with horizontal labels (no angle chosen)
+REP-3,"report generator: HTML report written, contains the methods text, no undefined/NaN tokens",GSE171012 (Status; whole skin),content scan,1.0,0.0,0,True,"50033 characters, 11 images (stub), 16 sections"
+MET-3,"methods text: generated, copied to clipboard unchanged, describes the analyses run, no undefined/NaN",GSE171012 (Status; whole skin),content scan,1.0,0.0,0,True,5620 characters
+TAB-4,every tab opened twice (before and after analyses): runtime errors,"GSE171012 (Status; CD8 samples, SortedCells trait)",no exception expected,20.0,0.0,0,True,
+ACT-4,"all driven actions, exports, report, methods, summary figure: runtime errors (including unhandled preview errors)","GSE171012 (Status; CD8 samples, SortedCells trait)",no exception expected,97.0,0.0,0,True,RUNTIME FAIL absent
+XLS-4,Excel/Prism export (plot toolbar) of every plot div with data: workbook parses and contains numeric cells,"GSE171012 (Status; CD8 samples, SortedCells trait)",zipfile parse of the exported workbook,44.0,0.0,0,True,
+IMG-4,"image export (camera button, preview window, Save) of every plot div: file written","GSE171012 (Status; CD8 samples, SortedCells trait)",download record in the stub,45.0,0.0,0,True,stub Plotly.toImage; image content not rendered
+NOD-4,plot divs without data that still offer image and Excel export (export contains no values),"GSE171012 (Status; CD8 samples, SortedCells trait)",trace data and Plotly config,45.0,1.0,0,False,p_bio (No biotype column in input)
+CSV-4,CSV/GMT exports reachable in the interface: files with no data rows,"GSE171012 (Status; CD8 samples, SortedCells trait)",line count of each exported file,19.0,0.0,0,True,; hub-across-datasets CSV excluded: its card cannot be opened without comparison datasets (Across datasets button hidden)
+TOK-4,"text exports (CSV, GMT, R, JSON, HTML, captions): literal undefined / NaN / [object Object]","GSE171012 (Status; CD8 samples, SortedCells trait)",regular expression scan,26.0,0.0,0,True,
+FUI-4,"figure exports: user-interface instructions in title, annotations, axis or legend text","GSE171012 (Status; CD8 samples, SortedCells trait)","pattern scan (click, hover, drag, button, ...)",337.0,2.0,0,False,"p_ridge: log₂FC distributions of the top sets: sorted by median (click a ridge for its barcode); p_setjaccard: Top enriched sets: member overlap, similarity-ordered (click a cell for the shared genes)"
+FLK-4,figure exports: hyperlinks or URLs in figure text or layout,"GSE171012 (Status; CD8 samples, SortedCells trait)","pattern scan (http, www, <a, href)",337.0,0.0,0,True,
+FCP-4,figure caption files: user-interface instructions or hyperlinks,"GSE171012 (Status; CD8 samples, SortedCells trait)",pattern scan,3.0,0.0,0,True,gene_panels_caption.txt; rnaseq_summary_figure_caption.txt; module_heatmap_caption.txt
+GEN-4,individual-gene figure exports show only the decoded gene name (title and file name),"GSE171012 (Status; CD8 samples, SortedCells trait)",gene symbol without identifier or HTML entity,3.0,0.0,0,True,"p_gene=""SERPINB4""; p_coscatter=""LCN6 vs SERPINB4""; p_trgene=""TNFAIP6: +2.822 log₂ per SD, FDR 2.17e-15"""
+ZER-4,bar plots and forest plots: value axis includes 0,"GSE171012 (Status; CD8 samples, SortedCells trait)","explicit range, rangemode or Plotly bar autorange",8.0,0.0,0,True,p_compare yaxis: rangemode tozero; p_complexity yaxis: autorange (Plotly bar autorange includes 0); p_det yaxis: autorange (Plotly bar autorange includes 0); p_gene yaxis: rangemode tozero; p_lib yaxis: autorange (Plotly bar autorange includes 0); p_phist yaxis: autorange (Plotly bar autorange includes 0); p_scree yaxis: autorange (Plotly bar autorange includes 0); p_upset yaxis: autorange (Plotly bar autorange includes 0)
+ANG-4,"angled category labels fit inside the figure (final state of every plot, 620 px)","GSE171012 (Status; CD8 samples, SortedCells trait)",label extent from the app's textW (stub metric 7 px per character),7.0,77.0,1,False,"p_enrmat: +77 px; provisional (stub text metric): right margin 279 px = 45% cap; overflow +19.5 px with the app's fallback metric (0.58 em per character), -22.4 px at 0.5 em"
+ASW-4,"angled labels fit: Gene Explorer bar plot and multi-gene comparison at 45, -45 and auto angle, 620/1000/1460 px","GSE171012 (Status; CD8 samples, SortedCells trait)",label extent as in run_checks figures_and_qc,18.0,-9.0,1,True,2 configurations with horizontal labels (no angle chosen)
+REP-4,"report generator: HTML report written, contains the methods text, no undefined/NaN tokens","GSE171012 (Status; CD8 samples, SortedCells trait)",content scan,1.0,0.0,0,True,"47656 characters, 11 images (stub), 15 sections"
+MET-4,"methods text: generated, copied to clipboard unchanged, describes the analyses run, no undefined/NaN","GSE171012 (Status; CD8 samples, SortedCells trait)",content scan,1.0,0.0,0,True,6560 characters
+FST-01,forest plots: x axis symmetric about 0 (CHANGELOG: forest plots always include 0 and are symmetric),PSO 4 cohorts + GSE143688,x-axis range,3.0,5.634312419447154,1e-09,False,p_metaforest: |lo+hi|=5.63; p_forest: |lo+hi|=0; p_hubxforest: |lo+hi|=0
+SES-01,"session save, fresh page, restore, re-run: DE lfc identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,19518.0,0.0,0,True,
+SES-02,"session save, fresh page, restore, re-run: DE p identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,19518.0,0.0,0,True,
+SES-03,"session save, fresh page, restore, re-run: DE q identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,19518.0,0.0,0,True,
+SES-04,"session save, fresh page, restore, re-run: DE settings identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,4.0,0.0,0,True,
+SES-05,"session save, fresh page, restore, re-run: meta rows (mu,se,p,q,k,CI,tau2) identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,155240.0,0.0,0,True,
+SES-06,"session save, fresh page, restore, re-run: meta model and signature identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,1645.0,0.0,0,True,
+SES-07,"session save, fresh page, restore, re-run: enrichment ORA p,q identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,50.0,0.0,0,True,
+SES-08,"session save, fresh page, restore, re-run: state desel identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,40.0,0.0,0,True,
+SES-09,"session save, fresh page, restore, re-run: state curGene identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,1.0,0.0,0,True,
+SES-10,"session save, fresh page, restore, re-run: state compare identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,4.0,0.0,0,True,
+SES-11,"session save, fresh page, restore, re-run: state included identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,171.0,0.0,0,True,
+SES-12,"session save, fresh page, restore, re-run: state groups identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,171.0,0.0,0,True,
+SES-13,"session save, fresh page, restore, re-run: state nG identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,1.0,0.0,0,True,
+SES-14,"session save, fresh page, restore, re-run: session saved again after restore equals original identical",PSO 4 cohorts + GSE143688 (comparison),results before saving,50.0,0.0,0,True,
+SES-15,"session save, fresh page, restore, re-run: DE lfc identical",GSE143688_all (Cell; interaction),results before saving,15492.0,0.0,0,True,
+SES-16,"session save, fresh page, restore, re-run: DE p identical",GSE143688_all (Cell; interaction),results before saving,15492.0,0.0,0,True,
+SES-17,"session save, fresh page, restore, re-run: DE q identical",GSE143688_all (Cell; interaction),results before saving,15492.0,0.0,0,True,
+SES-18,"session save, fresh page, restore, re-run: DE settings identical",GSE143688_all (Cell; interaction),results before saving,4.0,0.0,0,True,
+SES-19,"session save, fresh page, restore, re-run: interaction lfc identical",GSE143688_all (Cell; interaction),results before saving,15492.0,0.0,0,True,
+SES-20,"session save, fresh page, restore, re-run: interaction p identical",GSE143688_all (Cell; interaction),results before saving,15492.0,0.0,0,True,
+SES-21,"session save, fresh page, restore, re-run: interaction q identical",GSE143688_all (Cell; interaction),results before saving,15492.0,0.0,0,True,
+SES-22,"session save, fresh page, restore, re-run: interaction spec identical",GSE143688_all (Cell; interaction),results before saving,7.0,0.0,0,True,
+SES-23,"session save, fresh page, restore, re-run: enrichment ORA p,q identical",GSE143688_all (Cell; interaction),results before saving,50.0,0.0,0,True,
+SES-24,"session save, fresh page, restore, re-run: state desel identical",GSE143688_all (Cell; interaction),results before saving,40.0,0.0,0,True,
+SES-25,"session save, fresh page, restore, re-run: state curGene identical",GSE143688_all (Cell; interaction),results before saving,1.0,0.0,0,True,
+SES-26,"session save, fresh page, restore, re-run: state compare identical",GSE143688_all (Cell; interaction),results before saving,4.0,0.0,0,True,
+SES-27,"session save, fresh page, restore, re-run: state included identical",GSE143688_all (Cell; interaction),results before saving,74.0,0.0,0,True,
+SES-28,"session save, fresh page, restore, re-run: state groups identical",GSE143688_all (Cell; interaction),results before saving,74.0,0.0,0,True,
+SES-29,"session save, fresh page, restore, re-run: state nG identical",GSE143688_all (Cell; interaction),results before saving,1.0,0.0,0,True,
+SES-30,"session save, fresh page, restore, re-run: session saved again after restore equals original identical",GSE143688_all (Cell; interaction),results before saving,50.0,0.0,0,True, (meta.mink excluded: empty in the saved session because no comparison dataset was loaded)
+SES-31,"session save, fresh page, restore, re-run: DE lfc identical",GSE171012 (Status; whole skin),results before saving,28933.0,0.0,0,True,
+SES-32,"session save, fresh page, restore, re-run: DE p identical",GSE171012 (Status; whole skin),results before saving,28933.0,0.0,0,True,
+SES-33,"session save, fresh page, restore, re-run: DE q identical",GSE171012 (Status; whole skin),results before saving,28933.0,0.0,0,True,
+SES-34,"session save, fresh page, restore, re-run: DE settings identical",GSE171012 (Status; whole skin),results before saving,4.0,0.0,0,True,
+SES-35,"session save, fresh page, restore, re-run: enrichment ORA p,q identical",GSE171012 (Status; whole skin),results before saving,50.0,0.0,0,True,
+SES-36,"session save, fresh page, restore, re-run: state desel identical",GSE171012 (Status; whole skin),results before saving,40.0,0.0,0,True,
+SES-37,"session save, fresh page, restore, re-run: state curGene identical",GSE171012 (Status; whole skin),results before saving,1.0,0.0,0,True,
+SES-38,"session save, fresh page, restore, re-run: state compare identical",GSE171012 (Status; whole skin),results before saving,4.0,0.0,0,True,
+SES-39,"session save, fresh page, restore, re-run: state included identical",GSE171012 (Status; whole skin),results before saving,243.0,0.0,0,True,
+SES-40,"session save, fresh page, restore, re-run: state groups identical",GSE171012 (Status; whole skin),results before saving,243.0,0.0,0,True,
+SES-41,"session save, fresh page, restore, re-run: state nG identical",GSE171012 (Status; whole skin),results before saving,1.0,0.0,0,True,
+SES-42,"session save, fresh page, restore, re-run: session saved again after restore equals original identical",GSE171012 (Status; whole skin),results before saving,50.0,0.0,0,True, (meta.mink excluded: empty in the saved session because no comparison dataset was loaded)
+SES-43,"session save, fresh page, restore, re-run: DE lfc identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,28933.0,0.0,0,True,
+SES-44,"session save, fresh page, restore, re-run: DE p identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,28933.0,0.0,0,True,
+SES-45,"session save, fresh page, restore, re-run: DE q identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,28933.0,0.0,0,True,
+SES-46,"session save, fresh page, restore, re-run: DE settings identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,4.0,0.0,0,True,
+SES-47,"session save, fresh page, restore, re-run: trait t identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,28933.0,0.0,0,True,
+SES-48,"session save, fresh page, restore, re-run: trait p identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,28933.0,0.0,0,True,
+SES-49,"session save, fresh page, restore, re-run: trait q identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,28933.0,0.0,0,True,
+SES-50,"session save, fresh page, restore, re-run: state desel identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,40.0,0.0,0,True,
+SES-51,"session save, fresh page, restore, re-run: state curGene identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,1.0,0.0,0,True,
+SES-52,"session save, fresh page, restore, re-run: state compare identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,4.0,0.0,0,True,
+SES-53,"session save, fresh page, restore, re-run: state included identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,243.0,0.0,0,True,
+SES-54,"session save, fresh page, restore, re-run: state groups identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,243.0,0.0,0,True,
+SES-55,"session save, fresh page, restore, re-run: state nG identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,1.0,0.0,0,True,
+SES-56,"session save, fresh page, restore, re-run: session saved again after restore equals original identical","GSE171012 (Status; CD8 samples, SortedCells trait)",results before saving,50.0,0.0,0,True, (meta.mink excluded: empty in the saved session because no comparison dataset was loaded)
+CSP-online-1,Content-Security-Policy meta tag: default-src 'none',index.html,CSP directive parse,1.0,0.0,0,True,'none'
+CSP-online-2,Content-Security-Policy: connect-src 'none',index.html,CSP directive parse,1.0,0.0,0,True,'none'
+CSP-online-3,single CSP meta tag placed before the first script,index.html,position in file,1.0,0.0,0,True,
+CSP-offline-1,Content-Security-Policy meta tag: default-src 'none',dist/benchside-offline.html,CSP directive parse,1.0,0.0,0,True,'none'
+CSP-offline-2,Content-Security-Policy: connect-src 'none',dist/benchside-offline.html,CSP directive parse,1.0,0.0,0,True,'none'
+CSP-offline-3,single CSP meta tag placed before the first script,dist/benchside-offline.html,position in file,1.0,0.0,0,True,
+CSP-online-4,online build: the only external source is the Plotly CDN (script-src) and the only external tag is the pinned Plotly script,index.html,CSP directives and resource tags,1.0,0.0,0,True,script-src hosts ['https://cdn.plot.ly']
+CSP-offline-4,"offline build: no http(s) resource source in tags, CSS or the CSP",dist/benchside-offline.html,"scan of src/href/data attributes, url(), @import and CSP text",1.0,0.0,0,True,Plotly's internal topojson URL string is not a source (map traces unused)
+SRI-1,subresource-integrity attribute equals sha384 of the Plotly 2.32.0 file downloaded from cdn.plot.ly,index.html,hashlib.sha384 of the CDN file,1.0,0.0,0,True,sha384-7TVmlZWH60iKX5Uk7lSvQhjtcgw2tkFjuwLcXoRSR4zXTyWFJRm9aPAguMh7CIra
+SRI-2,Plotly inlined in the offline build is the same file (sha384 = integrity attribute; sha256 = pin in build_offline.py),dist/benchside-offline.html,hashlib,2.0,0.0,0,True,0a17719a72751704861215da0e5c5cdb3f9a8d50eff5cb84cb6f8b80786682b0
+BLD-02,application script identical in the online and offline builds,both builds,byte comparison,1.0,0.0,0,True,
+SNP-H,"snapshot.py sets every meta-analysis control it depends on (model, test, datasets)",tests/engine/snapshot.py,source scan; DL+HK variant,1.0,373.0,0,False,"metahk not set: the stub returns """" (z) because it ignores selected; in a browser the default ""hk"" would give DL+HK, signature 1778 instead of 2151"

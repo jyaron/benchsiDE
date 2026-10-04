@@ -15,7 +15,7 @@ benchsiDE performs normalization, differential expression, gene-set testing, mod
 |---|---|
 | Local computation | No server component and no upload. The offline build makes no network requests. |
 | Validated statistics | TMM normalization and filterByExpr (edgeR); moderated t, moderated F, voom, covariate models, CAMERA and FRY (limma); RRHO; hypergeometric, KS and OLS tests (scipy, statsmodels). Checked on a synthetic dataset and on the public demo dataset GSE63310; see [VALIDATION.md](VALIDATION.md). |
-| In-browser verification | **Validate statistics** regenerates a deterministic dataset and compares 16 components with embedded reference values, listing every compared value and its tolerance. |
+| In-browser verification | **Validate statistics** regenerates a deterministic dataset and compares 21 components with embedded reference values, listing every compared value and its tolerance. |
 | Reproducibility | Seeded randomness throughout; version-stamped session files; self-contained HTML reports; methods text generated from the settings used, with citations; DESeq2 companion script export. |
 
 ## Quick start
@@ -32,10 +32,11 @@ The included demo dataset (`demo/GSE63310_counts.tsv`, `demo/GSE63310_design.tsv
 |---|---|
 | Quality control | Library size, detected genes, PCA with loadings, MDS, dendrogram, sample correlation, RLE, expression density, library complexity, sex check, biotype composition, power estimation |
 | Normalization and filtering | TMM or library-size CPM; filterByExpr or CPM threshold; display-only batch removal |
+| Co-expression | Gene–gene correlation with slope and p; WGCNA-style hub connectivity; circular and force-directed network views, exportable to Cytoscape |
 | Differential expression | Moderated t with covariates (categorical, continuous, blocking), voom, Welch t; moderated F; all-pairs contrasts, UpSet and Venn; diagnostic plots |
-| Gene-set testing | ORA, preranked GSEA, FRY; built-in MSigDB Hallmark, GO (BP, CC, MF) and Reactome for human and mouse, or any GMT file; enrichment across all contrasts |
+| Gene-set testing | ORA, GSEA (sample permutation, or preranked for ranking only), FRY; built-in MSigDB Hallmark, GO (BP, CC, MF) and Reactome for human and mouse, or any GMT file; enrichment across all contrasts |
 | Discovery | Module screen over gene families, HGNC gene groups and gene-set libraries; CAMERA (two groups) or seeded permutation (more groups) |
-| Cross-dataset | Up to eight datasets; symbol, mouse–human ortholog or custom matching; fold-change and t concordance, RRHO, forest plots, signature transfer, homology-family scoring |
+| Cross-dataset | Any number of datasets within memory, each with a user-set name; symbol, mouse–human ortholog or custom matching; random- and fixed-effect meta-analysis with heterogeneity, shared-signature heatmap and leave-one-out robustness; fold-change and t concordance, RRHO, forest plots with pooled estimates, signature transfer, homology-family scoring |
 | Output | SVG export at screen, paper and poster type sizes; composite figures; HTML report; session files; methods text |
 
 ## Repository layout

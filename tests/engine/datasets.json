@@ -1,0 +1,43 @@
+{
+ "GSE54456": {
+  "source": "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=GSE54456&format=file&file=GSE54456_raw_counts_GRCh38.p13_NCBI.tsv.gz",
+  "sha256_of_decompressed": "c5b227860218a49cebe25e949a676841c09ddabfd69027dc56fca4e7454aa558",
+  "note": "171 samples (3 GEO samples absent). Cond Psoriasis_skin / normal_skin. No patient IDs."
+ },
+ "GSE121212": {
+  "source": "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=GSE121212&format=file&file=GSE121212_raw_counts_GRCh38.p13_NCBI.tsv.gz",
+  "sha256_of_decompressed": "0f0d7937de0569043c980472f80cdfaf7cc48549e28ce674a7093049457c2086",
+  "note": "144 samples (3 design-only samples absent). Contains PSORIASIS AND ATOPIC DERMATITIS: use Group (e.g. PSO_lesional vs PSO_non_lesional, or PSO_lesional vs CTRL_healthy). Patient from GEO titles; PSO patients paired lesional/non-lesional."
+ },
+ "GSE186063": {
+  "source": "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=GSE186063&format=file&file=GSE186063_raw_counts_GRCh38.p13_NCBI.tsv.gz",
+  "sha256_of_decompressed": "113b3fecdf9db956d5913fe1f2f53576ee2a6f994bb34b89a21b79f8f65aa143",
+  "note": "65 samples in matrix (GSM5629997 in design only). Type: lesion 26 / non_lesion 28 / normal_skin 11 (normal skin is from ankylosing spondylitis patients, not healthy donors). Diag: Psoriasis / Psoriatic_Arthritis / Ankylosing_Spondylitis. Pair: 26 lesion/non-lesion pairs INFERRED from consecutive GEO titles with identical age, sex and diagnosis (GEO gives no subject ID); 2 non-lesion samples unpaired (NA). Also Sex, Age."
+ },
+ "GSE83645": {
+  "source": "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=GSE83645&format=file&file=GSE83645_raw_counts_GRCh38.p13_NCBI.tsv.gz",
+  "sha256_of_decompressed": "1124a5887a9837161085d03a6d5831b9011e3145e50b46ec621d2bfb0fcdd0bf",
+  "note": "25 samples, 5 patients x (1 uninvolved + 4 psoriasis sites). Cond, Patient, Site from GEO."
+ },
+ "GSE41745": {
+  "source": "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=GSE41745&format=file&file=GSE41745_raw_counts_GRCh38.p13_NCBI.tsv.gz",
+  "sha256_of_decompressed": "bd9a3301dd3d2dab32b2d8dfacc94377406de497be8f142f98b0040810584eb5",
+  "note": "5 samples (GSM1023437, lesional Patient 1, absent from matrix). Cond lesional 2 / non_lesional 3; Patient from GEO (Patient1 has only non-lesional)."
+ },
+ "GSE171012": {
+  "source": "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=GSE171012&format=file&file=GSE171012_raw_counts_GRCh38.p13_NCBI.tsv.gz",
+  "sha256_of_decompressed": "b2c14cf5ef3590d5b6f84f7e6b2eca02513113bae706ad1298e14907a9cfefe5",
+  "note": "Whole skin and sorted skin T cells; restrict to CellType = bulk for skin analyses."
+ },
+ "GSE143688": {
+  "source": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE143nnn/GSE143688/suppl/GSE143688_Raw_counts.txt.gz",
+  "subset": "columns whose genotype field is WT or FL (36 samples)",
+  "sha256_of_subset_tsv": "4ffa7ce132cd7649bfeb2dc97df47a22ed9523d71f09cd810b96663ffe13e0b0",
+  "note": "Author-supplied counts (Ensembl IDs); Il36r-/- and keratinocyte-deleted mice excluded."
+ },
+ "GSE143688_all": {
+  "source": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE143nnn/GSE143688/suppl/GSE143688_Raw_counts.txt.gz",
+  "sha256_of_decompressed": "1fbb99053868cd0b14a28ab4c0b817534ac10ff8e589f25eef7b07ed6580cd1e",
+  "note": "All 74 samples (WT, Il36r fl/fl, Il36r-/-, keratinocyte deletion; Aldara or control; days 3 and 7), for interaction contrasts."
+ }
+}

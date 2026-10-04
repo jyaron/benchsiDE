@@ -23,6 +23,7 @@
 - [Patterns and clustering](Patterns-and-Clustering.md)
 - [Heatmaps](Heatmaps.md)
 - [Co-expression](Co-expression-and-Hubs.md)
+- [Co-expression](Sample-Traits.md)
 
 **Comparing datasets**
 - [Cross-dataset comparison](Cross-Dataset-Comparison.md)

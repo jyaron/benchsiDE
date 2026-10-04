@@ -11,15 +11,28 @@ import hashlib, re, sys, urllib.request, pathlib
 PLOTLY_SHA256 = "0a17719a72751704861215da0e5c5cdb3f9a8d50eff5cb84cb6f8b80786682b0"  # 2.32.0
 root = pathlib.Path(__file__).resolve().parents[1]
 src = (root / "index.html").read_text(encoding="utf-8")
-m = re.search(r'<script src="(https://cdn\.plot\.ly/plotly-[\d.]+\.min\.js)"></script>', src)
+m = re.search(r'<script src="(https://cdn\.plot\.ly/plotly-[\d.]+\.min\.js)"(?: integrity="([^"]+)" crossorigin="anonymous")?></script>', src)
 if not m:
     sys.exit("CDN plotly tag not found in index.html")
 js = urllib.request.urlopen(m.group(1)).read().decode("utf-8")
 digest = hashlib.sha256(js.encode()).hexdigest()
 if digest != PLOTLY_SHA256:
     sys.exit(f"Plotly checksum mismatch: {digest} (update PLOTLY_SHA256 when bumping the pin)")
+if m.group(2):   # subresource-integrity pin in index.html must match the verified file
+    import base64
+    sri = "sha384-" + base64.b64encode(hashlib.sha384(js.encode()).digest()).decode()
+    if sri != m.group(2):
+        sys.exit(f"integrity attribute in index.html does not match Plotly {sri}")
 out = src.replace(m.group(0), "<script>\n/* Plotly.js (MIT) inlined for offline use */\n" + js + "\n</script>")
 assert '<script src="https://cdn.plot.ly' not in out
+# Content-Security-Policy: the offline build may not load anything from any server
+csp_on = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]+)">', out)
+if not csp_on:
+    sys.exit("Content-Security-Policy meta tag not found in index.html")
+csp_off = csp_on.group(1).replace(" https://cdn.plot.ly", "")
+assert "http" not in csp_off and "connect-src 'none'" in csp_off
+out = out.replace(csp_on.group(0), f'<meta http-equiv="Content-Security-Policy" content="{csp_off}">')
+out = out.replace("except Plotly.js from its CDN in this online build (the offline build allows no server at all)", "(offline build: no server at all)")
 app_on  = re.findall(r"<script>\n(.*?)\n</script>", src, re.S)[-1]
 app_off = re.findall(r"<script>\n(.*?)\n</script>", out, re.S)[-1]
 assert app_on == app_off, "app script changed during inlining"

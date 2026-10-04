@@ -5,7 +5,7 @@
 Each statistical routine is compared with its reference implementation on inputs that anyone can obtain. The results are recorded in [VALIDATION.md](../VALIDATION.md), with the maximum deviation observed for each check. Two checks are provided:
 
 1. **In-app self-test.** Sixteen components on a deterministic synthetic dataset (below).
-2. **External validation on public data.** The demo dataset in the repository (GEO GSE63310) is analyzed by the application and by R. `validation/reference.R` produces the reference values, and `tests/validation.spec.js` compares them with the application's results (36 checks).
+2. **External validation on public data.** The demo dataset in the repository (GEO GSE63310) is analyzed by the application and by R. `validation/reference.R` produces the reference values, and `tests/validation.spec.js` compares them with the application's results (59 checks).
 
 | Component | Reference |
 |---|---|

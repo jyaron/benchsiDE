@@ -34,17 +34,18 @@ function runExternalValidation(M, D, REF) {
   ok("filterByExpr: kept-gene count and index checksum (exact)", 2,
     Math.abs(nG - REF.n_kept) + Math.abs(checksum - REF.kept_checksum), 0);
   ok("TMM normalization factors", nS, absMax(TMMF, REF.tmm), 1e-9);
-  ok("log2(CPM + 1), gene 1, all samples", nS, absMax(Array.from({ length: nS }, (_, q) => L[q]), REF.logcpm_1), 1e-9);
+  ok("log-CPM (edgeR, prior.count 2), gene 1, all samples", nS, absMax(Array.from({ length: nS }, (_, q) => L[q]), REF.logcpm_1), 1e-9);
 
   // differential expression, LP vs Basal
   el("selA").value = "Basal"; el("selB").value = "LP"; el("selFDR").value = "0.05"; el("fcthr").value = "1";
   const de = (method, cov) => { deMethod = method; DECOVSEL = cov; deKey = ""; return computeDE(); };
+  const savFit = DEFIT; DEFIT = "pair";   // checks below up to the full-design block use the two-group fit option
   let r = de("mod", []);
   const tLP = Array.from(r.tv);
   ok("moderated t", G.length, absMax(at(r.tv), REF.mod.t), 1e-6);
   ok("moderated t p-values (relative)", G.length, relMax(at(r.p), REF.mod.p), 1e-6);
   ok("BH-adjusted p-values", G.length, absMax(at(r.q), REF.mod.q), 1e-8);
-  ok("empirical-Bayes prior (d0, s0^2)", 2, Math.max(Math.abs(r.prior.df0 - REF.mod.df0), Math.abs(r.prior.s20 - REF.mod.s20)), 1e-6);
+  ok("empirical-Bayes prior, trend (d0, median s0^2)", 2, Math.max(Math.abs(r.prior.df0 - REF.mod.df0), Math.abs(r.prior.s20 - REF.mod.s20)), 1e-6);
   const hm = hitsOf(r);
   ok("moderated t: significant genes up/down (exact)", 2, absMax(hm, REF.mod.hits), 0);
   // over-representation of the up hits in SET_TOP_LFC
@@ -116,6 +117,53 @@ function runExternalValidation(M, D, REF) {
     ok("co-expression: p for r = 0 (relative)", cg.length, relMax(cg.map(g => coP[g]), REF.coexp.p), 1e-6);
     coGene = null; coKey = "";
   }
+  // hub neighbourhood, within-group mode: partial correlation given cell type and its t-test p
+  if (REF.pcor) {
+    const inc = S.map((_, j) => j).filter(j => included[j]);
+    const gl = [...new Set(inc.map(j => S[j].group))], gc = inc.map(j => gl.indexOf(S[j].group));
+    const u1 = residNorm(inc.map(j => L[0 * nS + j]), gc, gl.length), df = inc.length - gl.length - 1;
+    const rr = REF.pcor.genes.map(g => { const u = residNorm(inc.map(j => L[g * nS + j]), gc, gl.length); let s2 = 0; for (let q = 0; q < u.length; q++) s2 += u[q] * u1[q]; return s2; });
+    ok("hub neighbourhood: partial correlation given group", rr.length, absMax(rr, REF.pcor.r), 1e-10);
+    ok("hub neighbourhood: p for partial r = 0 (relative)", rr.length, relMax(rr.map(r => corrP(r, df)), REF.pcor.p), 1e-6);
+  }
+  // hub across datasets: soft connectivity, WGCNA module-preservation statistics, robust rank aggregation
+  if (REF.kconn) {
+    const inc = S.map((_, j) => j).filter(j => included[j]);
+    const u = unitRowsGeneric((g, c) => L[g * nS + c], Array.from({ length: 200 }, (_, g) => g), inc, inc.map(() => 0), 1);
+    ok("connectivity: sum of |r|^6", 200, relMax(Array.from(connectivityOver(u, 200, 6)), REF.kconn), 1e-9);
+  }
+  if (REF.pres) {
+    const P = REF.pres, uni = (gs, cols) => unitRowsGeneric((g, c) => L[g * nS + c], gs, cols, cols.map(() => 0), 1);
+    const ur = uni(P.mod, P.refS), Rr = presRefPart(corFromUnit(ur.U, ur.n, P.mod.map((_, i) => i)), P.mod.length);
+    const names = ["propVarExplained", "meanSignAwareKME", "meanSignAwareCorDat", "meanAdj", "corkIM", "corkME", "corcor"];
+    const st = gs => { const ut = uni(gs, P.tstS); const o = presStats(Rr, corFromUnit(ut.U, ut.n, gs.map((_, i) => i)), gs.length); return names.map(k => o[k]); };
+    const js = st(P.mod).concat(...P.sets.map(st)), rf = P.obs.concat(...P.perm);
+    ok("module preservation: 7 statistics, observed and 5 random sets (WGCNA " + P.wgcna + ")", js.length, absMax(js, rf), 1e-10);
+  }
+  if (REF.trait) {
+    const T = REF.trait, saveC = COVARS;
+    COVARS = Object.assign({}, COVARS, { TraitX: {}, BlockX: {} });
+    S.forEach((_, j) => { COVARS.TraitX[j] = String(T.x[j]); COVARS.BlockX[j] = "b" + T.block[j]; });
+    const R1 = runSync(traitDEGen({ trait: "TraitX", transform: "none", groups: [], adjustGroup: false, covs: [], block: null }));
+    ok("trait association: moderated t (limma-trend, ~ trait)", 50, absMax(Array.from(R1.t.slice(0, 50)), T.t_all), 1e-8);
+    ok("trait association: p (relative)", 50, relMax(Array.from(R1.p.slice(0, 50)), T.p_all), 1e-6);
+    const R2 = runSync(traitDEGen({ trait: "TraitX", transform: "none", groups: [], adjustGroup: true, covs: [], block: "BlockX", blockMode: "dupcor" }));
+    ok("trait association with blocks: duplicateCorrelation consensus", 1, Math.abs(R2.rho - T.rho), 1e-8);
+    ok("trait association with blocks: moderated t (lmFit block, correlation)", 50, absMax(Array.from(R2.t.slice(0, 50)), T.t_blk), 1e-6);
+    const sets = [Array.from({ length: 30 }, (_, i) => i), Array.from({ length: 31 }, (_, i) => 499 + 50 * i), Array.from({ length: 101 }, (_, i) => 2999 + i)];
+    const cam = cameraOnTrait(R1, sets.map((rows, i) => ({ name: "s" + i, rows })));
+    ok("trait gene sets: CAMERA p (relative)", 3, relMax(cam.map(c => c.p), T.cam_p), 1e-6);
+    if (T.me) {
+      const e = moduleEigengene(Array.from({ length: 40 }, (_, i) => i), R1.Y, R1.n), sc = T.me.reduce((a, v, i) => a + v * e.me[i], 0) / e.me.reduce((a, v) => a + v * v, 0);
+      ok("module eigengene and its trait t (WGCNA moduleEigengenes, lm)", 10, Math.max(absMax(Array.from(e.me, v => v * sc), T.me), Math.abs(moduleTraitTest(R1, e.me).t - T.me_t)), 1e-8);
+    }
+    COVARS = saveC;
+  }
+  if (REF.rra) {
+    const n = 300, ranks = REF.rra.lists.map(l => { const r = new Int32Array(n); l.forEach((it, p) => r[it] = p + 1); return r; });
+    const sc = REF.rra.item.map(it => rraRho(ranks.map(r => r[it] / n)));
+    ok("robust rank aggregation: RRA score (relative)", n, relMax(sc, REF.rra.score), 1e-9);
+  }
 
   // density
   const v1 = Array.from({ length: nG }, (_, g) => L[g * nS]);
@@ -138,6 +186,25 @@ function runExternalValidation(M, D, REF) {
   ok("RRHO grid dimensions (exact)", 2, Math.abs(z.length - REF.rrho.dim[0]) + Math.abs(z[0].length - REF.rrho.dim[1]), 0);
   ok("RRHO -log10 p, diagonal and first row", cells.length, absMax(cells, refc), 1e-8);
   el("selB").value = "LP"; deKey = "";
+ // full design (application default): every group fitted, LP vs Basal by contrast
+  DEFIT = "all";
+  r = de("mod", []);
+  ok("full design: moderated t", G.length, absMax(at(r.tv), REF.full_mod.t), 1e-6);
+  ok("full design: moderated t p-values (relative)", G.length, relMax(at(r.p), REF.full_mod.p), 1e-6);
+  ok("full design: prior d0 and residual df", 2, Math.abs(r.prior.df0 - REF.full_mod.df0) + Math.abs(r.prior.dfr - REF.full_mod.dfr), 1e-6);
+  ok("full design: significant genes up/down (exact)", 2, absMax(hitsOf(r), REF.full_mod.hits), 0);
+  r = de("mod", ["lcov"]);
+  ok("full design, continuous covariate: moderated t", G.length, absMax(at(r.tv), REF.full_covc.t), 1e-6);
+  ok("full design, continuous covariate: significant genes (exact)", 2, absMax(hitsOf(r), REF.full_covc.hits), 0);
+  r = de("mod", ["blk"]);
+  ok("full design, blocking factor: moderated t", G.length, absMax(at(r.tv), REF.full_covb.t), 1e-6);
+  ok("full design, blocking factor: significant genes (exact)", 2, absMax(hitsOf(r), REF.full_covb.hits), 0);
+  r = de("voom", []);
+  ok("full design, voom: moderated t", G.length, absMax(at(r.tv), REF.full_voom.t), 1e-6);
+  ok("full design, voom: significant genes up/down (exact)", 2, absMax(hitsOf(r), REF.full_voom.hits), 0);
+  deMethod = "mod"; DECOVSEL = []; deKey = "";
+  fryCheck("full design", [], REF.full_fry);
+  DEFIT = savFit;
 
   // experiment-planning power model
   ok("power model: n per group and power (relative)", 2, relMax(
@@ -145,3 +212,5 @@ function runExternalValidation(M, D, REF) {
 
   return { rows, fixture };
 }
+
+ 

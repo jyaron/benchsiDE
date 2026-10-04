@@ -2,7 +2,7 @@
 
 ## Plot export
 
-Each plot has a toolbar (visible on hover). The camera icon saves the plot as SVG. The **export** selector sets the aspect ratio of exported figures: as shown, single column (4:3 or 1:1), or double column (7:4 or wide).
+Each plot has a toolbar (visible on hover). The camera icon saves the plot as SVG. **Figure settings → Export size** in the header sets the aspect ratio of exported figures: as shown, single column (4:3 or 1:1), or double column (7:4 or wide).
 
 ## Type size
 
@@ -52,3 +52,7 @@ Exported figures contain no interactive elements or on-screen instructions.
 ## Tables
 
 Most panels offer CSV export of the full underlying table, not only the rows displayed.
+
+## Preview before saving
+
+The camera button on a plot opens a preview of the figure as it will be saved, with its size, a choice of SVG (vector; recommended for publication) or PNG (rendered at 3×), and the file name. **Save** writes the file; **Close** or **Esc** cancels. Composite exports (module heatmap, gene panels, summary figure) are previewed the same way, and their caption file is written only when you save. To save without the preview, untick **Figure settings → Preview**.

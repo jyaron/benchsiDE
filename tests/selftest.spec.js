@@ -1,5 +1,5 @@
 // benchsiDE CI: numerical validation and demo pipeline in real browser engines.
-// The in-app self-test regenerates a deterministic dataset and compares 16 statistical
+// The in-app self-test regenerates a deterministic dataset and compares 21 statistical
 // components against embedded edgeR, limma, scipy and statsmodels reference values.
 const { test, expect } = require("@playwright/test");
 const path = require("path");
@@ -7,7 +7,7 @@ const fs = require("fs");
 
 const PAGE = "file://" + path.resolve(__dirname, "..", "index.html");
 const OFFLINE = "file://" + path.resolve(__dirname, "..", "dist", "benchside-offline.html");
-const N_COMPONENTS = 16;
+const N_COMPONENTS = 21;
 
 async function runSelfTestOn(page, url) {
   await page.goto(url);
@@ -30,10 +30,11 @@ test("statistical self-test passes (offline build)", async ({ page }) => {
 });
 
 // Pinned values were reproduced independently in R (edgeR calcNormFactors, filterByExpr or
-// CPM filter, limma voom + eBayes on the Basal and LP samples; BH FDR <= 0.05, |log2FC| >= 1).
+// CPM filter, limma voom + eBayes with design ~ group over all nine samples, LP vs Basal
+// coefficient, the application default; BH FDR <= 0.05, |log2FC| >= 1).
 const DEMO_PINS = {
-  cpm: { nG: 14490, up: 2410, dn: 2835, df0: 5.2046 },
-  fbe: { nG: 16624, up: 2810, dn: 3338, df0: 5.4806 },
+  cpm: { nG: 14490, up: 2387, dn: 2811, df0: 4.1600 },
+  fbe: { nG: 16624, up: 2781, dn: 3301, df0: 4.4189 },
 };
 
 for (const mode of Object.keys(DEMO_PINS)) {
@@ -91,7 +92,7 @@ test("self-test leaves the user's analysis and its displays unchanged", async ({
   }, [matrix, design]);
   const before = await snap();
   await page.click("#selftestbtn");
-  await expect(page.locator("#selftestout")).toContainText("All 16 components reproduce their references", { timeout: 30000 });
+  await expect(page.locator("#selftestout")).toContainText("All 21 components reproduce their references", { timeout: 30000 });
   expect(await snap()).toEqual(before);
   await page.evaluate(() => document.getElementById("probe").click());
   expect(await page.evaluate(() => window.__probe)).toBe(1);

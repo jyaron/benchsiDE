@@ -1,0 +1,33 @@
+frame,name,n,dev,passed_arg
+5f156557,"""known biology: sex-chromosome genes (XIST, RPS4Y1, DDX3Y, UTY, KDM5D,",10,0,(derived from dev<=tol)
+2c8f1a0a,'GSEA plot title in sample-permutation mode',1,1,"note=f""title '{LOLLI['title']}' shown for a sample-permutation run"""
+2c8f1a0a,'Discovery panel-figure caption names the test used (CAMERA mode)',1,1,note=CAPJ['CAPS'][0]['cap'][:160]
+2c8f1a0a,'Discovery heatmap-export caption names the test used (CAMERA mode)',1,0,(derived from dev<=tol)
+2c8f1a0a,'Discovery CAMERA ignores DE covariates (Patient) without notice',3009,0.0,ok=True
+9c381362,"""QC flags (low depth <25% of median, n=1 groups, correlation outlier)""",1,0,R63['qc']['flags']==[]
+9c381362,"""GeneExplorer ANOVA source when display is batch-adjusted""",60,60,False
+9c381362,"""Power table cells (n for 80%/90%, power at current n) recomputed from",9,0,True
+9c381362,"""Input detection: log2(CPM+1) matrix detected as log scale""",1,0,VR['log2cpm1']['DATALOG']
+9c381362,"""Input detection: log2 CPM with negative values detected as log scale""",1,0,VR['log2cpm_negative']['DATALOG']
+9c381362,"""Input detection: CPM detected as already normalized""",1,0,(not VR['cpm']['DATALOG']) and (not VR['cpm']['HASCOUNTS'])
+9c381362,"""Input detection: TPM detected as already normalized""",1,0,(not VR['tpm']['DATALOG']) and (not VR['tpm']['HASCOUNTS'])
+9c381362,"""Input detection: FPKM (non-integer, column sums 0.69-0.72e6) not trea",1,1,False
+9c381362,"""Input detection: integer counts sorted low-expression-first""",1,1,False
+9c381362,"""Input detection: session and comparison-dataset rules agree""",1,1,False
+9c381362,"""Input parsing: duplicated gene IDs""",2,2,False
+9c381362,"""Input parsing: semicolon separator with comma decimals""",1,1,False
+9c381362,"""Design parsing: extra samples in design ignored""",9,0,DR['extra_samples']['groups']==[ct[s] for s in samples63]
+9c381362,"""Design parsing: matrix samples missing from design""",2,2,False
+9c381362,"""Design parsing: GEO 'key: value' prefix stripped""",9,0,"DR['geo_prefix']['GROUPS']==['Basal','LP','ML']"
+9c381362,"""Design parsing: numeric factor treated as ordered numeric grouping""",1,0,"DR['numeric_factor']['NUMERIC'] and DR['numeric_factor']['GROUPS']==['0','5','10']"
+9c381362,"""Design parsing: quoted design (R write.csv output)""",1,1,False
+9c381362,"""Design: combined factors offered (2-6 factors with 2 <= levels < max(",1,0,"combos_ref(basef,samples63)==DR['multi_factor']['factorNames']"
+9c381362,"""Co-expression minimum n (>=4 included samples)""",2,0,RU['co_min']['m3'].startswith('Need') and RU['co_min']['m4'].startswith('vs ')
+9c381362,"""Power pilot groups follow the DE contrast""",1,1,False
+9c381362,"""QC low-depth flag (<25% of median library size)""",9,0,"[re.search(r'Low depth: (\S+) ',f).group(1) for f in RU['lowdepth']['flags']]==exp_"
+9c381362,"""DE p-value histogram notes (spike, depleted, uniform, interior hump)""",4,0,okp
+9c381362,"""Session restore of ORA set-size limits and hub network size""",3,3,False
+9c381362,"""Excel/Prism export of p_upset: Prism sheet identifies intersections""",14,1,False
+9c381362,"""Excel/Prism export of p_rle (RLE box plot)""",1,1,False
+9c381362,"""Compare minimum matched genes (N >= 50)""",2,0,"CM['R'][0]['msg'].startswith('<span class=""warnchip"">Only 40') and CM['R'][1]['msg'].startswith('Matched genes"
+9c381362,"""Signature transfer minimum module size (>= 3 genes)""",1,0,CM['m1'].endswith('fewer than 3 genes.</span>')

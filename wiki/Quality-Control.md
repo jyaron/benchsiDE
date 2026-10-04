@@ -24,3 +24,7 @@ The top of the tab lists flags such as low-depth samples and samples whose corre
 ## Excluding samples
 
 Untick a sample in the sample bar to exclude it from every statistic. Exclusions are stored in session files and reported in the methods text. Record the reason for any exclusion.
+
+## Sample dendrogram
+
+Average-linkage clustering on 1 − Pearson correlation of the 2,000 most variable genes (identical to R `hclust(as.dist(1 - cor(x)), "average")`). **colour leaves by** marks each sample by group or by another design column, so you can see which samples the tree places together. **cut into** divides the tree into clusters (as R `cutree`) and compares them with the chosen column: a cross-table, the adjusted Rand index (1 = the clusters reproduce the column exactly, 0 = no better than chance), and a list of samples that sit in a cluster dominated by another group. A low index, or samples that cluster with the wrong group, can mean outliers, swapped labels, or a batch, sex or quality effect larger than the condition effect: colour by those columns to check.

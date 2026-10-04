@@ -1,0 +1,15 @@
+{
+ "Meta-analysis": [
+  "CHANGED: the default meta-analysis is now REML random effects with the Hartung-Knapp-Sidik-Jonkman test (t distribution on k-1 degrees of freedom). On null data the previous default (DerSimonian-Laird, z test) gave genes at FDR \u2264 0.05 more often than chance allows with three to five small datasets; the new default stayed within the binomial bound in every tested configuration. On the four psoriasis cohorts the shared signature changes from 2,151 to 1,773 genes and keeps all 20 canonical psoriasis genes. DerSimonian-Laird, the z test and a truncated Hartung-Knapp test remain available. Sessions saved with earlier versions restore the model they were run with.",
+  "NEW: REML estimate of the between-dataset variance (Newton iterations on the restricted likelihood, with the boundary at zero checked), agreeing with metafor::rma(method = \"REML\") to 1.1e-9 in tau\u00b2 over 19,518 genes.",
+  "CHANGED: confidence intervals in the meta-analysis table, CSV export, single-gene and multi-gene forest plots and the hub member forest plot use the standard error and critical value of the selected test (t on k-1 df with Hartung-Knapp); the prediction interval uses the same standard error, as metafor does.",
+  "NEW: meta-analysis settings (model, test, minimum datasets, thresholds, prediction-interval rule) are saved in sessions.",
+  "Validation: two self-test components added (REML with Hartung-Knapp, and DerSimonian-Laird with Hartung-Knapp, against metafor), 21 in total."
+ ],
+ "Privacy": [
+  "NEW: both builds carry a Content-Security-Policy that forbids the page from opening any network connection or loading content from another server; the online build may load only Plotly.js from its CDN, now pinned by a subresource-integrity hash. The offline build allows no server. A new CI test confirms in Chromium, Firefox and WebKit that a full analysis makes no outside request and that attempts to reach another server are refused. The Privacy page describes how to check this in the browser."
+ ],
+ "Differential expression": [
+  "NEW: interaction contrasts. A new card in the DE tab tests the difference of differences (B2 \u2212 A2) \u2212 (B1 \u2212 A1) between four groups of a combined factor (for example treatment \u00d7 genotype or treatment \u00d7 time), with the moderated t or voom, covariates, and the variance from all groups or the four groups only. It reports both simple effects, a volcano plot, a sortable table linked to the Gene Explorer, a CSV export, a methods paragraph and over-representation analysis of the significant genes. Results agree with limma to 5e-11 on GSE143688 (VALIDATION_REPORT.md)."
+ ]
+}

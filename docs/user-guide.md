@@ -13,6 +13,7 @@ Version covered: 0.19.x. The application is at <https://www.benchside.org>; sour
 5. [Tutorial C: a time course](#5-tutorial-c-a-time-course)
 6. [Tutorial D: gene-set testing](#6-tutorial-d-gene-set-testing)
 7. [Tutorial E: the Discovery screen](#7-tutorial-e-the-discovery-screen)
+7b. [Tutorial E2: sample traits](#7b-tutorial-e2-sample-traits-clinical-scores-ihc-counts-and-other-per-sample-measurements)
 8. [Tutorial F: comparing datasets and species](#8-tutorial-f-comparing-datasets-and-species)
 9. [Tutorial G: figures, reports, sessions and methods text](#9-tutorial-g-figures-reports-sessions-and-methods-text)
 10. [Tutorial H: verifying the statistics in your own browser](#10-tutorial-h-verifying-the-statistics-in-your-own-browser)
@@ -100,6 +101,10 @@ For mouse, human and rat, built-in annotation converts Ensembl and Entrez IDs to
 
 ---
 
+### 2.5 Large datasets
+
+benchsiDE runs entirely in the browser, so computation time grows with the size of the data. As a guide, GEO GSE54456 (171 samples, 19,518 genes after filtering) takes about 5 s to analyze, and FRY on GO Biological Process (7,608 sets) takes about 7 s on a recent laptop. Long computations show a progress bar with the current step, elapsed time and an estimate of time remaining; the page remains responsive while they run. Chrome, Edge, Firefox and Safari are supported; a 64-bit browser with at least 8 GB of system memory is recommended for datasets of this size.
+
 ## 3. Tutorial A: your first analysis with the demo dataset
 
 The repository includes a public dataset (GEO GSE63310: mouse mammary basal, luminal progenitor (LP) and mature luminal (ML) cells, three replicates each). The numbers quoted below were reproduced independently in R (edgeR and limma), so you can use them to confirm that each step went as intended.
@@ -156,12 +161,20 @@ Untick a sample in the sample bar. Every statistic in every tab recomputes immed
 3. Choose the method **voom**.
 4. Read the result: 2,810 genes up and 3,338 down in LP relative to Basal.
 5. Switch between **Volcano** and **MA plot**. Set **label top** to the number of genes to annotate, and choose whether to rank them by **p-value**, **|log₂FC|** or **π score**.
-6. Open the **p-value histogram (diagnostic)** and **voom mean–variance trend** panels to check the model assumptions.
-7. Click **Export full table (CSV)** to save all genes with log₂FC, t, p and FDR.
+6. To list a group of genes, set **drag to** to **select (box)** or **select (lasso)** and drag over them on the volcano or MA plot (Shift adds to the selection; double-click clears it). The table below the plot lists the selected genes with log₂FC, group means, p, FDR and the significance call; click a column header to sort. The selection is kept when you switch between volcano and MA plot. From the selection you can export a CSV, copy the gene symbols, draw a heatmap of the selected genes, or compare up to 10 of them in Gene Explorer.
+7. Open the **p-value histogram (diagnostic)** and **voom mean–variance trend** panels to check the model assumptions.
+8. Click **Export full table (CSV)** to save all genes with log₂FC, t, p and FDR.
+
+
+**Variance from all groups.** With more than two groups, the default (*variance from: all groups*) fits every group and compares the two chosen groups by a contrast, as limma does. This uses all samples to estimate the variance and is usually more powerful. Choose *these two groups only* if other groups are known to be much more variable.
 
 ### Step 10. Look at individual genes (Gene Explorer tab)
 
 Click any gene in the top-genes table. The Gene Explorer opens with per-group values. Use the toggles to switch between **log₂** and **linear** scale and between **± SEM** and **± SD**. Choose **pairwise vs first group** or **all pairs (sig. only)** to add Holm-corrected pairwise tests to the plot. **← back** returns you to the previous view.
+
+The **bar / box / violin** toggle sets how each group is drawn; the sample points are shown on every type. Bars show the mean ± SEM or SD; boxes show the median and quartiles with whiskers to the most extreme sample within 1.5 × IQR; violins show a kernel density estimate with the median and quartiles. With fewer than about 5 (box) or 8 (violin) samples per group these summaries rest on very few values, and the caption says so.
+
+**+ Add to comparison** collects genes for the multi-gene comparison below the plot. It is drawn as grouped bars by default, or as grouped box or violin plots, or as profile lines through the group means. **Group by** sets the arrangement: by condition (genes side by side within each condition) or by gene (conditions or time points side by side within each gene). **z-score each gene** puts genes with different expression levels on one axis. The Excel export of this plot is a Prism Grouped table in the arrangement shown, with the samples as replicate sub-columns.
 
 ### Step 11. Compare all contrasts
 
@@ -212,6 +225,9 @@ The **Design check** (review step, and under the sample list after analysis) sho
 
 Example: in GEO GSE186063 every normal-skin sample is from an ankylosing spondylitis patient, and lesional and non-lesional samples are from psoriasis and psoriatic arthritis patients. Diagnosis can be adjusted for in lesion vs non-lesion, but a comparison of lesion with normal skin is also a comparison of diagnoses.
 
+
+Each covariate has a **continuous / categorical** selector. Patient, subject, donor and pair columns are categorical by default, even when they are numbered, so they are fitted as blocking factors. Use continuous only for measurements such as age or RIN.
+
 ### Step 5. Paired designs
 
 For paired samples (the same subject before and after treatment, or lesional and non-lesional biopsies from each patient), add a column identifying the subject and select it under **adjust for**. This fits subject as a blocking factor. If the design file has no subject column, add one on the review step: open **Edit the design**, type the column name, click **Add column**, and fill in each sample's subject.
@@ -247,6 +263,17 @@ With few replicates at baseline, genome-wide FDR can be unattainable even for la
 
 ---
 
+
+### Step 6. Interaction: does a response differ between conditions?
+
+For a factorial design (for example treatment × genotype, or treatment × time point), combine the two factors into one grouping under **Review → group by**, so that each group is one combination such as *Aldara_WT*. In the Differential Expression tab, the **Interaction** card tests the difference of differences (B2 − A2) − (B1 − A1):
+
+1. Set the reference condition, for example Control_WT → Aldara_WT, and the compared condition, Control_KO → Aldara_KO.
+2. Choose the test, whether the variance is estimated from all groups, and any covariates (for example Day), and click **Run**.
+3. Read the table: the interaction log₂FC is the change in the response, and the two simple effects show whether a gene responds in one condition only. A positive value means the response is larger in the compared condition.
+
+An interaction is estimated less precisely than a single comparison, so it needs larger groups; the card warns when a group has fewer than three samples.
+
 ## 6. Tutorial D: gene-set testing
 
 ### Step 1. Choose a library (Enrichment tab)
@@ -258,8 +285,10 @@ Under **1 · Gene-set library (GMT)**, choose a built-in library for your specie
 | Method | Question | Input |
 |---|---|---|
 | **ORA (gene list)** | Are my significant genes over-represented in this set? | The current DE hit list |
-| **GSEA (preranked)** | Are the genes of this set concentrated at the top or bottom of the ranking? | All genes ranked by the moderated t-statistic |
+| **GSEA** | Are the genes of this set concentrated at the top or bottom of the ranking? | All genes ranked by the moderated t-statistic; significance from permuting sample labels |
 | **FRY (self-contained)** | Is the set as a whole differentially expressed? | Per-sample expression of the set's genes |
+
+**GSEA significance.** By default GSEA permutes the sample labels (Subramanian et al. 2005). This keeps the correlation between genes, so the FDR is valid for sets whose members are co-regulated. It needs at least 1,000 distinct labelings (about 7 samples per group) and no covariates; otherwise, or if you choose **permute: genes**, the app uses gene permutation (preranked); it then reports no FDR, and the table is a ranking by NES and nominal p only. On random splits of normal skin, gene permutation reported 12–37 of the 50 Hallmark sets at FDR ≤ 0.05; sample permutation reported none. Sample permutation is conservative when a set is strongly co-regulated, so results are shaded at FDR ≤ 0.25, the threshold the GSEA documentation uses; FRY and CAMERA (Discovery tab) remain the recommended tests for inference.
 
 FRY is usually the most sensitive of the three when replicates are few. FRY finding signal where ORA or GSEA do not is expected, not a contradiction: the tests answer different questions (see [Gene-set testing](../wiki/Gene-Set-Testing.md)).
 
@@ -302,9 +331,19 @@ Click **Run discovery**. For two-group designs, each module is tested with CAMER
 
 ---
 
+## 7b. Tutorial E2: sample traits (clinical scores, IHC counts and other per-sample measurements)
+
+1. Add the measurement as a column of the design file, one value per sample (blank or NA where it was not measured), or add it in the review step with **Edit the design → Add column**.
+2. Open the **Sample traits** tab and choose the trait. Choose a transformation if needed: log₂(x + 1) for counts, logit for percentages, rank when a few samples have extreme values.
+3. If the trait differs between groups (PASI is 0 in healthy controls), tick **adjust for group** or keep one group only (for example lesional samples). Otherwise the genes found are mostly those that differ between the groups.
+4. If a subject contributes several samples, choose the subject column under **repeated samples per**. Leave the analysis on **auto**: subject-level traits are analysed on subject means, and traits measured per sample with a mixed model.
+5. Click **Test association**. Click a gene in the table or volcano plot to see expression against the trait with the fitted slope. Genes marked in the Cook's D column depend on one sample.
+6. The arrow next to a gene, or **Open in Gene Explorer** under the plot, opens the gene in Gene Explorer; **← back** returns to the Traits tab.
+7. With a gene-set library loaded (Enrichment tab), **Gene sets (CAMERA)** tests whole sets. **Module × trait matrix** tests hub neighbourhoods, gene sets or Discovery modules against every trait at once, and shows how the traits correlate with each other. Click a cell, or a gene-set name, to list its genes with links to Gene Explorer.
+
 ## 8. Tutorial F: comparing datasets and species
 
-The Compare datasets tab relates your session (dataset A) to up to eight other datasets. Each dataset is filtered, normalized and tested on its own; raw values are never merged across datasets.
+The Compare datasets tab relates your session (dataset A) to any number of other datasets. There is no fixed limit on the number of datasets; the limit is memory. Each dataset uses about 8 bytes per gene per sample (roughly 30 MB for 20,000 genes × 170 samples). The slot list shows the total, warns above 1.5 GB, and refuses a dataset that would take the total above 3 GB. Each dataset is filtered, normalized and tested on its own; raw values are never merged across datasets.
 
 ### Step 1. Add a dataset
 
@@ -313,6 +352,8 @@ The Compare datasets tab relates your session (dataset A) to up to eight other d
 3. Optionally click **Design for last added** and select its design file.
 
 The slot reports how many genes matched. If the count is low, the message names the identifier types on both sides and the remedy.
+
+Each dataset has a name field. A GEO file such as `GSE54456_raw_counts_GRCh38.p13_NCBI.tsv` is named `GSE54456` by default. Type any other name (for example `Li et al. 2014`) and press Enter; it is used in every plot, table, export and the methods text. The session's own dataset is named in the field above the slots (default "A (this session)"), and that name is saved with the session.
 
 ### Step 2. How genes are matched
 
@@ -335,7 +376,29 @@ Choose X and Y and click **Compare pair**. You will see:
 
 Click **Compute across all datasets** for the correlation matrix and consensus table. Type a gene symbol in the **forest plot** field and click **Draw** for its effect in every dataset. The axis always includes 0, so effect sizes are compared on a common scale. Gene Explorer also shows the selected gene in every comparison dataset, each with its own groups and statistics.
 
-### Step 5. Score homology families (cross-species)
+### Step 5. Meta-analysis: shared signatures
+
+The meta-analysis card combines the datasets' own results into one pooled estimate per gene. It does not merge expression values.
+
+1. Tick the datasets to include and set each dataset's contrast in its slot. If a comparison dataset's design file has several columns, the slot lets you choose which column defines the groups and which to **adjust for / pair by**. For paired samples (lesional and non-lesional skin from the same patients), tick the patient column: the fold change and its standard error then come from the within-patient comparison, as in the session's own analysis. Without it, a paired dataset is analyzed as unpaired and its standard errors are larger (1.6-fold in a simulated 8-patient example), which gives it less weight in the pooled estimate.
+2. Choose the model and the test. The default is **random effects with REML** and the **Hartung–Knapp** test, the appropriate choice when datasets differ in platform, tissue, cohort or species and when there are few datasets: on null data it kept false positives at the nominal rate with two to five small datasets, where the DerSimonian–Laird model with the z test did not. DerSimonian–Laird, the z test and a fixed-effect model (one common effect) remain available.
+3. Choose whether a gene must be matched in all datasets or in at least *k*.
+4. Set the shared-signature criteria: meta FDR and minimum |pooled log₂FC|; optionally, that the 95% prediction interval excludes 0 and a maximum I² (both off by default).
+5. Click **Run meta-analysis**.
+
+Results:
+
+| Output | Content |
+|---|---|
+| Meta volcano | pooled log₂FC against −log₁₀ meta p; colour = I²; the shared signature is outlined |
+| Heatmap | the signature genes (up to 100, ranked by |pooled log₂FC| or by meta p): log₂FC in each dataset and pooled; * = FDR ≤ 0.05 in that dataset |
+| Table | pooled log₂FC with 95% confidence and prediction intervals, p, FDR, I², τ², direction agreement and each dataset's log₂FC; sortable by any column |
+| Leave-one-dataset-out | the signature recomputed with each dataset omitted, and how much of it is retained |
+| Exports | all tested genes (CSV); the signature as up and down gene sets (GMT), which can be loaded as a gene-set library |
+
+A gene enters the shared signature only if it is significant after pooling, has a pooled effect at least the chosen size, and changes in the same direction in every dataset. With the prediction-interval option, the 95% prediction interval, the range expected for the effect in a new comparable study, must also exclude 0. This asks whether the direction replicates while allowing the size of the change to differ between studies. I² is not a good default filter: large studies measure fold changes so precisely that a log₂ fold change of 9 in one study and 7 in another (512-fold and 128-fold) counts as heterogeneous, so an I² limit removes the largest, best-established effects (for psoriasis, S100A7–9, SERPINB3/4, PI3). Click any gene for its forest plot, which then shows the pooled estimate as a diamond. With two or three datasets, I² and τ² are imprecise; read the leave-one-out table before relying on the signature.
+
+### Step 6. Score homology families (cross-species)
 
 Many genes have no one-to-one ortholog (for example the mouse Serpinb3a to Serpinb3d genes and human SERPINB3 and SERPINB4). These families are excluded from gene-level matching but are not lost:
 
@@ -345,7 +408,7 @@ Many genes have no one-to-one ortholog (for example the mouse Serpinb3a to Serpi
 4. Click a point, or **plot** in a table row, for per-sample scores in both datasets.
 5. **Clear** resets the panel.
 
-### Step 6. Transfer a signature
+### Step 7. Transfer a signature
 
 Under **Signature transfer**, choose a module from dataset A (up- or down-regulated DE genes, or a Discovery module) and click **Score**. The module is scored in each other dataset and compared with random signatures of the same size.
 
@@ -355,10 +418,12 @@ Under **Signature transfer**, choose a module from dataset A (up- or down-regula
 
 ### 9.1 Figure exports
 
-- Set the export shape with the **export** selector (as shown; single column 4:3 or 1:1; double column 7:4 or wide).
-- Set the type size with the font selector: **screen fonts**, **paper fonts (1.5×)** or **poster fonts (2×)**. Margins adjust automatically.
-- Set axis labels with the three label selectors: orientation (auto, horizontal, 45°, vertical), label size, and long-label handling (wrap, full length, or shortened). With wrap or full length, labels are never cut off; the figure margin grows instead.
+- Saving a figure opens a preview first: check it, choose SVG or PNG and the file name, then click **Save** (or **Close** to cancel). Untick **Figure settings → Preview** to save at once.
+- Open **Figure settings** in the header. **Export size** sets the shape of exported figures (as shown; single column 4:3 or 1:1; double column 7:4 or wide).
+- **Fonts** sets the type size: screen, paper (1.5×) or poster (2×). Margins adjust automatically.
+- **Axis labels**, **Label size** and **Long labels** set the tick labels: orientation (auto, horizontal, 45°, vertical), label size, and long-label handling (wrap, full length, or shortened). With wrap or full length, labels are never cut off; the figure margin grows instead.
 - The camera icon on any plot saves it as SVG, the recommended format for publication.
+- **Colours** (header): the group palette (default, Okabe–Ito and Tol bright, both colour-blind safe, ColorBrewer Dark2, greyscale), the up/down colours, the heatmap scale (RdBu, PuOr, PiYG, BrBG, blue–white–red) and the continuous scale (viridis, cividis, magma, inferno, greyscale). Any single group can be given its own colour. The choice applies to every plot and export and is saved with the session.
 - The **Download data** icon on any plot saves an Excel workbook of the plotted values, with a sheet laid out as a GraphPad Prism table (Column, Grouped or XY) so the figure can be redrawn in the same style as your other figures. In Prism, create a table of the type named on the Notes sheet and paste or import the Prism sheet.
 - **Summary figure** (header) composes a four-panel overview with a caption.
 - In the Gene Explorer, add genes with **+ Add to comparison**, then choose **Export panel figure** for a multi-panel figure with statistics.
