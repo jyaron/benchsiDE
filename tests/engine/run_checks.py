@@ -14,7 +14,7 @@ def J(x): return json.dumps(x)
 
 @check
 def core():
-    m = open(os.path.join(ROOT, "demo", "GSE63310_counts.tsv")).read(); d = open(os.path.join(ROOT, "demo", "GSE63310_design.tsv")).read()
+    m = open(os.path.join(HERE, "..", "..", "demo", "GSE63310_counts.tsv")).read(); d = open(os.path.join(ROOT, "demo", "GSE63310_design.tsv")).read()
     ref = open(os.path.join(ROOT, "validation", "gse63310_reference.json")).read()
     o = run(APP, r"""
   const res = runExternalValidation(""" + J(m) + ", " + J(d) + ", " + ref + r""");
@@ -171,6 +171,57 @@ def rc_fixes():
     titles = "click a cell for the shared genes" not in APP and "click a ridge for its barcode)" not in APP
     info = dict(R1[0], **R2[0], titlesClean=titles)
     ok = info["welchConstP"] == 1 and info["msgNoBar"] and info["i2bad"] == 0 and info["forestSym"] and info["looDir"] and info["methodsHK"] and info["noWald"] and titles
+    return ok, info
+
+
+@check
+def covariates_treat():
+    # 1.0.0-rc.2: voom with covariates and TREAT against limma (contrasts.fit workflow), plus the user-facing text
+    import gzip
+    REFD = json.load(gzip.open(os.path.join(HERE, "de_rc2_reference.json.gz"), "rt"))
+    sets = {"GSE63310": (open(os.path.join(HERE, "..", "..", "demo", "GSE63310_counts.tsv")).read(), open(os.path.join(HERE, "designs", "GSE63310_lane_rin_design.tsv")).read(), "mouse", "celltype"),
+            "GSE186063": (mat("GSE186063"), des("GSE186063"), "human", "Type")}
+    info = {}; ok = True
+    for ds, (M, D, sp, fac) in sets.items():
+        refs = REFD[ds]
+        o = run(APP, r"""
+  el("species").value=""" + J(sp) + r"""; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe"; loadFromText(""" + J(M) + ", " + J(D) + r"""); applyFactor(""" + J(fac) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  const CF=""" + J([r["cfg"] for r in refs]) + r""";
+  print("IDS " + JSON.stringify(IDS));
+  CF.forEach((c,i)=>{ el("selA").value=c.A; el("selB").value=c.B; el("selFDR").value="0.05"; el("fcthr").value=String(c.tr==null?1:c.tr); deMethod=c.m; DEFIT=c.fit; DECOVSEL=c.cov; DETREAT=c.tr!=null; deKey="";
+    const r=computeDE(); print("R " + JSON.stringify(r.err? {i, err:r.err} : {i, t:Array.from(r.tv), p:Array.from(r.p)})); });
+""", timeout=2400)
+        ids = lines_with(o, "IDS ")[0]; res = lines_with(o, "R ")
+        dmax = 0.0; pmax = 0.0
+        for r in res:
+            ref = refs[r["i"]]
+            if "err" in r or ref["ids"] != ids: ok = False; info[ds + "_err"] = r.get("err", "gene order differs"); continue
+            dmax = max(dmax, max(abs(a - b) for a, b in zip(r["t"], ref["t"])))
+            pmax = max(pmax, max(abs(a - b) / max(abs(b), 1e-300) for a, b in zip(r["p"], ref["p"])))
+        info[ds] = {"configs": len(res), "t": dmax, "p_rel": pmax}
+        ok = ok and len(res) == len(refs) and dmax <= 1e-6 and pmax <= 1e-6
+    # user-facing behaviour on the demo with lane
+    o = run(APP, r"""
+  el("species").value="mouse"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe"; loadFromText(""" + J(sets["GSE63310"][0]) + ", " + J(sets["GSE63310"][1]) + r"""); applyFactor("celltype"); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="Basal"; el("selB").value="LP"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="voom"; DEFIT="all"; DECOVSEL=["lane"]; DETREAT=true; deKey="";
+  switchTab("de"); __drain(); drawDE(); const r=computeDE();
+  let csv=null; const _d=downloadCSV; downloadCSV=(txt,fn)=>{ csv=txt; }; el("deexport")._h["click"](); downloadCSV=_d;
+  const hdr=csv? csv.split("\n").find(l=>l.startsWith("gene,")) : "";
+  const vc=plotlyCalls.filter(x=>x.id==="p_volcano").pop();
+  const mt=deMethodsText(); const ss=JSON.parse(JSON.stringify(sessionState())); DETREAT=false; applySession(ss); __drain();
+  // ranking-based and cross-dataset functions use the ordinary moderated t
+  DETREAT=true; deKey=""; const rT=computeDE(); DETREAT=false; deKey=""; const r0=computeDE(); DETREAT=true; deKey="";
+  let same=true; for(let g=0;g<nG;g++) if(rT.ebT[g]!==r0.tv[g]||rT.ebP[g]!==r0.p[g]) { same=false; break; }
+  const ds0=dsResult(0); let dsStd=true; for(let g=0;g<nG;g++) if(ds0.tv[g]!==r0.tv[g]) { dsStd=false; break; }
+  let below=0; for(let g=0;g<nG;g++) if(rT.q[g]<=0.05&&Math.abs(rT.lfc[g])<=1) below++;
+  print("UI " + JSON.stringify({treat:!!r.treat, csvTreatCols:/t_treat,p_treat,FDR_treat/.test(hdr), csvRule:/TREAT test of \|log2FC\| > 1/.test(csv||""),
+    yTitle:/TREAT/.test(vc.layout.yaxis.title), methodsTreat:/McCarthy DJ & Smyth GK/.test(mt), methodsVoomCov:/voom weights were estimated from the fit of this design/.test(mt),
+    sessionTreat:DETREAT===true, ebStandard:same, dsStandard:dsStd, belowThreshold:below, rule:deRuleText(0.05,1)}));
+""", timeout=900)
+    U = lines_with(o, "UI ")
+    if not U: return False, dict(info, error=o[-500:])
+    u = U[0]; info["ui"] = u
+    ok = ok and u["treat"] and u["csvTreatCols"] and u["csvRule"] and u["yTitle"] and u["methodsTreat"] and u["methodsVoomCov"] and u["sessionTreat"] and u["ebStandard"] and u["dsStandard"] and u["belowThreshold"] == 0
     return ok, info
 
 if __name__ == "__main__":

@@ -436,6 +436,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
         Group A <select id="selA"></select> vs Group B <select id="selB"></select>
         &nbsp; FDR &le; <select id="selFDR"><option>0.01</option><option selected>0.05</option><option>0.10</option></select>
         &nbsp; |log&#8322;FC| &ge; <input type="text" id="fcthr" value="1" style="width:52px">
+        <label id="detreatwrap" title="Off: genes are called when FDR ≤ the threshold and the estimated |log2FC| ≥ the value entered. On: TREAT (McCarthy &amp; Smyth 2009, as limma::treat) tests whether |log2FC| is greater than the value entered, and genes are called when that test has FDR ≤ the threshold; the p-values, FDR and t shown are then TREAT values. TREAT is stricter and is the method recommended by the limma authors for a fold-change requirement. Not available for the Welch t." style="font-size:12.5px;display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="detreat"> test the threshold (TREAT)</label>
         <div class="toggle" id="demethod"><button data-m="mod" class="on">Moderated t (eBayes)</button><button data-m="voom" id="voombtn">voom</button><button data-m="welch">Welch t</button></div>
         <span id="defitwrap" title="Which samples estimate the gene-wise variances. All groups (limma's standard analysis): every included sample is fitted as ~0 + group and the two selected groups are compared by a contrast, so the other groups contribute residual degrees of freedom. These two groups only: the model is fitted on the two selected groups alone. Welch always uses the two groups only.">variance from <select id="defit"><option value="all" selected>all groups</option><option value="pair">these two groups only</option></select></span>
         <span id="decovwrap" style="display:none">adjust for <span id="decov"></span></span>
@@ -993,6 +994,14 @@ function covLooksLikeId(name, values){
 }
 // Columns of X (rows = samples) that are linearly independent, taken in order (as R's lm/lmFit pivoting
 // drops later aliased columns). Returns kept column indices.
+function voomTrendObj(lo, sxF, syF, span){
+  const step=Math.max(1,Math.floor(lo.x.length/500)), lx=[], ly=[];
+  for(let g2=0;g2<lo.x.length;g2+=step){ lx.push(lo.x[g2]); ly.push(lo.y[g2]); }
+  if((lo.x.length-1)%step){ lx.push(lo.x[lo.x.length-1]); ly.push(lo.y[lo.y.length-1]); }
+  const st2=Math.max(1,Math.floor(sxF.length/2000)), px=[], py=[];
+  for(let g2=0;g2<sxF.length;g2+=st2){ px.push(sxF[g2]); py.push(syF[g2]); }
+  return {line:{x:lx,y:ly}, span, pts:{x:px,y:py}};
+}
 function independentCols(X){
   const n=X.length, p=X[0].length, Q=[], keep=[];
   for(let c=0;c<p;c++){
@@ -1011,7 +1020,7 @@ function covIsContinuous(name, levels, allValues){
   if(COVTYPE[name]) return COVTYPE[name]==="numeric";
   return !covLooksLikeId(name, allValues||(COVARS[name]? Object.values(COVARS[name]) : levels));
 }
-const APP_VERSION="1.0.0-rc.1 (2026-10-03)";
+const APP_VERSION="1.0.0-rc.2 (2026-10-04)";
 document.getElementById("appver").textContent="v"+APP_VERSION;
 let FONTSCALE=1;
 let LABELCFG={angle:"auto", size:"auto", long:"wrap"};   // axis tick-label controls (header)
@@ -3384,17 +3393,51 @@ el("deexport").addEventListener("click",()=>{
   const A=el("selA").value.replace(/[,\s]+/g,"_"), B=el("selB").value.replace(/[,\s]+/g,"_"), pr=res.prior||{};
   const fdr=parseFloat(el("selFDR").value), fc=parseFloat(el("fcthr").value)||0;
   const meanLab=res.method==="voom"? "voom_weighted_mean" : "mean_log2";
-  const hdr=[`# benchsiDE ${APP_VERSION}; ${deMethodLabel()}; contrast ${el("selB").value} vs ${el("selA").value}; ${res.method==="welch"||res.fit==="pair"?"fitted on the two groups only":"fitted on all groups ("+(pr.groupsFit||[]).join(", ")+")"}${pr.cov?"; covariates: "+pr.cov:""}${pr.dropNA?"; "+pr.dropNA+" samples with missing covariate values excluded":""}; residual df ${pr.dfr??"NA"}; prior df ${pr.df0!=null?(isFinite(pr.df0)?pr.df0.toFixed(4):"Inf"):"NA"}; call: FDR <= ${fdr}${fc>0?" and |log2FC| >= "+fc:""}`,
+  const hdr=[`# benchsiDE ${APP_VERSION}; ${deMethodLabel()}; contrast ${el("selB").value} vs ${el("selA").value}; ${res.method==="welch"||res.fit==="pair"?"fitted on the two groups only":"fitted on all groups ("+(pr.groupsFit||[]).join(", ")+")"}${pr.cov?"; covariates: "+pr.cov:""}${pr.dropNA?"; "+pr.dropNA+" samples with missing covariate values excluded":""}; residual df ${pr.dfr??"NA"}; prior df ${pr.df0!=null?(isFinite(pr.df0)?pr.df0.toFixed(4):"Inf"):"NA"}; call: ${res.treat? "TREAT test of |log2FC| > "+res.treat.lfc+", FDR <= "+fdr+" (t, p and FDR are TREAT values)" : "FDR <= "+fdr+(fc>0?" and |log2FC| >= "+fc:"")}`,
     `# log2FC is the fitted ${B} - ${A} coefficient${pr.cov?" (covariate-adjusted, so it can differ from the difference of the unadjusted group means)":""}; group means are ${res.method==="voom"?"precision-weighted means on the voom scale":"unadjusted means of log2 expression"}; AveExpr is the average over all fitted samples`];
-  const rows=hdr.concat([`gene,gene_id,biotype,${meanLab}_${A},${meanLab}_${B},AveExpr,log2FC_${B}_vs_${A},SE,t,p,FDR,call`]);
+  const rows=hdr.concat([`gene,gene_id,biotype,${meanLab}_${A},${meanLab}_${B},AveExpr,log2FC_${B}_vs_${A},SE,${res.treat?"t_treat,p_treat,FDR_treat":"t,p,FDR"},call`]);
   for(let g=0;g<nG;g++){ const call=res.q[g]<=fdr&&Math.abs(res.lfc[g])>=fc? (res.lfc[g]>0?"up":"down") : "";
     rows.push([GENES[g].replace(/,/g,";"),IDS[g],BIOTYPES[BT[g]],
     res.aM[g].toFixed(5),res.bM[g].toFixed(5),res.Amean[g].toFixed(5),res.lfc[g].toFixed(5),res.se[g].toExponential(5),res.tv[g].toFixed(5),res.p[g].toExponential(5),res.q[g].toExponential(5),call].join(",")); }
   downloadCSV(rows.join("\n"),`DE_${el("selB").value}_vs_${el("selA").value}.csv`); });
 let deMethod="mod";
+let DETREAT=false;   // test the fold-change threshold with TREAT
 function deMethodLabel(){ return deMethod==="mod"?"moderated t (limma-trend eBayes)":deMethod==="voom"?"voom (precision-weighted moderated t)":"Welch t"; }
 el("demethod").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
-  deMethod=b.dataset.m; document.querySelectorAll("#demethod button").forEach(x=>x.classList.toggle("on",x===b)); drawDE(); }));
+  deMethod=b.dataset.m; document.querySelectorAll("#demethod button").forEach(x=>x.classList.toggle("on",x===b)); syncTreatUI(); drawDE(); }));
+function covFullyDropped(pr){
+  const dr=((pr&&pr.covDropped)||[]).filter(n=>!n.startsWith("cell:")&&!n.startsWith("group:"));
+  return DECOVSEL.filter(v=>COVARS[v]).filter(cn=>dr.some(n=>n===cn||n.startsWith(cn+":")) && !(pr.covTerms||[]).some(n=>n===cn||n.startsWith(cn+":")));
+}
+function covAdjustedText(pr){
+  // the covariates actually in the model (fully aliased ones removed)
+  const out=covFullyDropped(pr);
+  return (pr.cov||"").split(" + ").filter(k=>k&&!out.includes(k.replace(/ \((continuous|categorical|2-level)\)$/,""))).join(" + ");
+}
+function covDroppedNote(pr){
+  // covariate terms that cannot be estimated (aliased with the groups or with other covariates) are dropped, as
+  // limma's lmFit does; say so, and say plainly when a covariate is left out entirely
+  const dr=((pr&&pr.covDropped)||[]).filter(n=>!n.startsWith("cell:")&&!n.startsWith("group:"));
+  if(!dr.length) return "";
+  const out=[], part=[];
+  for(const cn of DECOVSEL.filter(v=>COVARS[v])){
+    const mine=dr.filter(n=>n===cn||n.startsWith(cn+":")); if(!mine.length) continue;
+    const kept=(pr.covTerms||[]).filter(n=>n===cn||n.startsWith(cn+":")).length;
+    if(!kept) out.push(cn); else part.push(`${mine.length} ${cn} term${mine.length>1?"s":""}`);
+  }
+  let t="";
+  if(out.length) t+=`\u26a0 ${out.join(", ")} could not be estimated (aliased with the groups or with other covariates) and ${out.length>1?"were":"was"} left out of the model, as limma does; the comparison is NOT adjusted for ${out.length>1?"them":"it"}. `;
+  if(part.length) t+=`${part.join(", ")} could not be estimated (aliased) and were dropped, as limma does. `;
+  return t;
+}
+function deRuleText(fdr, thr){
+  // the call rule in words, for captions of every view that uses the DE-tab settings
+  const cov=(deMethod!=="welch")? DECOVSEL.filter(v=>COVARS[v]) : [];
+  const rule=(DETREAT&&deMethod!=="welch")? `TREAT test of |log₂FC| > ${thr}, FDR ≤ ${fdr}` : `FDR ≤ ${fdr}, |log₂FC| ≥ ${thr}`;
+  return `${rule}, ${deMethodLabel()}${cov.length?`, adjusted for ${cov.join(", ")}`:``}`;
+}
+function syncTreatUI(){ const cb=el("detreat"); if(!cb) return; cb.checked=DETREAT; cb.disabled=deMethod==="welch"; el("detreatwrap").style.opacity=deMethod==="welch"? "0.5" : "1"; }
+el("detreat").addEventListener("change",()=>{ DETREAT=el("detreat").checked; deKey=""; drawDE(); });
 el("deseq2script").addEventListener("click",()=>{
   const A=el("selA").value, B=el("selB").value;
   const mName=(pending&&pending.matrixName)||"expression_matrix.tsv";
@@ -3479,6 +3522,13 @@ function lmContrastDE(spec){
     const lib=colSumsSeq(CNT, nT, samp).map((s,i)=>s*(TMMF?TMMF[samp[i]]:1)), l2lib=lib.map(s=>Math.log2(s+1));
     const mLib=mean(l2lib), L2E6=Math.log2(1e6);
     const inv0=XtXinv(null); if(!inv0) return {err:"Design matrix is singular."};
+    // Contrast standard error as limma's contrasts.fit applied to the weighted lmFit of ~0 + group + covariates:
+    // per-gene unscaled SDs of the coefficients from the weighted fit, combined with the coefficient correlation of
+    // the UNWEIGHTED design (cov2cor of (X'X)^-1). This equals the exact c'(X'WX)^-1 c when the design is orthogonal;
+    // otherwise it is limma's documented approximation, used here so that results match the standard limma workflow.
+    const rho0=Array.from({length:p0},(_,r)=>Array.from({length:p0},(_,c)=>inv0[r][c]/Math.sqrt(inv0[r][r]*inv0[c][c])));
+    let orth=true; for(let r=0;r<p0;r++) for(let c=0;c<r;c++) if(Math.abs(rho0[r][c])>=1e-14) orth=false;
+    const limmaVar=(inv,c)=>{ let s=0; for(let r=0;r<p0;r++){ if(!c[r]) continue; const sr=Math.sqrt(inv[r][r]); for(let k=0;k<p0;k++){ if(!c[k]) continue; s+=c[r]*c[k]*sr*Math.sqrt(inv[k][k])*(orth? (r===k?1:0) : rho0[r][k]); } } return s; };
     const M=Array.from({length:p0},(_,r)=>{ const v=new Float64Array(nT); for(let q=0;q<nT;q++){ let s=0; for(let c=0;c<p0;c++) s+=inv0[r][c]*X[q][c]; v[q]=s; } return v; });
     const Y=new Float64Array(nT), FIT=new Float64Array(nG*nT), YA=new Float64Array(nG*nT), sx=new Float64Array(nG), sy=new Float64Array(nG), b=new Float64Array(p0);
     for(let g=0;g<nG;g++){
@@ -3488,14 +3538,15 @@ function lmContrastDE(spec){
       sx[g]=sAll/nT + mLib - L2E6; sy[g]=Math.sqrt(Math.sqrt(rss/dfr)); Amean[g]=sAll/nT;
     }
     const sxF=[], syF=[]; for(let g=0;g<nG;g++){ let cs=0; for(const j of samp) cs+=CNT[g][j]; if(cs>0){ sxF.push(sx[g]); syF.push(sy[g]); } }
-    const span=Math.min(1, 0.3 + 0.7*Math.pow(50/nG, 1/3)), fint=approxRule2(lowessFit(sxF, syF, span));
+    const span=Math.min(1, 0.3 + 0.7*Math.pow(50/nG, 1/3)), lo0=lowessFit(sxF, syF, span), fint=approxRule2(lo0);
+    if(spec.keepTrend) VOOMTREND=voomTrendObj(lo0, sxF, syF, span);
     const w=new Float64Array(nT);
     for(let g=0;g<nG;g++){
       for(let q=0;q<nT;q++){ w[q]=1/Math.pow(fint(FIT[g*nT+q] + l2lib[q] - L2E6), 4); Y[q]=YA[g*nT+q]; }
       const inv=XtXinv(w); if(!inv){ s2[g]=NaN; continue; }
       for(let r=0;r<p0;r++){ let s=0; for(let c=0;c<p0;c++){ let t=0; for(let q=0;q<nT;q++) t+=X[q][c]*w[q]*Y[q]; s+=inv[r][c]*t; } b[r]=s; }
       let rss=0; for(let q=0;q<nT;q++){ let f=0; for(let c=0;c<p0;c++) f+=X[q][c]*b[c]; rss+=w[q]*(Y[q]-f)*(Y[q]-f); }
-      s2[g]=rss/dfr; vfac[g]=quad(inv, C[0]);
+      s2[g]=rss/dfr; vfac[g]=limmaVar(inv, C[0]);
       C.forEach((c,ci)=>{ let s=0; for(let r=0;r<p0;r++) s+=c[r]*b[r]; est[ci][g]=s; });
       for(let k=0;k<nC;k++) cellMean[k][g]=b[k];
     }
@@ -3523,8 +3574,10 @@ function lmContrastDE(spec){
 }
 function computeDE(){
   const gi=groupsIdx(), a=gi[el("selA").value], b=gi[el("selB").value];
-  const covNames=(deMethod==="mod")? DECOVSEL.filter(v=>COVARS[v]) : [];
-  const key=deMethod+"|"+DEFIT+"|"+covNames.join("+")+"|"+el("selA").value+"|"+el("selB").value+"|"+included.join("")+"|"+JSON.stringify(COVTYPE);
+  const covNames=(deMethod==="mod"||deMethod==="voom")? DECOVSEL.filter(v=>COVARS[v]) : [];
+  // TREAT (McCarthy & Smyth, Bioinformatics 25:765, 2009): tests |log2FC| > threshold; not defined for Welch
+  const treatOn = DETREAT && deMethod!=="welch", thrT = Math.abs(parseFloat(el("fcthr").value))||0;
+  const key=deMethod+"|"+DEFIT+"|"+covNames.join("+")+"|"+el("selA").value+"|"+el("selB").value+"|"+included.join("")+"|"+JSON.stringify(COVTYPE)+"|"+(treatOn? "treat"+thrT : "");
   if(deKey===key) return deCache;
   if(!a||!b||a.length<2||b.length<2){ deCache={err:`Need ≥2 included samples per group (A n=${a?a.length:0}, B n=${b?b.length:0}).`}; deKey=key; return deCache; }
   const lfc=new Float64Array(nG), p=new Float64Array(nG), aM=new Float64Array(nG), bM=new Float64Array(nG);
@@ -3546,6 +3599,31 @@ function computeDE(){
       for(let q=0;q<b.length;q++)bv[q]=L[g*nS+b[q]];
       const w=welch(av,bv); lfc[g]=w.d; p[g]=w.p; aM[g]=mean(av); bM[g]=mean(bv); tv[g]=w.t; se[g]=w.se; Amean[g]=(a.length*aM[g]+b.length*bM[g])/(a.length+b.length);
     }
+  } else if(deMethod==="voom" && covNames.length){
+    // voom with covariates, as limma: voom(counts, design ~0 + group + covariates), lmFit, contrasts.fit (B - A),
+    // eBayes. The contrast standard error follows contrasts.fit (see lmContrastDE). Samples with a missing covariate
+    // value are left out, as lmFit does.
+    if(!HASCOUNTS){ deCache={err:"voom needs raw counts; this input was already normalized or log-scale."}; deKey=key; return deCache; }
+    const okS=j=>covNames.every(cn=>{ const v=COVARS[cn][j]; return v!==undefined&&v!==null&&String(v).trim()!==""&&String(v).trim().toUpperCase()!=="NA"; });
+    const aC=a.filter(okS), bC=b.filter(okS);
+    if(aC.length<2||bC.length<2){ deCache={err:`After leaving out samples with a missing value in ${covNames.join(", ")}, fewer than 2 samples remain in a group.`}; deKey=key; return deCache; }
+    const useS=abAll.filter(okS);
+    let totLv=0;
+    for(const cn of covNames){
+      const lv=[...new Set(useS.map(j=>COVARS[cn][j]))].sort();
+      if(lv.length<2){ deCache={err:`Covariate "${cn}" is constant within this contrast: nothing to adjust for.`}; deKey=key; return deCache; }
+      totLv+= covIsContinuous(cn, lv)? 1 : lv.length;
+    }
+    const cells=[selAname, selBname].concat(others.filter(g=>gi[g].some(okS)));   // groups with no sample left after missing covariate values are not fitted, as in the moderated t
+    const cvec=new Float64Array(cells.length); cvec[0]=-1; cvec[1]=1;
+    const R=lmContrastDE({cells, gi, cvecs:[cvec], covNames, method:"voom", keepTrend:true});
+    if(R.err){ deCache={err:"voom with covariates: "+R.err}; deKey=key; return deCache; }
+    if(R.prior.dropped.some(n=>n.startsWith("cell:"))){ deCache={err:`Covariate set (${covNames.join(", ")}) is confounded with the groups; it cannot be adjusted for in this comparison.`}; deKey=key; return deCache; }
+    const meanOf=(idx,g)=>{ let s3=0; for(const j of idx) s3+=L[g*nS+j]; return s3/idx.length; };
+    for(let g=0;g<nG;g++){ lfc[g]=R.lfc[g]; se[g]=R.se[g]; tv[g]=R.tv[g]; p[g]=R.p[g]; Amean[g]=R.Amean[g]; aM[g]=meanOf(aC,g); bM[g]=meanOf(bC,g); }
+    const pr=R.prior;
+    prior={df0:pr.df0, s20:pr.s20, dfTot:pr.dfTot, dfr:pr.dfr, cov:pr.cov, covLevels:totLv, covDropped:pr.dropped, covTerms:pr.kept, dropNA:abAll.length-useS.length, nA:aC.length, nB:bC.length, nFit:pr.nFit,
+      groupsFit:cells.slice(), span:pr.span};
   } else if(deMethod==="voom"){
     if(!HASCOUNTS){ deCache={err:"voom needs raw counts; this input was already normalized or log-scale."}; deKey=key; return deCache; }
     const ab=abAll, nA=a.length, nB=b.length, nT=ab.length, G=nGrp, dfr=nT-G;
@@ -3577,12 +3655,7 @@ function computeDE(){
     const span=Math.min(1, 0.3 + 0.7*Math.pow(50/nG, 1/3));
     const lo=lowessFit(sxF,syF,span);
     const fint=approxRule2(lo);
-    VOOMTREND={line:(()=>{ const step=Math.max(1,Math.floor(lo.x.length/500)), lx=[], ly=[];
-        for(let g2=0;g2<lo.x.length;g2+=step){ lx.push(lo.x[g2]); ly.push(lo.y[g2]); }
-        if((lo.x.length-1)%step){ lx.push(lo.x[lo.x.length-1]); ly.push(lo.y[lo.y.length-1]); }
-        return {x:lx,y:ly}; })(), span,
-      pts:(()=>{ const step=Math.max(1,Math.floor(sxF.length/2000)), px=[], py=[];
-        for(let g2=0;g2<sxF.length;g2+=step){ px.push(sxF[g2]); py.push(syF[g2]); } return {x:px,y:py}; })()};
+    VOOMTREND=voomTrendObj(lo, sxF, syF, span);
     // weights from fitted log2-counts per observation; then weighted group-means LS + eBayes
     const s2=new Float64Array(nG), swA=new Float64Array(nG), swB=new Float64Array(nG);
     const sw=new Float64Array(G), swy=new Float64Array(G), wrow=new Float64Array(nT);
@@ -3619,9 +3692,9 @@ function computeDE(){
     const nDropNA=abAll.length-aC.length-bC.length-oC.reduce((s2,x)=>s2+x.length,0);
     if(aC.length<2||bC.length<2){ deCache={err:`After leaving out samples with a missing value in ${covNames.join(", ")} (${nDropNA}), fewer than 2 samples remain in a group.`}; deKey=key; return deCache; }
     const ab=aC.concat(bC, ...oC), nT=ab.length, nA=aC.length, nB=bC.length;
-    const dummies=[]; let totLv=0; const covKinds=[];
+    const dummies=[], dnames=[]; let totLv=0; const covKinds=[]; let covDroppedMod=[];
     // indicators of the other fitted groups (reference = A; coefficient 1 = B - A)
-    { let off=nA+nB; for(const x of oC){ const col=new Array(nT).fill(0); for(let q=0;q<x.length;q++) col[off+q]=1; dummies.push(col); off+=x.length; } }
+    { let off=nA+nB; for(const x of oC){ const col=new Array(nT).fill(0); for(let q=0;q<x.length;q++) col[off+q]=1; dummies.push(col); dnames.push("group:other"); off+=x.length; } }
     const nOtherCols=dummies.length;
     for(const cn of covNames){
       const cv=ab.map(j=>COVARS[cn][j]);
@@ -3632,11 +3705,11 @@ function computeDE(){
       // and numeric parameterizations give identical t-statistics, so the dummy path is kept there)
       const isNum=lv.every(v=>v!==""&&isFinite(Number(v)));
       if(covIsContinuous(cn, lv)){
-        dummies.push(ab.map((j,q)=>Number(cv[q])));
+        dummies.push(ab.map((j,q)=>Number(cv[q]))); dnames.push(cn);
         covKinds.push(cn+" (continuous)"); totLv+=1;
       } else {
         totLv+=lv.length;
-        for(const l2 of lv.slice(1)) dummies.push(ab.map((j,q)=>cv[q]===l2?1:0));
+        for(const l2 of lv.slice(1)){ dummies.push(ab.map((j,q)=>cv[q]===l2?1:0)); dnames.push(cn+":"+l2); }
         covKinds.push(cn+(isNum&&lv.length===2?" (2-level)":" (categorical)"));
       }
     }
@@ -3644,7 +3717,7 @@ function computeDE(){
     if(false&&nT-p0chk<1){ deCache={err:`Covariates (${covNames.join(", ")}) leave no residual degrees of freedom (n = ${nT}, parameters = ${p0}).`}; deKey=key; return deCache; }
     let X=ab.map((j,q)=>[1, (q>=nA&&q<nA+nB)?1:0, ...dummies.map(d=>d[q])]);
     // drop aliased columns (e.g. a patient indicator that duplicates a single-sample group); the B - A coefficient must survive
-    { const kc=independentCols(X); if(kc.length<X[0].length){ if(!kc.includes(1)){ deCache={err:`Covariate set (${covNames.join(", ")}) is confounded with the ${el("selA").value} vs ${el("selB").value} contrast; it cannot be adjusted for in this comparison. The Design check under the sample list shows which comparisons each factor can be adjusted in.`}; deKey=key; return deCache; } X=X.map(r=>kc.map(c=>r[c])); } }
+    { const kc=independentCols(X); if(kc.length<X[0].length){ if(!kc.includes(1)){ deCache={err:`Covariate set (${covNames.join(", ")}) is confounded with the ${el("selA").value} vs ${el("selB").value} contrast; it cannot be adjusted for in this comparison. The Design check under the sample list shows which comparisons each factor can be adjusted in.`}; deKey=key; return deCache; } covDroppedMod=dnames.filter((_,i)=>!kc.includes(i+2)); X=X.map(r=>kc.map(c=>r[c])); } }
     const p0=X[0].length;
     if(nT-p0<1){ deCache={err:`Covariates (${covNames.join(", ")}) leave no residual degrees of freedom (n = ${nT}, parameters = ${p0}).`}; deKey=key; return deCache; }
     const XtX=Array.from({length:p0},(_,r2)=>Array.from({length:p0},(_,c2)=>{
@@ -3672,7 +3745,7 @@ function computeDE(){
       se[g]=Math.sqrt(s2post*vGG); const t=lfc[g]/Math.sqrt(Math.max(s2post*vGG,1e-300));
       tv[g]=t; p[g]=tPval(t,dfTot);
     }
-    prior={df0,s20:median(s20),trend:true,dfTot,dfr,cov:covKinds.join(" + "),covLevels:totLv,dropNA:nDropNA,nA,nB,nFit:nT,groupsFit:[selAname,selBname].concat(others.filter((g,i)=>gi[g].some(okS)))};
+    prior={df0,s20:median(s20),trend:true,dfTot,dfr,cov:covKinds.join(" + "),covLevels:totLv,covDropped:covDroppedMod,covTerms:dnames.filter(n=>!covDroppedMod.includes(n)),dropNA:nDropNA,nA,nB,nFit:nT,groupsFit:[selAname,selBname].concat(others.filter((g,i)=>gi[g].some(okS)))};
   } else {
     const nA=a.length, nB=b.length, nT=abAll.length, G=nGrp, dfr=nT-G;
     if(dfr<1){ deCache={err:"No residual degrees of freedom."}; deKey=key; return deCache; }
@@ -3697,8 +3770,29 @@ function computeDE(){
     }
     prior={df0,s20:median(s20),trend:true,dfTot,dfr,nA,nB,nFit:nT,groupsFit:fitGroups.slice()};
   }
-  const q=bh(Array.from(p));
-  deCache={lfc,p,q,aM,bM,prior,tv,se,Amean,method:deMethod,fit:(deMethod==="welch"?"pair":DEFIT)}; deKey=key; return deCache;
+  // standard moderated-t statistics are kept as ebT/ebP/ebQ for functions that rank or pool genes (GSEA, barcode,
+  // cross-dataset analyses); with TREAT, p/q/tv hold the TREAT values, as limma's treat() output does
+  const ebT=Float64Array.from(tv), ebP=Float64Array.from(p), ebQ=bh(Array.from(ebP));
+  let treat=null;
+  if(treatOn){
+    // limma::treat (legacy = upshot = FALSE): p = P(T > (|b| - lfc)/se) + P(T > (|b| + lfc)/se), T ~ t(df.total);
+    // t = sign(b) max(0, (|b| - lfc)/se) when |b| > lfc, else 0
+    const df=prior.dfTot;
+    for(let g=0;g<nG;g++){
+      const ab1=Math.abs(lfc[g]), s3=Math.max(se[g],1e-300), tr=(ab1-thrT)/s3, tl=(ab1+thrT)/s3;
+      p[g]=tUpperJS(tr,df)+tUpperJS(tl,df);
+      tv[g]= lfc[g]>thrT? Math.max(tr,0) : lfc[g]<-thrT? -Math.max(tr,0) : 0;
+    }
+    treat={lfc:thrT};
+  }
+  const q= treatOn? bh(Array.from(p)) : ebQ;
+  deCache={lfc,p,q,aM,bM,prior,tv,se,Amean,ebT,ebP,ebQ,treat,method:deMethod,fit:(deMethod==="welch"?"pair":DEFIT)}; deKey=key; return deCache;
+}
+function tUpperJS(x,df){
+  // upper tail P(T > x), T ~ t(df)
+  if(!isFinite(x)) return x>0? 0 : 1;
+  const two=tPval(Math.abs(x),df);
+  return x>=0? two/2 : 1-two/2;
 }
 function drawDE(){
   const res=computeDE();
@@ -3719,10 +3813,10 @@ function drawDE(){
     else cs.push("#c7ccd6");
   }
   el("decounts").innerHTML =
-    `<span class="pill" style="background:#fee2e2;color:#b91c1c">${nUp.toLocaleString()} up in ${el("selB").value}</span> <span class="pill" style="background:#dbeafe;color:#1d4ed8">${nDn.toLocaleString()} down</span>`;
+    `<span class="pill" style="background:#fee2e2;color:#b91c1c">${nUp.toLocaleString()} up in ${el("selB").value}</span> <span class="pill" style="background:#dbeafe;color:#1d4ed8">${nDn.toLocaleString()} down</span>${res.treat? ` <span class="footer-note" title="TREAT tests whether |log2FC| exceeds the threshold; p, FDR and t are TREAT values">TREAT: |log₂FC| &gt; ${res.treat.lfc}, FDR ≤ ${fdr}</span>` : ""}`;
   const covSel=DECOVSEL.join(" + ");
-  const covMsg=(covSel && deMethod!=="mod")? `\u26a0 Covariate adjustment ("${covSel}") applies only to the moderated t method; current ${deMethodLabel()} results are UNADJUSTED. `
-    : (res.prior&&res.prior.cov? `Adjusted for ${res.prior.cov} (${res.prior.covLevels} levels; residual df = ${res.prior.dfr}). ` : "");
+  const covMsg=(covSel && deMethod==="welch")? `⚠ Covariate adjustment ("${covSel}") is not available for the Welch t; these results are UNADJUSTED. Choose the moderated t or voom to adjust. `
+    : (res.prior&&res.prior.cov? (covAdjustedText(res.prior)? `Adjusted for ${covAdjustedText(res.prior)} (${res.prior.covLevels} levels; residual df = ${res.prior.dfr}). ` : ``) + covDroppedNote(res.prior) : "");
   const nMinDE=Math.min(res.prior&&res.prior.nA!=null? res.prior.nA : (groupsIdx()[el("selA").value]||[]).length, res.prior&&res.prior.nB!=null? res.prior.nB : (groupsIdx()[el("selB").value]||[]).length);
   const smallMsg= nMinDE<=3 && res.method!=="welch" ? `⚠ ${nMinDE} samples in the smaller group: FDR control is approximate at this size (benchsiDE calibration: in 10–25% of random 3-versus-3 splits of healthy skin at least one gene reached FDR ≤ 0.05); confirm findings independently. ` : "";
   el("deprior").textContent = smallMsg + covMsg + (res.prior ?
@@ -3770,7 +3864,7 @@ function drawDE(){
     hovertemplate:dePlot==="volcano"?"%{text}<br>log₂FC %{x:.2f} · −log₁₀p %{y:.1f}<extra></extra>":"%{text}<br>mean log₂ %{x:.2f} · log₂FC %{y:.2f}<extra></extra>"}],
     {margin:{t:26,b:45,l:55,r:10},font:{size:12},title:{text:`${el("selB").value} vs ${el("selA").value}`,font:{size:14}},
      xaxis:{title:dePlot==="volcano"?"log₂ fold change":"average log₂ expression (all fitted samples)"},
-     yaxis:{title:dePlot==="volcano"?"−log₁₀ p":"log₂ fold change"}, shapes, annotations:annos, dragmode:el("dedrag").value},
+     yaxis:{title:dePlot==="volcano"?(res.treat? `−log₁₀ p (TREAT, |log₂FC| > ${res.treat.lfc})` : "−log₁₀ p"):"log₂ fold change"}, shapes, annotations:annos, dragmode:el("dedrag").value},
     Object.assign({}, PL, {modeBarButtonsToRemove:PL.modeBarButtonsToRemove.filter(b=>b!=="select2d"&&b!=="lasso2d")}));
   onPlotClick(el("p_volcano"), ev=>{ const i=nameToIdx[ev.points[0].text.toLowerCase()]; if(i!==undefined){jumpToGene(i);} });
   // point k of the trace is gene k (every gene is drawn, in index order), so the selection maps directly
@@ -4388,9 +4482,10 @@ function* runGSEAGen(){
   const res=computeDE();
   if(res.err){ clearEnrDisplay("GSEA needs a valid DE contrast: "+res.err); return; }
   const mn=parseInt(el("enrmin").value,10)||5, mx=parseInt(el("enrmax").value,10)||2000;
-  let ordR=Array.from({length:nG},(_,i)=>i).sort((a,b)=>res.tv[b]-res.tv[a]);
+  const rankT=res.ebT||res.tv;   // GSEA ranks by the moderated t (not the TREAT statistic)
+  let ordR=Array.from({length:nG},(_,i)=>i).sort((a,b)=>rankT[b]-rankT[a]);
   const rankOf=new Int32Array(nG); ordR.forEach((g,r2)=>{rankOf[g]=r2;});
-  let wAbs=new Float64Array(nG); for(let r2=0;r2<nG;r2++) wAbs[r2]=Math.abs(res.tv[ordR[r2]]);
+  let wAbs=new Float64Array(nG); for(let r2=0;r2<nG;r2++) wAbs[r2]=Math.abs(rankT[ordR[r2]]);
   const sets=[];
   for(const s of GMT){
     const gs=new Set();
@@ -4743,7 +4838,7 @@ function deMethodsText(){
   if(!r) return "";
   const A=el("selA").value, B=el("selB").value, pr=r.prior||{}, nA=pr.nA, nB=pr.nB;
   const fdr=el("selFDR").value, fc=parseFloat(el("fcthr").value)||0;
-  const covAsked=DECOVSEL.filter(v=>COVARS[v]);
+  const covAsked=DECOVSEL.filter(v=>COVARS[v]); const covUsed=covAdjustedText(pr); const covOut=covFullyDropped(pr);
   let t=`Differential expression of ${B} relative to ${A}`;
   if(r.method==="welch"){
     t+=` was assessed per gene with Welch's unequal-variance t-test on the ${(groupsIdx()[A]||[]).length} ${A} and ${(groupsIdx()[B]||[]).length} ${B} samples (no information shared across genes).`;
@@ -4752,13 +4847,16 @@ function deMethodsText(){
     t+= r.method==="voom"
       ? ` was assessed with voom (Law CW et al., Genome Biol 15:R29, 2014): counts were transformed to log₂((count + 0.5)/(library size + 1) × 10⁶), observation-level precision weights were estimated from the mean–variance trend, and weighted linear models were fitted; reported group means are precision-weighted means on this scale.`
       : ` was assessed with limma-trend moderated t-statistics (Law CW et al., Genome Biol 15:R29, 2014): gene-wise residual variances were shrunk by empirical Bayes toward a prior that depends on average log-expression (Smyth GK, Stat Appl Genet Mol Biol 3:Article3, 2004).`;
-    t+= all ? ` The linear model was fitted to all ${pr.nFit} samples of the ${pr.groupsFit.length} groups (one coefficient per group${r.method==="mod"&&pr.cov?`, plus ${pr.cov}`:``}), and ${B} and ${A} (${nB} and ${nA} samples) were compared by a contrast, so every group contributed to the variance estimate`
-            : ` The model was fitted to the ${nA} ${A} and ${nB} ${B} samples only${r.method==="mod"&&pr.cov?`, with ${pr.cov} as additional terms`:``}`;
+    t+= all ? ` The linear model was fitted to all ${pr.nFit} samples of the ${pr.groupsFit.length} groups (one coefficient per group${covUsed?`, plus ${covUsed}`:``}), and ${B} and ${A} (${nB} and ${nA} samples) were compared by a contrast, so every group contributed to the variance estimate`
+            : ` The model was fitted to the ${nA} ${A} and ${nB} ${B} samples only${covUsed?`, with ${covUsed} as additional terms`:``}`;
     t+=` (${pr.dfr} residual and ${isFinite(pr.df0)?pr.df0.toFixed(2):"infinite"} prior degrees of freedom).`;
-    if(r.method==="mod"&&pr.cov) t+=` Numeric covariates with more than two distinct values were fitted as continuous slopes unless marked categorical; categorical covariates (including subject or pair identifiers, which block on individual) were fitted as indicator terms.${pr.dropNA?` ${pr.dropNA} samples with a missing covariate value were excluded from this fit.`:``}`;
+    if(covOut.length) t+=` ${covOut.join(", ")} could not be estimated because ${covOut.length>1?"they are":"it is"} aliased with the groups or with other covariates, and ${covOut.length>1?"were":"was"} left out of the model; the comparison is not adjusted for ${covOut.length>1?"them":"it"}.`;
+    if(r.method==="voom"&&covUsed) t+=` The voom weights were estimated from the fit of this design, and the ${B} − ${A} contrast was estimated from the weighted fit of each gene.`;
+    if(covUsed) t+=` Numeric covariates with more than two distinct values were fitted as continuous slopes unless marked categorical; categorical covariates (including subject or pair identifiers, which block on individual) were fitted as indicator terms.${pr.dropNA?` ${pr.dropNA} samples with a missing covariate value were excluded from this fit.`:``}`;
   }
-  if(covAsked.length&&r.method!=="mod") t+=` Covariates (${covAsked.join(", ")}) were not adjusted for: the ${r.method==="voom"?"voom":"Welch"} analysis in this application does not support covariates.`;
-  t+=` p-values were adjusted by the Benjamini–Hochberg procedure, and genes with FDR ≤ ${fdr}${fc>0?` and |log₂ fold change| ≥ ${fc}`:``} were called differentially expressed (positive fold changes: higher in ${B}). `;
+  if(covAsked.length&&r.method==="welch") t+=` Covariates (${covAsked.join(", ")}) were not adjusted for: the Welch t-test does not support covariates.`;
+  if(r.treat) t+=` p-values for a fold-change threshold were computed with TREAT (McCarthy DJ & Smyth GK, Bioinformatics 25:765–771, 2009), which tests whether |log₂ fold change| exceeds ${r.treat.lfc}; they were adjusted by the Benjamini–Hochberg procedure, and genes with TREAT FDR ≤ ${fdr} were called differentially expressed (positive fold changes: higher in ${B}). `;
+  else t+=` p-values were adjusted by the Benjamini–Hochberg procedure, and genes with FDR ≤ ${fdr}${fc>0?` and |log₂ fold change| ≥ ${fc}`:``} were called differentially expressed (positive fold changes: higher in ${B}). `;
   return t;
 }
 function genMethods(){
@@ -5021,12 +5119,13 @@ function runSelfTest(){
   const hadData = S && S.length;
   const ST=hadData? {S:S,inc:included.slice(),CNT:CNT,L:L,nG:nG,nS:nS,GROUPS:GROUPS.slice(),GX:{...GX},GCOL:{...GCOL},
     NUM:NUMERIC,TMMF:TMMF,EFF:EFFLIB,HAS:HASCOUNTS,GENES:GENES,IDS:IDS,BT:BT,BIO:BIOTYPES,pend:pending,
-    de:deCache,dk:deKey,dm:deMethod,gt:GROUPTYPE,f:FILTER,fac:FACTOR,cov:{...COVARS},
+    de:deCache,dk:deKey,dm:deMethod,dtr:DETREAT,gt:GROUPTYPE,f:FILTER,fac:FACTOR,cov:{...COVARS},
     gmt:GMT,gmtn:GMTname,gmtc:GMTCITE,gmtb:GMTBUILTIN,enr:enrResults,disco:DISCO,hc:heatClusters,
     n2i:nameToIdx,i2i:idToIdx,vals:VALS,dlog:DATALOG,nn:NORMNOTE,unm:UNMAPPED,
     cg:curGene,cl:compareList.slice(),cog:coGene,cop:coPartner,cok:coKey,sck:scorrKey,ps:patState,
     selA:el("selA").value,selB:el("selB").value,selFDR:el("selFDR").value,fcthr:el("fcthr").value,
     dcv:DECOVSEL.slice(), bd:BATCHDISP, go:(GROUPORDER&&GROUPORDER.slice?GROUPORDER.slice():GROUPORDER)} : null;
+  DETREAT=false;   // the self-test compares standard moderated t results
   // On-screen state that analyzeNow() rewrites. Content panels are moved aside as live nodes and
   // moved back afterwards, so their click handlers survive; the self-test leaves no visible trace.
   const UI_CONTENT=["hdrsub","methodsnote","qcwarn","gmtinfo","enrinfo","enrtable","decov","batchdisp"];
@@ -5166,7 +5265,7 @@ function runSelfTest(){
   if(ST){
     S=ST.S; included=ST.inc; CNT=ST.CNT; L=ST.L; nG=ST.nG; nS=ST.nS; GROUPS=ST.GROUPS; GX=ST.GX; GCOL=ST.GCOL;
     NUMERIC=ST.NUM; TMMF=ST.TMMF; EFFLIB=ST.EFF; HASCOUNTS=ST.HAS; GENES=ST.GENES; IDS=ST.IDS; BT=ST.BT; BIOTYPES=ST.BIO;
-    pending=ST.pend; deCache=ST.de; deKey=ST.dk; deMethod=ST.dm; GROUPTYPE=ST.gt; FILTER=ST.f; FACTOR=ST.fac; COVARS=ST.cov;
+    pending=ST.pend; deCache=ST.de; deKey=ST.dk; deMethod=ST.dm; DETREAT=ST.dtr; syncTreatUI(); GROUPTYPE=ST.gt; FILTER=ST.f; FACTOR=ST.fac; COVARS=ST.cov;
     GMT=ST.gmt; GMTname=ST.gmtn; GMTCITE=ST.gmtc; GMTBUILTIN=ST.gmtb; enrResults=ST.enr; DISCO=ST.disco; heatClusters=ST.hc;
     nameToIdx=ST.n2i; idToIdx=ST.i2i; VALS=ST.vals; DATALOG=ST.dlog; NORMNOTE=ST.nn; UNMAPPED=ST.unm;
     curGene=ST.cg; compareList=ST.cl; coGene=ST.cog; coPartner=ST.cop; coKey=ST.cok; scorrKey=ST.sck; patState=ST.ps;
@@ -5461,7 +5560,7 @@ function dsResult(i){
   if(i===0){
     const r=computeDE();
     if(r.err) return {err:r.err};
-    return {lfc:r.lfc, tv:r.tv, q:r.q, se:r.se, p:r.p, df:(r.prior&&r.prior.dfTot)||null, clabel:el("selB").value+" vs "+el("selA").value};
+    return {lfc:r.lfc, tv:r.ebT||r.tv, q:r.ebQ||r.q, se:r.se, p:r.ebP||r.p, df:(r.prior&&r.prior.dfTot)||null, clabel:el("selB").value+" vs "+el("selA").value};
   }
   const d=DSETS[i-1];
   if(!d.selA||!d.selB||d.selA===d.selB) return {err:dsLabel(i)+": pick two groups with n≥2."};
@@ -6687,7 +6786,7 @@ function drawVenn(){
     hovertemplate:"%{text} genes<extra>click for the list</extra>"}],
     {margin:{t:30,b:20,l:20,r:20}, height:430, shapes, annotations:annos,
      xaxis:{visible:false,range:[-1.6,1.6],scaleanchor:"y"}, yaxis:{visible:false,range:[-1.45,1.45]},
-     title:{text:`DEG Venn: ${dir2==="any"?"significant":dir2+"-regulated"} at FDR ≤ ${fdr}, |log₂FC| ≥ ${thr} (${deMethodLabel()}); counts exact, areas not proportional`, font:{size:11}}}, PL);
+     title:{text:`DEG Venn: ${dir2==="any"?"significant":dir2+"-regulated"} (${deRuleText(fdr, thr)}); counts exact, areas not proportional`, font:{size:11}}}, PL);
   onPlotClick(el("p_venn"), ev=>{
     const key=ev.points[0].customdata;
     vennShowRegion(key);
@@ -6740,7 +6839,7 @@ function runAllPairs(){
   const okRows=rows.filter(r=>!r.err);
   el("venncfg").style.display=okRows.length>=2? "flex":"none";
   el("vennpicks").innerHTML=okRows.map((r,k2)=>`<label style="margin-right:8px"><input type="checkbox" class="vennck" data-a="${r.A}" data-b="${r.B}" ${k2<Math.min(3,okRows.length)?"checked":""}> ${r.B} vs ${r.A}</label>`).join("");
-  el("allpairsout").innerHTML=`<div class="footer-note">${deMethodLabel()}, FDR ≤ ${fdr}, |log₂FC| ≥ ${thr}. Same statistics as the single-contrast view: this is a convenience runner, not a joint model; each contrast's FDR is within-contrast.</div>`+
+  el("allpairsout").innerHTML=`<div class="footer-note">${deRuleText(fdr, thr)}. Same statistics as the single-contrast view: this is a convenience runner, not a joint model; each contrast's FDR is within-contrast.</div>`+
     `<table class="tbl"><tr><th>contrast</th><th>up in B</th><th>down in B</th></tr>`+
     ALLPAIRS.rows.map(r=>r.err? `<tr><td>${r.B} vs ${r.A}</td><td colspan="2">${r.err}</td></tr>` :
       `<tr><td>${r.B} vs ${r.A}</td><td style="color:#dc2626">${r.up}</td><td style="color:#2563eb">${r.dn}</td></tr>`).join("")+`</table>`+
@@ -7217,7 +7316,7 @@ function drawBarcode(rowsSet, setName){
   const res=deCache&&!deCache.err? deCache : computeDE();
   if(res.err){ el("p_barcode").innerHTML=""; return; }
   const n=nG;
-  const ord=Array.from({length:n},(_,g)=>g).sort((a,b)=>res.tv[a]-res.tv[b]);   // ascending, limma convention
+  const rkT=res.ebT||res.tv; const ord=Array.from({length:n},(_,g)=>g).sort((a,b)=>rkT[a]-rkT[b]);   // by moderated t   // ascending, limma convention
   const inSet=new Set(rowsSet);
   const memb=new Float64Array(n);
   const pos=[];
@@ -7437,7 +7536,7 @@ function runCC(){
   for(let g=0;g<nG;g++){ if(r1.q[g]<=fdr&&Math.abs(r1.lfc[g])>=thr)s1.add(g); if(r2.q[g]<=fdr&&Math.abs(r2.lfc[g])>=thr)s2.add(g); }
   let both=0; s1.forEach(g=>{ if(s2.has(g))both++; });
   CCLAST={r1,r2,l1:`${b1} vs ${a1}`,l2:`${b2} vs ${a2}`};
-  el("ccinfo").innerHTML=`log₂FC correlation (all ${nG.toLocaleString()} genes): <b>r = ${rr.toFixed(3)}</b> · hits X only: <b>${s1.size-both}</b> · shared: <b>${both}</b> · Y only: <b>${s2.size-both}</b> (FDR ≤ ${fdr}, |log₂FC| ≥ ${thr}, ${deMethodLabel()}).`;
+  el("ccinfo").innerHTML=`log₂FC correlation (all ${nG.toLocaleString()} genes): <b>r = ${rr.toFixed(3)}</b> · hits X only: <b>${s1.size-both}</b> · shared: <b>${both}</b> · Y only: <b>${s2.size-both}</b> (${deRuleText(fdr, thr)}).`;
   // scatter: subsample non-hits for weight, all hits
   const px=[],py=[],pc=[],pt=[];
   const step=Math.max(1,Math.floor(nG/4000));
@@ -7451,8 +7550,8 @@ function runCC(){
   const fit=olsCI(Array.from(r1.lfc), Array.from(r2.lfc));
   // ranked lists: shared (both sig, by combined |t| rank), X-only, Y-only (by |t| in their contrast)
   const rkX=new Int32Array(nG), rkY=new Int32Array(nG);
-  Array.from({length:nG},(_,g)=>g).sort((a,b)=>Math.abs(r1.tv[b])-Math.abs(r1.tv[a])).forEach((g,r2_)=>rkX[g]=r2_);
-  Array.from({length:nG},(_,g)=>g).sort((a,b)=>Math.abs(r2.tv[b])-Math.abs(r2.tv[a])).forEach((g,r2_)=>rkY[g]=r2_);
+  Array.from({length:nG},(_,g)=>g).sort((a,b)=>Math.abs((r1.ebT||r1.tv)[b])-Math.abs((r1.ebT||r1.tv)[a])).forEach((g,r2_)=>rkX[g]=r2_);
+  Array.from({length:nG},(_,g)=>g).sort((a,b)=>Math.abs((r2.ebT||r2.tv)[b])-Math.abs((r2.ebT||r2.tv)[a])).forEach((g,r2_)=>rkY[g]=r2_);
   const shared=[], xOnly=[], yOnly=[];
   for(let g=0;g<nG;g++){
     const h1=s1.has(g),h2=s2.has(g);
@@ -8372,7 +8471,7 @@ function drawHubs(){
   // k vs |t| scatter: the driver-candidate view
   if(de){
     const ordIdx=HUBS.rows.map(r=>r.g);
-    const xs=HUBS.rows.map(r=>r.kNorm), ys=HUBS.rows.map(r=>Math.abs(de.tv[r.g]));
+    const xs=HUBS.rows.map(r=>r.kNorm), ys=HUBS.rows.map(r=>Math.abs((de.ebT||de.tv)[r.g]));
     const cs=HUBS.rows.map(r=>de.q[r.g]<=deFDR()? "#dc2626" : "#94a3b8");
     Plotly.react(el("p_hubscatter"), [{x:xs, y:ys, text:HUBS.rows.map(r=>GENES[r.g].split(" (")[0]),
       mode:"markers", type:"scattergl", marker:{size:5, color:cs, opacity:0.7},
@@ -9533,7 +9632,7 @@ const nextFrame=()=>new Promise(res=>{ if(typeof requestAnimationFrame==="functi
 async function runBenchmark(o){
   o=Object.assign({sizes:BENCH_SIZES, reps:5, warmup:1, gseaPerm:1000, onProgress:null, render:true}, o||{});
   const env=benchEnv(), out={env, settings:{sizes:o.sizes, reps:o.reps, warmup:o.warmup, genes:BENCH_GENES, gseaPerm:o.gseaPerm, filter:"filterByExpr", norm:"TMM"}, datasets:[]};
-  const save={fm:el("fmode").value, nm:el("normsel").value};
+  const save={fm:el("fmode").value, nm:el("normsel").value, tr:DETREAT}; DETREAT=false;
   let k=0; const total=o.sizes.length*(o.reps+o.warmup);
   for(const n of o.sizes){
     const ds=benchDataset(n, 0xBE7C0000+n), steps={};
@@ -9566,7 +9665,7 @@ async function runBenchmark(o){
     if(typeof performance!=="undefined"&&performance.memory) res.heapUsedMB=Math.round(performance.memory.usedJSHeapSize/1e6);
     out.datasets.push(res);
   }
-  el("fmode").value=save.fm; el("normsel").value=save.nm;
+  DETREAT=save.tr; deKey=""; syncTreatUI(); el("fmode").value=save.fm; el("normsel").value=save.nm;
   if(o.onProgress) o.onProgress("done", 1);
   return out;
 }
@@ -9940,7 +10039,7 @@ function discoveryRun(){
   let indSig=null, indLab="";
   if(gk.length===2){
     const res=computeDE();
-    if(!res.err){ indSig=g=>res.q[g]<=0.05; indLab=`per-gene ${deMethodLabel()} FDR ≤ 0.05 (${el("selB").value} vs ${el("selA").value})`; }
+    if(!res.err){ indSig=g=>res.q[g]<=0.05; indLab=`per-gene ${deMethodLabel()}${res.treat?` TREAT (|log₂FC| > ${res.treat.lfc})`:``} FDR ≤ 0.05 (${el("selB").value} vs ${el("selA").value})`; }
   }
   if(!indSig){
     const pj=new Float64Array(nG);
@@ -10206,7 +10305,7 @@ async function makeSummaryFigure(){
 
 /* ================= session save / restore ================= */
 function sessionState(){
-  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
+  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, deTreat:DETREAT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
     disco:{fam:el("dscfam").checked, cur:el("dsccur").checked, gmt:el("dscgmt").checked, mn:el("dscmin").value, mx:el("dscmax").value, B:el("dscperm").value},
     matrixName:pending&&pending.matrixName||"", nG0:FILTER.ng0, factor:FACTOR,
     factors:(pending&&pending.factors)? Object.fromEntries(baseFactorNames().map(f=>[f,pending.factors[f]])) : null,
@@ -10361,7 +10460,7 @@ function applySession(ss){
   el("selA").value=ss.de.A; el("selB").value=ss.de.B;
   el("selFDR").value=ss.de.fdr; el("fcthr").value=ss.de.thr;
   deMethod=ss.de.method||"mod";
-  document.querySelectorAll("#demethod button").forEach(x=>x.classList.toggle("on",x.dataset.m===deMethod));
+  document.querySelectorAll("#demethod button").forEach(x=>x.classList.toggle("on",x.dataset.m===deMethod)); DETREAT=!!ss.deTreat; syncTreatUI();
   if(ss.gmt){
     if(ss.gmt.builtin){ useBuiltin(ss.gmt.builtin); el("builtinsel").value=ss.gmt.builtin; }
     else { GMT=ss.gmt.sets; GMTname=ss.gmt.name; GMTCITE=""; GMTBUILTIN=""; el("gmtinfo").textContent=`${GMT.length} gene sets restored from session (${GMTname})`; }

@@ -20,8 +20,8 @@ function runExternalValidation(M, D, REF) {
   const cols = M.split("\n")[0].replace(/\r$/, "").split("\t").slice(1);
   const cell = {};
   D.trim().split("\n").slice(1).forEach(l => { const f = l.replace(/\r$/, "").split("\t"); cell[f[0]] = f[1]; });
-  const Dcov = "sample\tcelltype\tlcov\tblk\n" +
-    cols.map((s, q) => [s, cell[s], REF.covariates.lcov[q], REF.covariates.blk[q]].join("\t")).join("\n");
+  const Dcov = "sample\tcelltype\tlcov\tblk\tlane\n" +
+    cols.map((s, q) => [s, cell[s], REF.covariates.lcov[q], REF.covariates.blk[q], REF.covariates.lane[q]].join("\t")).join("\n");
 
   el("normsel").value = "tmm"; el("fmode").value = "fbe";
   loadFromText(M, Dcov); GROUPTYPE = "categorical"; analyzeNow();
@@ -202,6 +202,29 @@ function runExternalValidation(M, D, REF) {
   r = de("voom", []);
   ok("full design, voom: moderated t", G.length, absMax(at(r.tv), REF.full_voom.t), 1e-6);
   ok("full design, voom: significant genes up/down (exact)", 2, absMax(hitsOf(r), REF.full_voom.hits), 0);
+  r = de("voom", ["blk"]);
+  ok("full design, voom with blocking factor (contrasts.fit): moderated t", G.length, absMax(at(r.tv), REF.full_voom_blk.t), 1e-6);
+  ok("full design, voom with blocking factor: significant genes up/down (exact)", 2, absMax(hitsOf(r), REF.full_voom_blk.hits), 0);
+  // TREAT (McCarthy & Smyth 2009), limma-trend, all groups
+  const savTreat = DETREAT; DETREAT = true;
+  r = de("mod", []);
+  ok("TREAT, |log2FC| > 1, moderated t: t", G.length, absMax(at(r.tv), REF.treat_mod.t), 1e-6);
+  ok("TREAT, |log2FC| > 1, moderated t: p (relative)", G.length, relMax(at(r.p), REF.treat_mod.p), 1e-6);
+  { let u = 0, d = 0; for (let g = 0; g < nG; g++) if (r.q[g] <= 0.05) { if (r.lfc[g] > 0) u++; else d++; }
+    ok("TREAT, moderated t: significant genes up/down (exact)", 2, absMax([u, d], REF.treat_mod.hits), 0); }
+  // the analysis of the limma/Glimma/edgeR workflow article (Law et al. 2016): ~0 + group + lane, voom, TREAT lfc 1
+  DETREAT = false; r = de("voom", ["lane"]);
+  ok("workflow article, voom with lane: moderated t", G.length, absMax(at(r.tv), REF.article.t), 1e-6);
+  ok("workflow article, voom with lane: prior d0", 1, Math.abs(r.prior.df0 - REF.article.df0), 1e-6);
+  ok("workflow article, voom with lane: significant genes up/down (exact)", 2, absMax(hitsOf(r), REF.article.hits), 0);
+  DETREAT = true; r = de("voom", ["lane"]);
+  ok("workflow article, TREAT: t", G.length, absMax(at(r.tv), REF.article.treat_t), 1e-6);
+  ok("workflow article, TREAT: p (relative)", G.length, relMax(at(r.p), REF.article.treat_p), 1e-6);
+  { const sig = (A, B) => { el("selA").value = A; el("selB").value = B; deKey = ""; const rr = computeDE(); const s = new Set(); for (let g = 0; g < nG; g++) if (rr.q[g] <= 0.05) s.add(g); return s; };
+    const sLP = sig("Basal", "LP"), sML = sig("Basal", "ML"); let both = 0; sLP.forEach(g => { if (sML.has(g)) both++; });
+    ok("workflow article, TREAT: LP vs Basal, ML vs Basal and shared genes (exact)", 3, absMax([sLP.size, sML.size, both], REF.article.venn), 0);
+    el("selA").value = "Basal"; el("selB").value = "LP"; }
+  DETREAT = savTreat;
   deMethod = "mod"; DECOVSEL = []; deKey = "";
   fryCheck("full design", [], REF.full_fry);
   DEFIT = savFit;

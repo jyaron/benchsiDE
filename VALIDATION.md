@@ -3,7 +3,7 @@
 benchsiDE reimplements its statistical methods in JavaScript. Each method is checked against its reference implementation (edgeR, limma, RRHO, RNASeqPower, metafor, stats, scipy or statsmodels) on inputs that anyone can obtain. Two independent checks are provided, and both run in continuous integration in Chromium, Firefox and WebKit.
 
 1. **In-app self-test** (21 components). A deterministic synthetic dataset is regenerated in the browser and compared with embedded reference values. Any user can run it with **Validate statistics**.
-2. **External validation on public data** (59 checks). The public demo dataset in this repository (`demo/`, GEO GSE63310) is analyzed by the application and by R, and the results are compared.
+2. **External validation on public data** (70 checks). The public demo dataset in this repository (`demo/`, GEO GSE63310) is analyzed by the application and by R, and the results are compared.
 
 Deviations are the maximum over all compared values. They are absolute unless marked relative. Counts of significant genes and kept genes must agree exactly.
 
@@ -242,3 +242,7 @@ The build was frozen (application script sha256 `cadbda80bd67db0e…` before the
 Corrections made after the check are covered by the engine check `rc_fixes`.
 
 **Not assessed here.** Real-browser rendering and Content-Security-Policy enforcement (covered by `tests/privacy.spec.js` and `tests/freeze.spec.js` in CI on Chromium, Firefox and WebKit); exported image pixels; paired nulls, co-expression FDR, RRHO and signature transfer on the frozen build (code paths unchanged since VAL_CAL).
+
+## Release candidate 1.0.0-rc.2: covariates with voom, and TREAT
+
+voom with covariates and TREAT were checked against limma 3.66.0 in 80 configurations on GSE63310 and GSE186063 (two methods, up to two covariates including a blocking factor and a continuous covariate, both fit options, ordinary and TREAT tests). The maximum deviations were 1.4 × 10⁻¹² in log₂FC, 1.1 × 10⁻¹¹ in t and 1.4 × 10⁻¹⁰ (relative) in p, and the number of significant genes was identical in every configuration. The analysis of the limma/Glimma/edgeR workflow article on GSE63310 (voom adjusted for sequencing lane, TREAT with |log₂FC| > 1) gives the limma values exactly: 3,647, 3,831 and 2,782 genes for LP vs Basal, ML vs Basal and both. On 300 null splits of healthy skin with a random block covariate, the tests behaved as documented above for the moderated t and voom without covariates (above the bound at three samples per group, within it from five), and TREAT stayed within the bound at every size; every count was reproduced by limma in R. Details: `validation/rc2/RC2_DE.md`.

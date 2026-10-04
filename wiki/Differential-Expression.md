@@ -5,10 +5,18 @@
 | Method | Model | Requires | Notes |
 |---|---|---|---|
 | Moderated t (limma-trend) | Linear model on log₂ CPM per gene, empirical-Bayes variance moderation toward a mean–variance trend (limma `lmFit` + `eBayes(trend = TRUE)`) | Any input | Default. Supports covariates. |
-| voom | Precision weights from the mean–variance trend, then the moderated t (limma `voom`) | Raw counts | Recommended for counts, particularly when library sizes vary. |
-| Welch t | Unequal-variance t-test per gene | Any input | No variance moderation; low power at small n. Provided for comparison. |
+| voom | Precision weights from the mean–variance trend, then the moderated t (limma `voom`) | Raw counts | Recommended for counts, particularly when library sizes vary. Supports covariates. |
+| Welch t | Unequal-variance t-test per gene | Any input | No variance moderation; low power at small n; no covariates. Provided for comparison. |
 
 All three report log₂ fold change, t, p and Benjamini–Hochberg FDR. A gene is called significant when FDR is at or below the chosen level and |log₂FC| is at or above the chosen threshold.
+
+## Testing a fold-change threshold (TREAT)
+
+With **test the threshold (TREAT)** ticked, the moderated t and voom test whether |log₂FC| is greater than the value in the |log₂FC| box, rather than whether it differs from zero (McCarthy & Smyth, Bioinformatics 25:765–771, 2009; limma `treat()`). The p-value is P(T > (|b| − τ)/SE) + P(T > (|b| + τ)/SE) on the posterior degrees of freedom, and genes are called when the TREAT FDR is at or below the chosen level. The t, p and FDR shown in the table, the volcano plot, the CSV export (columns `t_treat`, `p_treat`, `FDR_treat`), the Venn diagram and the all-contrasts table are then TREAT values, and every caption says so. The limma authors recommend TREAT over the default rule, which keeps genes whose *estimated* |log₂FC| reaches the threshold and so admits genes whose true change may be smaller. TREAT is stricter: on the demo dataset (LP vs Basal, voom adjusted for lane, FDR 0.05, threshold 1) it calls 3,647 genes against 6,133 with the default rule. Gene-set tests that rank genes (GSEA, the barcode plot) and the cross-dataset analyses always use the ordinary moderated t; over-representation analysis of significant genes uses the genes called under the current rule.
+
+## Covariates with voom
+
+Covariates can be used with the moderated t and with voom. With voom, the design is `~ 0 + group + covariates`; voom estimates the precision weights from the fit of that design, and the B − A contrast is taken with limma's `contrasts.fit`. When precision weights are combined with a non-orthogonal design (any covariate not balanced across groups), `contrasts.fit` computes the standard error approximately, from each gene's weighted coefficient standard errors and the coefficient correlation of the unweighted design; its documentation states this. benchsiDE uses the same rule so that its results equal the standard limma workflow. The Welch t does not support covariates; with covariates selected it shows an unadjusted warning.
 
 ## Which samples enter the model
 
@@ -53,4 +61,4 @@ The model is ~ 0 + group (+ covariates); the interaction and the two simple effe
 
 An interaction is estimated with the variance of four group means rather than two, so it needs more samples than a simple comparison; the card warns when the smallest of the four groups has fewer than three samples.
 
-**Agreement with limma.** On GSE143688 (74 samples, eight groups), the moderated-t interaction adjusted for day agrees with `lmFit`, `contrasts.fit` and `eBayes(trend = TRUE)` to 5 × 10⁻¹² in log₂FC and 4.5 × 10⁻¹¹ in t. For voom, benchsiDE computes each gene's contrast standard error exactly from that gene's weighted fit and agrees to 5 × 10⁻¹² with limma when the interaction is fitted as a model coefficient (`~ treatment * genotype + day`). limma's `contrasts.fit` does not refit each gene and is therefore approximate when precision weights are combined with a non-orthogonal design (as its documentation states); in this example its t-statistics differed from the exact values by up to 0.31.
+**Agreement with limma.** On GSE143688 (74 samples, eight groups), the moderated-t interaction adjusted for day agrees with `lmFit`, `contrasts.fit` and `eBayes(trend = TRUE)` to 5 × 10⁻¹² in log₂FC and 4.5 × 10⁻¹¹ in t. The voom interaction adjusted for day agrees with `voom`, `lmFit`, `contrasts.fit` and `eBayes` to 5 × 10⁻¹² in log₂FC and t. With precision weights and a covariate, `contrasts.fit` uses limma's documented approximation for the standard error (see *Covariates with voom*), and benchsiDE follows it.

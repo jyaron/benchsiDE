@@ -1,6 +1,10 @@
-# benchsiDE validation report (1.0.0-rc.1)
+# benchsiDE validation report (1.0.0-rc.2)
 
 This report summarizes the end-to-end validation of benchsiDE on public data. Detailed results for each part are in `validation/study/`: VAL_DE.md (differential expression against limma, edgeR and DESeq2), VAL_ENR.md (gene-set tests, Discovery, clustering), VAL_XDS.md (cross-dataset comparison and meta-analysis), VAL_CAL.md (false-positive calibration on null data and positive controls) and VAL_UNT.md (Gene Explorer, Patterns, QC, power, input handling, sessions, exports). The study tested 0.22.0-beta.
+
+## Release candidate 1.0.0-rc.2
+
+Covariates with voom and the TREAT test were added and checked against limma in 80 configurations on two public datasets, including the analysis of the limma/Glimma/edgeR workflow article, and calibrated on 300 null splits of healthy skin (`validation/rc2/RC2_DE.md`). The external validation has 70 checks.
 
 ## Release candidate 1.0.0-rc.1
 
@@ -29,8 +33,9 @@ The external validation (48 checks against R on GSE63310; 59 since the hub-neigh
 | Filtering (filterByExpr, CPM) | Validated | edgeR parity; external validation |
 | TMM normalization, edgeR log-CPM | Validated | edgeR parity |
 | Moderated t (limma-trend), full design or two groups | Validated | limma parity on GSE63310 and four psoriasis datasets; FDR approximate at ≤ 3 per group (warning shown) |
-| voom | Validated | limma parity |
-| Covariates and blocking factors | Validated | limma parity including paired designs |
+| voom | Validated | limma parity, with and without covariates (contrasts.fit workflow; from 1.0.0-rc.2) |
+| Covariates and blocking factors | Validated | limma parity including paired designs; moderated t and voom |
+| TREAT (fold-change threshold test) | Validated | limma treat() parity in 40 configurations; calibrated on 300 null splits (from 1.0.0-rc.2) |
 | Welch t (per gene) | Validated | scipy and R t.test parity; constant genes untestable as in R (from 1.0.0-rc.1) |
 | Moderated F (Patterns) | Validated | limma parity |
 | ORA | Validated | scipy parity; anti-conservative for co-regulated lists (stated) |

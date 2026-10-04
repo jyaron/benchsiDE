@@ -1,0 +1,750 @@
+{
+ "env": {
+  "app": "benchsiDE",
+  "version": "1.0.0-rc.1 (2026-10-03)",
+  "run_at": "2026-10-04T07:02:43.770Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15",
+  "platform": "MacIntel",
+  "cores": 8,
+  "deviceMemoryGB": null,
+  "crossOriginIsolated": false,
+  "heapLimitMB": null,
+  "timerResolutionMs": 1
+ },
+ "settings": {
+  "sizes": [
+   6,
+   24,
+   96,
+   192
+  ],
+  "reps": 5,
+  "warmup": 1,
+  "genes": 20000,
+  "gseaPerm": 1000,
+  "filter": "filterByExpr",
+  "norm": "TMM"
+ },
+ "datasets": [
+  {
+   "nSamples": 6,
+   "nGenes": 20000,
+   "nKept": 17391,
+   "seed": 3195797510,
+   "gseaMode": "genes",
+   "steps": {
+    "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": {
+     "median": 270,
+     "min": 258,
+     "max": 273,
+     "runs": [
+      268.00000000000364,
+      270,
+      258,
+      273,
+      270
+     ]
+    },
+    "DE: moderated t (limma-trend)": {
+     "median": 19.999999999996362,
+     "min": 19,
+     "max": 24,
+     "runs": [
+      19.999999999996362,
+      24,
+      19,
+      19.000000000007276,
+      20
+     ]
+    },
+    "DE: voom": {
+     "median": 53.999999999992724,
+     "min": 52,
+     "max": 58,
+     "runs": [
+      53.00000000000364,
+      58,
+      52,
+      53.999999999992724,
+      54
+     ]
+    },
+    "FRY, Hallmark (50 sets)": {
+     "median": 50,
+     "min": 49,
+     "max": 54.99999999999636,
+     "runs": [
+      54.99999999999636,
+      50,
+      49,
+      52,
+      50
+     ]
+    },
+    "GSEA, Hallmark (1000 permutations)": {
+     "median": 706,
+     "min": 691,
+     "max": 724,
+     "runs": [
+      704,
+      713,
+      691,
+      724,
+      706
+     ]
+    },
+    "hub screen (2,000 genes)": {
+     "median": 94,
+     "min": 26.000000000003638,
+     "max": 193,
+     "runs": [
+      26.000000000003638,
+      42,
+      94,
+      193,
+      112
+     ]
+    },
+    "render: volcano and PCA": {
+     "median": 343,
+     "min": 333,
+     "max": 353.0000000000073,
+     "runs": [
+      339.99999999999636,
+      351,
+      353.0000000000073,
+      343,
+      333
+     ]
+    }
+   },
+   "totalMedian": 1536.999999999989,
+   "runs": [
+    {
+     "run": 0,
+     "warmup": true,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 301,
+      "DE: moderated t (limma-trend)": 22.000000000003638,
+      "DE: voom": 61.99999999999636,
+      "FRY, Hallmark (50 sets)": 44,
+      "GSEA, Hallmark (1000 permutations)": 734,
+      "hub screen (2,000 genes)": 27,
+      "render: volcano and PCA": 418.00000000000364
+     },
+     "total": 1608.0000000000036
+    },
+    {
+     "run": 1,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 268.00000000000364,
+      "DE: moderated t (limma-trend)": 19.999999999996362,
+      "DE: voom": 53.00000000000364,
+      "FRY, Hallmark (50 sets)": 54.99999999999636,
+      "GSEA, Hallmark (1000 permutations)": 704,
+      "hub screen (2,000 genes)": 26.000000000003638,
+      "render: volcano and PCA": 339.99999999999636
+     },
+     "total": 1466
+    },
+    {
+     "run": 2,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 270,
+      "DE: moderated t (limma-trend)": 24,
+      "DE: voom": 58,
+      "FRY, Hallmark (50 sets)": 50,
+      "GSEA, Hallmark (1000 permutations)": 713,
+      "hub screen (2,000 genes)": 42,
+      "render: volcano and PCA": 351
+     },
+     "total": 1508
+    },
+    {
+     "run": 3,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 258,
+      "DE: moderated t (limma-trend)": 19,
+      "DE: voom": 52,
+      "FRY, Hallmark (50 sets)": 49,
+      "GSEA, Hallmark (1000 permutations)": 691,
+      "hub screen (2,000 genes)": 94,
+      "render: volcano and PCA": 353.0000000000073
+     },
+     "total": 1516.0000000000073
+    },
+    {
+     "run": 4,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 273,
+      "DE: moderated t (limma-trend)": 19.000000000007276,
+      "DE: voom": 53.999999999992724,
+      "FRY, Hallmark (50 sets)": 52,
+      "GSEA, Hallmark (1000 permutations)": 724,
+      "hub screen (2,000 genes)": 193,
+      "render: volcano and PCA": 343
+     },
+     "total": 1658
+    },
+    {
+     "run": 5,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 270,
+      "DE: moderated t (limma-trend)": 20,
+      "DE: voom": 54,
+      "FRY, Hallmark (50 sets)": 50,
+      "GSEA, Hallmark (1000 permutations)": 706,
+      "hub screen (2,000 genes)": 112,
+      "render: volcano and PCA": 333
+     },
+     "total": 1545
+    }
+   ]
+  },
+  {
+   "nSamples": 24,
+   "nGenes": 20000,
+   "nKept": 17067,
+   "seed": 3195797528,
+   "gseaMode": "samples",
+   "steps": {
+    "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": {
+     "median": 646.0000000000073,
+     "min": 633,
+     "max": 655,
+     "runs": [
+      642,
+      633,
+      653,
+      646.0000000000073,
+      655
+     ]
+    },
+    "DE: moderated t (limma-trend)": {
+     "median": 20,
+     "min": 20,
+     "max": 22,
+     "runs": [
+      20,
+      20,
+      22,
+      20.999999999992724,
+      20
+     ]
+    },
+    "DE: voom": {
+     "median": 82,
+     "min": 82,
+     "max": 108,
+     "runs": [
+      106.00000000000728,
+      82,
+      82,
+      82,
+      108
+     ]
+    },
+    "FRY, Hallmark (50 sets)": {
+     "median": 62.000000000007276,
+     "min": 56,
+     "max": 64,
+     "runs": [
+      63,
+      62.000000000007276,
+      61,
+      64,
+      56
+     ]
+    },
+    "GSEA, Hallmark (1000 permutations)": {
+     "median": 2992.9999999999927,
+     "min": 2956,
+     "max": 2996,
+     "runs": [
+      2996,
+      2973.9999999999927,
+      2956,
+      2992.9999999999927,
+      2993
+     ]
+    },
+    "hub screen (2,000 genes)": {
+     "median": 538,
+     "min": 68,
+     "max": 547,
+     "runs": [
+      538,
+      373,
+      68,
+      547,
+      542
+     ]
+    },
+    "render: volcano and PCA": {
+     "median": 554,
+     "min": 545,
+     "max": 563,
+     "runs": [
+      545,
+      554,
+      563,
+      558,
+      547
+     ]
+    }
+   },
+   "totalMedian": 4895.000000000007,
+   "runs": [
+    {
+     "run": 0,
+     "warmup": true,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 658.9999999999927,
+      "DE: moderated t (limma-trend)": 21,
+      "DE: voom": 107,
+      "FRY, Hallmark (50 sets)": 62,
+      "GSEA, Hallmark (1000 permutations)": 2933,
+      "hub screen (2,000 genes)": 61,
+      "render: volcano and PCA": 556
+     },
+     "total": 4398.999999999993
+    },
+    {
+     "run": 1,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 642,
+      "DE: moderated t (limma-trend)": 20,
+      "DE: voom": 106.00000000000728,
+      "FRY, Hallmark (50 sets)": 63,
+      "GSEA, Hallmark (1000 permutations)": 2996,
+      "hub screen (2,000 genes)": 538,
+      "render: volcano and PCA": 545
+     },
+     "total": 4910.000000000007
+    },
+    {
+     "run": 2,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 633,
+      "DE: moderated t (limma-trend)": 20,
+      "DE: voom": 82,
+      "FRY, Hallmark (50 sets)": 62.000000000007276,
+      "GSEA, Hallmark (1000 permutations)": 2973.9999999999927,
+      "hub screen (2,000 genes)": 373,
+      "render: volcano and PCA": 554
+     },
+     "total": 4698
+    },
+    {
+     "run": 3,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 653,
+      "DE: moderated t (limma-trend)": 22,
+      "DE: voom": 82,
+      "FRY, Hallmark (50 sets)": 61,
+      "GSEA, Hallmark (1000 permutations)": 2956,
+      "hub screen (2,000 genes)": 68,
+      "render: volcano and PCA": 563
+     },
+     "total": 4405
+    },
+    {
+     "run": 4,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 646.0000000000073,
+      "DE: moderated t (limma-trend)": 20.999999999992724,
+      "DE: voom": 82,
+      "FRY, Hallmark (50 sets)": 64,
+      "GSEA, Hallmark (1000 permutations)": 2992.9999999999927,
+      "hub screen (2,000 genes)": 547,
+      "render: volcano and PCA": 558
+     },
+     "total": 4910.999999999993
+    },
+    {
+     "run": 5,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 655,
+      "DE: moderated t (limma-trend)": 20,
+      "DE: voom": 108,
+      "FRY, Hallmark (50 sets)": 56,
+      "GSEA, Hallmark (1000 permutations)": 2993,
+      "hub screen (2,000 genes)": 542,
+      "render: volcano and PCA": 547
+     },
+     "total": 4921
+    }
+   ]
+  },
+  {
+   "nSamples": 96,
+   "nGenes": 20000,
+   "nKept": 17114,
+   "seed": 3195797600,
+   "gseaMode": "samples",
+   "steps": {
+    "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": {
+     "median": 2765,
+     "min": 2692,
+     "max": 2787.0000000000146,
+     "runs": [
+      2692,
+      2765,
+      2785,
+      2787.0000000000146,
+      2698
+     ]
+    },
+    "DE: moderated t (limma-trend)": {
+     "median": 27,
+     "min": 24.999999999985448,
+     "max": 30,
+     "runs": [
+      27,
+      30,
+      27,
+      24.999999999985448,
+      26.000000000014552
+     ]
+    },
+    "DE: voom": {
+     "median": 291,
+     "min": 201,
+     "max": 291.99999999998545,
+     "runs": [
+      272,
+      201,
+      291,
+      291,
+      291.99999999998545
+     ]
+    },
+    "FRY, Hallmark (50 sets)": {
+     "median": 124,
+     "min": 115,
+     "max": 130.00000000001455,
+     "runs": [
+      130.00000000001455,
+      126,
+      123.99999999998545,
+      124,
+      115
+     ]
+    },
+    "GSEA, Hallmark (1000 permutations)": {
+     "median": 3855,
+     "min": 3776,
+     "max": 3921.9999999999854,
+     "runs": [
+      3921.9999999999854,
+      3776,
+      3786,
+      3862,
+      3855
+     ]
+    },
+    "hub screen (2,000 genes)": {
+     "median": 1733,
+     "min": 181,
+     "max": 1787,
+     "runs": [
+      1733,
+      1321,
+      181,
+      1787,
+      1760
+     ]
+    },
+    "render: volcano and PCA": {
+     "median": 1929,
+     "min": 417,
+     "max": 2026,
+     "runs": [
+      2026,
+      1929,
+      417,
+      1997,
+      1888
+     ]
+    }
+   },
+   "totalMedian": 10724,
+   "runs": [
+    {
+     "run": 0,
+     "warmup": true,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 2716,
+      "DE: moderated t (limma-trend)": 27,
+      "DE: voom": 291,
+      "FRY, Hallmark (50 sets)": 121,
+      "GSEA, Hallmark (1000 permutations)": 3772,
+      "hub screen (2,000 genes)": 178,
+      "render: volcano and PCA": 361
+     },
+     "total": 7466
+    },
+    {
+     "run": 1,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 2692,
+      "DE: moderated t (limma-trend)": 27,
+      "DE: voom": 272,
+      "FRY, Hallmark (50 sets)": 130.00000000001455,
+      "GSEA, Hallmark (1000 permutations)": 3921.9999999999854,
+      "hub screen (2,000 genes)": 1733,
+      "render: volcano and PCA": 2026
+     },
+     "total": 10802
+    },
+    {
+     "run": 2,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 2765,
+      "DE: moderated t (limma-trend)": 30,
+      "DE: voom": 201,
+      "FRY, Hallmark (50 sets)": 126,
+      "GSEA, Hallmark (1000 permutations)": 3776,
+      "hub screen (2,000 genes)": 1321,
+      "render: volcano and PCA": 1929
+     },
+     "total": 10148
+    },
+    {
+     "run": 3,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 2785,
+      "DE: moderated t (limma-trend)": 27,
+      "DE: voom": 291,
+      "FRY, Hallmark (50 sets)": 123.99999999998545,
+      "GSEA, Hallmark (1000 permutations)": 3786,
+      "hub screen (2,000 genes)": 181,
+      "render: volcano and PCA": 417
+     },
+     "total": 7610.999999999985
+    },
+    {
+     "run": 4,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 2787.0000000000146,
+      "DE: moderated t (limma-trend)": 24.999999999985448,
+      "DE: voom": 291,
+      "FRY, Hallmark (50 sets)": 124,
+      "GSEA, Hallmark (1000 permutations)": 3862,
+      "hub screen (2,000 genes)": 1787,
+      "render: volcano and PCA": 1997
+     },
+     "total": 10873
+    },
+    {
+     "run": 5,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 2698,
+      "DE: moderated t (limma-trend)": 26.000000000014552,
+      "DE: voom": 291.99999999998545,
+      "FRY, Hallmark (50 sets)": 115,
+      "GSEA, Hallmark (1000 permutations)": 3855,
+      "hub screen (2,000 genes)": 1760,
+      "render: volcano and PCA": 1888
+     },
+     "total": 10634
+    }
+   ]
+  },
+  {
+   "nSamples": 192,
+   "nGenes": 20000,
+   "nKept": 17030,
+   "seed": 3195797696,
+   "gseaMode": "samples",
+   "steps": {
+    "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": {
+     "median": 6981,
+     "min": 6693,
+     "max": 7080,
+     "runs": [
+      6944.999999999971,
+      7080,
+      6693,
+      6981,
+      7011
+     ]
+    },
+    "DE: moderated t (limma-trend)": {
+     "median": 35,
+     "min": 34,
+     "max": 39,
+     "runs": [
+      34,
+      35,
+      39,
+      35,
+      34
+     ]
+    },
+    "DE: voom": {
+     "median": 530,
+     "min": 363,
+     "max": 534.0000000000291,
+     "runs": [
+      533.0000000000291,
+      385,
+      363,
+      530,
+      534.0000000000291
+     ]
+    },
+    "FRY, Hallmark (50 sets)": {
+     "median": 248,
+     "min": 246,
+     "max": 257,
+     "runs": [
+      247,
+      248,
+      252,
+      246,
+      257
+     ]
+    },
+    "GSEA, Hallmark (1000 permutations)": {
+     "median": 4984,
+     "min": 4967,
+     "max": 5076,
+     "runs": [
+      5055,
+      4984,
+      4967,
+      4972,
+      5076
+     ]
+    },
+    "hub screen (2,000 genes)": {
+     "median": 3304,
+     "min": 1672.000000000029,
+     "max": 3375,
+     "runs": [
+      3340,
+      1672.000000000029,
+      3375,
+      3282,
+      3304
+     ]
+    },
+    "render: volcano and PCA": {
+     "median": 4363.999999999971,
+     "min": 1010,
+     "max": 4806.000000000029,
+     "runs": [
+      4785,
+      4363.999999999971,
+      4043.000000000029,
+      1010,
+      4806.000000000029
+     ]
+    }
+   },
+   "totalMedian": 20445.99999999997,
+   "runs": [
+    {
+     "run": 0,
+     "warmup": true,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 7047,
+      "DE: moderated t (limma-trend)": 35,
+      "DE: voom": 534,
+      "FRY, Hallmark (50 sets)": 242.9999999999709,
+      "GSEA, Hallmark (1000 permutations)": 4991,
+      "hub screen (2,000 genes)": 3371,
+      "render: volcano and PCA": 993
+     },
+     "total": 17213.99999999997
+    },
+    {
+     "run": 1,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 6944.999999999971,
+      "DE: moderated t (limma-trend)": 34,
+      "DE: voom": 533.0000000000291,
+      "FRY, Hallmark (50 sets)": 247,
+      "GSEA, Hallmark (1000 permutations)": 5055,
+      "hub screen (2,000 genes)": 3340,
+      "render: volcano and PCA": 4785
+     },
+     "total": 20939
+    },
+    {
+     "run": 2,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 7080,
+      "DE: moderated t (limma-trend)": 35,
+      "DE: voom": 385,
+      "FRY, Hallmark (50 sets)": 248,
+      "GSEA, Hallmark (1000 permutations)": 4984,
+      "hub screen (2,000 genes)": 1672.000000000029,
+      "render: volcano and PCA": 4363.999999999971
+     },
+     "total": 18768
+    },
+    {
+     "run": 3,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 6693,
+      "DE: moderated t (limma-trend)": 39,
+      "DE: voom": 363,
+      "FRY, Hallmark (50 sets)": 252,
+      "GSEA, Hallmark (1000 permutations)": 4967,
+      "hub screen (2,000 genes)": 3375,
+      "render: volcano and PCA": 4043.000000000029
+     },
+     "total": 19732.00000000003
+    },
+    {
+     "run": 4,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 6981,
+      "DE: moderated t (limma-trend)": 35,
+      "DE: voom": 530,
+      "FRY, Hallmark (50 sets)": 246,
+      "GSEA, Hallmark (1000 permutations)": 4972,
+      "hub screen (2,000 genes)": 3282,
+      "render: volcano and PCA": 1010
+     },
+     "total": 17056
+    },
+    {
+     "run": 5,
+     "warmup": false,
+     "steps": {
+      "load and normalize (parse, filterByExpr, TMM, log-CPM, QC)": 7011,
+      "DE: moderated t (limma-trend)": 34,
+      "DE: voom": 534.0000000000291,
+      "FRY, Hallmark (50 sets)": 257,
+      "GSEA, Hallmark (1000 permutations)": 5076,
+      "hub screen (2,000 genes)": 3304,
+      "render: volcano and PCA": 4806.000000000029
+     },
+     "total": 21022.00000000006
+    }
+   ]
+  }
+ ]
+}

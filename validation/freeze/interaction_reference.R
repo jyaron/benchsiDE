@@ -14,12 +14,14 @@ con <- makeContrasts(contrasts = "(Aldara_KO-Control_KO)-(Aldara_WT-Control_WT)"
 f1 <- eBayes(contrasts.fit(lmFit(lc, d1), con), trend = TRUE)
 t1 <- topTable(f1, number = Inf, sort.by = "none")
 out$mod_all_day <- list(logFC = signif(t1$logFC, 12), t = signif(t1$t, 12), p = signif(t1$P.Value, 12), df0 = f1$df.prior[1])
-# 2. voom, the four groups only, adjusted for Day. limma's contrasts.fit is approximate when precision weights are
-#    combined with a non-orthogonal design (?contrasts.fit), so the interaction is fitted as a coefficient instead.
-sel <- cell %in% c("Control_WT", "Aldara_WT", "Control_KO", "Aldara_KO"); cf <- droplevels(cell[sel])
-trt <- factor(sub("_.*", "", cf), levels = c("Control", "Aldara")); gen <- factor(sub(".*_", "", cf), levels = c("WT", "KO"))
-d2 <- model.matrix(~ trt * gen + day[sel]); v2 <- voom(y[, sel], d2); f2 <- eBayes(lmFit(v2, d2))
-t2 <- topTable(f2, coef = "trtAldara:genKO", number = Inf, sort.by = "none")
+# 2. voom, the four groups only, adjusted for Day, with the standard limma workflow: ~ 0 + cell + day, voom, lmFit,
+#    contrasts.fit, eBayes. With precision weights and a non-orthogonal design, contrasts.fit computes the standard
+#    error approximately (?contrasts.fit); the application uses the same rule so that results match this workflow.
+sel <- cell %in% c("Control_WT", "Aldara_WT", "Control_KO", "Aldara_KO"); cf <- droplevels(cell[sel]); ds <- droplevels(day[sel])
+d2 <- model.matrix(~ 0 + cf + ds); colnames(d2) <- sub("^cf", "", colnames(d2))
+con2c <- makeContrasts(contrasts = "(Aldara_KO-Control_KO)-(Aldara_WT-Control_WT)", levels = d2)
+v2 <- voom(y[, sel], d2); f2 <- eBayes(contrasts.fit(lmFit(v2, d2), con2c))
+t2 <- topTable(f2, number = Inf, sort.by = "none")
 out$voom_four_day <- list(logFC = signif(t2$logFC, 12), t = signif(t2$t, 12), p = signif(t2$P.Value, 12), df0 = f2$df.prior[1])
 con2 <- gzfile("validation/freeze/interaction_reference_GSE143688.json.gz", "w"); writeLines(toJSON(out, digits = NA), con2); close(con2)
 cat("written:", length(out$genes), "genes\n")

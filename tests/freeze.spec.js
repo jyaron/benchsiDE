@@ -93,3 +93,32 @@ test("FRY results replace the panels and notes of an earlier GSEA or ORA run", a
   expect(await page.evaluate(() => getComputedStyle(document.getElementById("enrtable")).maxHeight)).toBe("none");
   await page.emulateMedia({ media: "screen" });
 });
+
+test("voom with a covariate and TREAT reproduce the limma workflow on the demo", async ({ page }) => {
+  await page.goto(PAGE);
+  // sequencing lane as in Law et al. (F1000Research 5:1408, 2016)
+  const lane = { GSM1545535: "L004", GSM1545536: "L004", GSM1545538: "L004", GSM1545539: "L006", GSM1545540: "L006", GSM1545541: "L006", GSM1545542: "L006", GSM1545544: "L008", GSM1545545: "L008" };
+  const m = read("demo/GSE63310_counts.tsv");
+  const d = read("demo/GSE63310_design.tsv").trim().split("\n");
+  const rows = [d[0] + "\tlane"].concat(d.slice(1).map((l) => l + "\t" + lane[l.split("\t")[0]]));
+  await page.evaluate(([mm, dd]) => {
+    document.getElementById("species").value = "mouse"; useBuiltinAnno();
+    document.getElementById("normsel").value = "tmm"; document.getElementById("fmode").value = "fbe";
+    loadFromText(mm, dd); applyFactor("celltype"); GROUPTYPE = "auto"; analyzeNow(); switchTab("de");
+  }, [m, rows.join("\n") + "\n"]);
+  await page.click('#demethod button[data-m="voom"]');
+  await page.evaluate(() => { DECOVSEL = ["lane"]; deKey = ""; });
+  await page.selectOption("#selA", "Basal"); await page.selectOption("#selB", "LP");
+  await page.selectOption("#selFDR", "0.05"); await page.fill("#fcthr", "1");
+  await page.check("#detreat");
+  await expect(page.locator("#decounts")).toContainText("TREAT");
+  const res = await page.evaluate(() => { drawDE(); const r = computeDE(); let n = 0; for (let g = 0; g < nG; g++) if (r.q[g] <= 0.05) n++; return { n, treat: !!r.treat, cov: r.prior.cov }; });
+  expect(res.treat).toBe(true);
+  expect(res.cov).toContain("lane");
+  expect(res.n).toBe(3647);   // limma 3.66: voom, ~0 + group + lane, contrasts.fit, treat(lfc = 1)
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#deexport")]);
+  const csv = fs.readFileSync(await dl.path(), "utf8");
+  expect(csv).toContain("t_treat,p_treat,FDR_treat");
+  await page.click('#demethod button[data-m="welch"]');
+  expect(await page.locator("#detreat").isDisabled()).toBe(true);
+});

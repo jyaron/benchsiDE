@@ -2,7 +2,7 @@
 
 This guide takes you from an expression matrix to reportable results, one step at a time. Each tutorial names the exact controls you will use. Concepts, statistical definitions and troubleshooting are covered in more depth in the [Knowledgebase](../wiki/Home.md).
 
-Version covered: 1.0.0-rc.1. The application is at <https://www.benchside.org>; source code and releases are at <https://github.com/jyaron/benchsiDE>.
+Version covered: 1.0.0-rc.2. The application is at <https://www.benchside.org>; source code and releases are at <https://github.com/jyaron/benchsiDE>.
 
 ## Contents
 
@@ -163,7 +163,7 @@ Untick a sample in the sample bar. Every statistic in every tab recomputes immed
 1. Set the baseline group (left selector) to **Basal** and the comparison group (right selector) to **LP**.
 2. Set the FDR selector to **0.05** and the **|log₂FC| ≥** threshold to **1**.
 3. Choose the method **voom**.
-4. Read the result: 2,810 genes up and 3,338 down in LP relative to Basal.
+4. Read the result: 2,781 genes up and 3,301 down in LP relative to Basal (variance estimated from all three groups, the default; with **two groups only** it is 2,810 and 3,338).
 5. Switch between **Volcano** and **MA plot**. Set **label top** to the number of genes to annotate, and choose whether to rank them by **p-value**, **|log₂FC|** or **π score**.
 6. To list a group of genes, set **drag to** to **select (box)** or **select (lasso)** and drag over them on the volcano or MA plot (Shift adds to the selection; double-click clears it). The table below the plot lists the selected genes with log₂FC, group means, p, FDR and the significance call; click a column header to sort. The selection is kept when you switch between volcano and MA plot. From the selection you can export a CSV, copy the gene symbols, draw a heatmap of the selected genes, or compare up to 10 of them in Gene Explorer.
 7. Open the **p-value histogram (diagnostic)** and **voom mean–variance trend** panels to check the model assumptions.
@@ -214,11 +214,17 @@ On the Overview & QC tab, look at the PCA. To see the data with the batch effect
 
 ### Step 4. Fit the adjusted model
 
-1. In the Differential Expression tab, choose **Moderated t (eBayes)**. Covariate adjustment is available for this method only; the other methods show an explicit unadjusted warning.
+1. In the Differential Expression tab, choose **Moderated t (eBayes)** or, for raw counts, **voom**. Covariate adjustment is available for both; the Welch t shows an explicit unadjusted warning.
 2. Select the covariate(s) under **adjust for**. A numeric covariate with more than two distinct values (such as RIN) is fitted as a continuous slope; a categorical covariate is fitted as indicator terms.
 3. The note under the plot states which covariates were fitted and the residual degrees of freedom.
 
 If a covariate is confounded with the groups (for example, every control in batch 1 and every treated sample in batch 2), benchsiDE refuses to fit the model and explains why. No statistical method can separate the two effects in that case.
+
+**Example: reproducing the limma/Glimma/edgeR workflow.** Law et al. (F1000Research 5:1408, 2016) analyse the demo dataset with sequencing lane as a covariate and TREAT. Add a `lane` column to the design file (GSM1545535, GSM1545536 and GSM1545538: L004; GSM1545539 to GSM1545542: L006; GSM1545544 and GSM1545545: L008), load the demo, and in the Differential Expression tab choose **voom**, adjust for **lane**, set FDR to **0.05** and |log₂FC| to **1**, and tick **test the threshold (TREAT)**. In Compare all contrasts, a Venn diagram of LP vs Basal and ML vs Basal then shows 3,647, 3,831 and 2,782 genes, the values limma 3.66 gives for the article's code (the article, computed with an earlier Bioconductor release, reports 3,648, 3,834 and 2,784). This analysis is part of the repository's external validation.
+
+### Step 4b. Test the fold-change threshold (TREAT)
+
+The default rule calls a gene when FDR is at or below the chosen level and the estimated |log₂FC| reaches the threshold. Ticking **test the threshold (TREAT)** instead tests whether |log₂FC| is greater than the threshold (McCarthy & Smyth 2009), as limma's `treat()`. This is stricter and is the approach recommended by the limma authors when a minimum fold change matters. The table, volcano plot, CSV, Venn diagram and methods text then report TREAT p-values and FDR, and say so.
 
 The **Design check** (review step, and under the sample list after analysis) shows this before you fit anything. It tabulates each factor against the groups and lists, for each pair of groups, whether the factor can be adjusted for or is confounded. For a confounded comparison you can:
 
@@ -504,7 +510,7 @@ The **Auto-generated methods text** card on the Overview & QC tab describes exac
 
 ### 11.3 Validation on public data (repository)
 
-The repository's validation on public data is not run from the application. It compares the application's results on GEO GSE63310 with R results (59 checks), and is run automatically in Chromium, Firefox and WebKit on every change to the repository (the Actions tab on GitHub shows the result). To run it yourself, see [VALIDATION.md](../VALIDATION.md). The full validation record, with parity on seven public datasets and the false-positive calibration, is in the repository's `validation/` folder.
+The repository's validation on public data is not run from the application. It compares the application's results on GEO GSE63310 with R results (70 checks), and is run automatically in Chromium, Firefox and WebKit on every change to the repository (the Actions tab on GitHub shows the result). To run it yourself, see [VALIDATION.md](../VALIDATION.md). The full validation record, with parity on seven public datasets and the false-positive calibration, is in the repository's `validation/` folder.
 
 ---
 

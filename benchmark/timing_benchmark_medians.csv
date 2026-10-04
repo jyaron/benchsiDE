@@ -1,0 +1,97 @@
+browser,samples,genes_kept,gsea_permutation,step,median_ms,min_ms,max_ms
+Chrome,6,17391,genes,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",181.40000000596046,180.40000000596046,198.5
+Chrome,6,17391,genes,DE: moderated t (limma-trend),17.299999982118607,16.69999998807907,19.400000005960464
+Chrome,6,17391,genes,DE: voom,86.80000001192093,84.2999999821186,104.69999998807907
+Chrome,6,17391,genes,"FRY, Hallmark (50 sets)",23.0,22.599999994039536,25.599999994039536
+Chrome,6,17391,genes,"GSEA, Hallmark (1000 permutations)",637.6999999880791,635.5999999940395,639.2000000178814
+Chrome,6,17391,genes,"hub screen (2,000 genes)",30.799999982118607,30.5,41.20000001788139
+Chrome,6,17391,genes,render: volcano and PCA,189.09999999403954,180.60000002384186,196.59999999403954
+Chrome,6,17391,genes,TOTAL,1166.0999999642372,,
+Chrome,24,17067,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",584.2999999821186,576.1999999880791,593.3000000119209
+Chrome,24,17067,samples,DE: moderated t (limma-trend),18.900000005960464,18.0,20.200000017881393
+Chrome,24,17067,samples,DE: voom,107.5,104.09999999403954,108.59999999403954
+Chrome,24,17067,samples,"FRY, Hallmark (50 sets)",31.799999982118607,31.19999998807907,35.60000002384186
+Chrome,24,17067,samples,"GSEA, Hallmark (1000 permutations)",3102.800000011921,3076.5,3123.9000000059605
+Chrome,24,17067,samples,"hub screen (2,000 genes)",56.69999998807907,56.20000001788139,66.69999998807907
+Chrome,24,17067,samples,render: volcano and PCA,381.40000000596046,373.30000001192093,417.40000000596046
+Chrome,24,17067,samples,TOTAL,4283.399999976158,,
+Chrome,96,17114,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",2765.0999999940395,2744.7999999821186,2815.5999999940395
+Chrome,96,17114,samples,DE: moderated t (limma-trend),23.900000005960464,23.19999998807907,24.19999998807907
+Chrome,96,17114,samples,DE: voom,197.40000000596046,194.90000000596046,198.5
+Chrome,96,17114,samples,"FRY, Hallmark (50 sets)",87.0,86.5,91.39999997615814
+Chrome,96,17114,samples,"GSEA, Hallmark (1000 permutations)",4206.0999999940395,4195.4000000059605,4244.5999999940395
+Chrome,96,17114,samples,"hub screen (2,000 genes)",167.0,164.59999999403954,282.40000000596046
+Chrome,96,17114,samples,render: volcano and PCA,1502.9000000059605,153.69999998807907,1660.0
+Chrome,96,17114,samples,TOTAL,8949.40000000596,,
+Chrome,192,17030,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",6929.9000000059605,6897.4000000059605,7039.700000017881
+Chrome,192,17030,samples,DE: moderated t (limma-trend),31.0,30.399999976158142,31.100000023841858
+Chrome,192,17030,samples,DE: voom,310.2999999821186,307.19999998807907,312.40000000596046
+Chrome,192,17030,samples,"FRY, Hallmark (50 sets)",191.19999998807907,190.30000001192093,192.09999999403954
+Chrome,192,17030,samples,"GSEA, Hallmark (1000 permutations)",5744.5999999940395,5698.0,5774.4000000059605
+Chrome,192,17030,samples,"hub screen (2,000 genes)",300.0,299.0,302.19999998807907
+Chrome,192,17030,samples,render: volcano and PCA,3459.5,374.19999998807907,3942.100000023842
+Chrome,192,17030,samples,TOTAL,16966.499999970198,,
+Firefox,6,17391,genes,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",161.0,156.0,173.0
+Firefox,6,17391,genes,DE: moderated t (limma-trend),13.0,13.0,17.0
+Firefox,6,17391,genes,DE: voom,48.0,46.0,52.0
+Firefox,6,17391,genes,"FRY, Hallmark (50 sets)",25.0,24.0,32.0
+Firefox,6,17391,genes,"GSEA, Hallmark (1000 permutations)",510.0,503.0,528.0
+Firefox,6,17391,genes,"hub screen (2,000 genes)",41.0,40.0,45.0
+Firefox,6,17391,genes,render: volcano and PCA,164.0,157.0,168.0
+Firefox,6,17391,genes,TOTAL,962.0,,
+Firefox,24,17067,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",490.0,481.0,491.0
+Firefox,24,17067,samples,DE: moderated t (limma-trend),15.0,14.0,17.0
+Firefox,24,17067,samples,DE: voom,71.0,70.0,76.0
+Firefox,24,17067,samples,"FRY, Hallmark (50 sets)",31.0,30.0,31.0
+Firefox,24,17067,samples,"GSEA, Hallmark (1000 permutations)",3303.0,3297.0,3461.0
+Firefox,24,17067,samples,"hub screen (2,000 genes)",88.0,86.0,89.0
+Firefox,24,17067,samples,render: volcano and PCA,283.0,280.0,288.0
+Firefox,24,17067,samples,TOTAL,4281.0,,
+Firefox,96,17114,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",2372.0,2354.0,2420.0
+Firefox,96,17114,samples,DE: moderated t (limma-trend),20.0,19.0,28.0
+Firefox,96,17114,samples,DE: voom,172.0,171.0,178.0
+Firefox,96,17114,samples,"FRY, Hallmark (50 sets)",94.0,91.0,101.0
+Firefox,96,17114,samples,"GSEA, Hallmark (1000 permutations)",4313.0,4276.0,4347.0
+Firefox,96,17114,samples,"hub screen (2,000 genes)",217.0,207.0,229.0
+Firefox,96,17114,samples,render: volcano and PCA,997.0,170.0,1121.0
+Firefox,96,17114,samples,TOTAL,8185.0,,
+Firefox,192,17030,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",6438.0,6375.0,6570.0
+Firefox,192,17030,samples,DE: moderated t (limma-trend),27.0,26.0,27.0
+Firefox,192,17030,samples,DE: voom,303.0,299.0,311.0
+Firefox,192,17030,samples,"FRY, Hallmark (50 sets)",233.0,230.0,243.0
+Firefox,192,17030,samples,"GSEA, Hallmark (1000 permutations)",5597.0,5551.0,5677.0
+Firefox,192,17030,samples,"hub screen (2,000 genes)",412.0,393.0,415.0
+Firefox,192,17030,samples,render: volcano and PCA,2609.0,511.0,2819.0
+Firefox,192,17030,samples,TOTAL,15619.0,,
+Safari,6,17391,genes,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",270.0,258.0,273.0
+Safari,6,17391,genes,DE: moderated t (limma-trend),19.999999999996362,19.0,24.0
+Safari,6,17391,genes,DE: voom,53.999999999992724,52.0,58.0
+Safari,6,17391,genes,"FRY, Hallmark (50 sets)",50.0,49.0,54.99999999999636
+Safari,6,17391,genes,"GSEA, Hallmark (1000 permutations)",706.0,691.0,724.0
+Safari,6,17391,genes,"hub screen (2,000 genes)",94.0,26.000000000003638,193.0
+Safari,6,17391,genes,render: volcano and PCA,343.0,333.0,353.0000000000073
+Safari,6,17391,genes,TOTAL,1536.999999999989,,
+Safari,24,17067,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",646.0000000000073,633.0,655.0
+Safari,24,17067,samples,DE: moderated t (limma-trend),20.0,20.0,22.0
+Safari,24,17067,samples,DE: voom,82.0,82.0,108.0
+Safari,24,17067,samples,"FRY, Hallmark (50 sets)",62.000000000007276,56.0,64.0
+Safari,24,17067,samples,"GSEA, Hallmark (1000 permutations)",2992.9999999999927,2956.0,2996.0
+Safari,24,17067,samples,"hub screen (2,000 genes)",538.0,68.0,547.0
+Safari,24,17067,samples,render: volcano and PCA,554.0,545.0,563.0
+Safari,24,17067,samples,TOTAL,4895.000000000007,,
+Safari,96,17114,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",2765.0,2692.0,2787.0000000000146
+Safari,96,17114,samples,DE: moderated t (limma-trend),27.0,24.999999999985448,30.0
+Safari,96,17114,samples,DE: voom,291.0,201.0,291.99999999998545
+Safari,96,17114,samples,"FRY, Hallmark (50 sets)",124.0,115.0,130.00000000001455
+Safari,96,17114,samples,"GSEA, Hallmark (1000 permutations)",3855.0,3776.0,3921.9999999999854
+Safari,96,17114,samples,"hub screen (2,000 genes)",1733.0,181.0,1787.0
+Safari,96,17114,samples,render: volcano and PCA,1929.0,417.0,2026.0
+Safari,96,17114,samples,TOTAL,10724.0,,
+Safari,192,17030,samples,"load and normalize (parse, filterByExpr, TMM, log-CPM, QC)",6981.0,6693.0,7080.0
+Safari,192,17030,samples,DE: moderated t (limma-trend),35.0,34.0,39.0
+Safari,192,17030,samples,DE: voom,530.0,363.0,534.0000000000291
+Safari,192,17030,samples,"FRY, Hallmark (50 sets)",248.0,246.0,257.0
+Safari,192,17030,samples,"GSEA, Hallmark (1000 permutations)",4984.0,4967.0,5076.0
+Safari,192,17030,samples,"hub screen (2,000 genes)",3304.0,1672.000000000029,3375.0
+Safari,192,17030,samples,render: volcano and PCA,4363.999999999971,1010.0,4806.000000000029
+Safari,192,17030,samples,TOTAL,20445.99999999997,,

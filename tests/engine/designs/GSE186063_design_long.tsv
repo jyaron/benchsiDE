@@ -1,0 +1,66 @@
+sample	Type	Diag	Sex	Age	Pair
+GSM5629971	lesion	Psoriasis	Male	41	P01
+GSM5629972	non-lesion	Psoriasis	Male	41	P01
+GSM5629973	normal_skin	Ankylosing_Spondylitis	Male	46	
+GSM5629974	normal_skin	Ankylosing_Spondylitis	Male	26	
+GSM5629975	lesion	Psoriatic_Arthritis	Male	50	P02
+GSM5629976	non-lesion	Psoriatic_Arthritis	Male	50	P02
+GSM5629977	lesion	Psoriatic_Arthritis	Male	52	P03
+GSM5629978	non-lesion	Psoriatic_Arthritis	Male	52	P03
+GSM5629979	normal_skin	Ankylosing_Spondylitis	Male	49	
+GSM5629980	lesion	Psoriasis	Female	20	P04
+GSM5629981	non-lesion	Psoriasis	Female	20	P04
+GSM5629982	normal_skin	Ankylosing_Spondylitis	Female	47	
+GSM5629983	lesion	Psoriatic_Arthritis	Male	50	P05
+GSM5629984	non-lesion	Psoriatic_Arthritis	Male	50	P05
+GSM5629985	normal_skin	Ankylosing_Spondylitis	Male	49	
+GSM5629986	lesion	Psoriasis	Female	24	P06
+GSM5629987	non-lesion	Psoriasis	Female	24	P06
+GSM5629988	normal_skin	Ankylosing_Spondylitis	Male	32	
+GSM5629989	lesion	Psoriatic_Arthritis	Male	29	P07
+GSM5629990	non-lesion	Psoriatic_Arthritis	Male	29	P07
+GSM5629991	normal_skin	Ankylosing_Spondylitis	Male	54	
+GSM5629992	lesion	Psoriatic_Arthritis	Male	47	P08
+GSM5629993	non-lesion	Psoriatic_Arthritis	Male	47	P08
+GSM5629994	lesion	Psoriatic_Arthritis	Male	52	P09
+GSM5629995	non-lesion	Psoriatic_Arthritis	Male	52	P09
+GSM5629996	normal_skin	Ankylosing_Spondylitis	Female	35	
+GSM5629998	non-lesion	Psoriatic_Arthritis	Female	41	
+GSM5629999	non-lesion	Psoriatic_Arthritis	Female	41	
+GSM5630000	lesion	Psoriatic_Arthritis	Female	28	P10
+GSM5630001	non-lesion	Psoriatic_Arthritis	Female	28	P10
+GSM5630002	lesion	Psoriatic_Arthritis	Male	54	P11
+GSM5630003	non-lesion	Psoriatic_Arthritis	Male	54	P11
+GSM5630004	lesion	Psoriatic_Arthritis	Male	37	P12
+GSM5630005	non-lesion	Psoriatic_Arthritis	Male	37	P12
+GSM5630006	lesion	Psoriasis	Female	48	P13
+GSM5630007	non-lesion	Psoriasis	Female	48	P13
+GSM5630008	lesion	Psoriasis	Male	50	P14
+GSM5630009	non-lesion	Psoriasis	Male	50	P14
+GSM5630010	lesion	Psoriasis	Male	48	P15
+GSM5630011	non-lesion	Psoriasis	Male	48	P15
+GSM5630012	lesion	Psoriasis	Female	53	P16
+GSM5630013	non-lesion	Psoriasis	Female	53	P16
+GSM5630014	lesion	Psoriatic_Arthritis	Male	53	P17
+GSM5630015	non-lesion	Psoriatic_Arthritis	Male	53	P17
+GSM5630016	lesion	Psoriasis	Female	63	P18
+GSM5630017	non-lesion	Psoriasis	Female	63	P18
+GSM5630018	lesion	Psoriasis	Male	33	P19
+GSM5630019	non-lesion	Psoriasis	Male	33	P19
+GSM5630020	lesion	Psoriasis	Male	26	P20
+GSM5630021	non-lesion	Psoriasis	Male	26	P20
+GSM5630022	lesion	Psoriatic_Arthritis	Female	61	P21
+GSM5630023	non-lesion	Psoriatic_Arthritis	Female	61	P21
+GSM5630024	lesion	Psoriasis	Female	56	P22
+GSM5630025	non-lesion	Psoriasis	Female	56	P22
+GSM5630026	lesion	Psoriatic_Arthritis	Male	48	P23
+GSM5630027	non-lesion	Psoriatic_Arthritis	Male	48	P23
+GSM5630028	lesion	Psoriatic_Arthritis	Female	51	P24
+GSM5630029	non-lesion	Psoriatic_Arthritis	Female	51	P24
+GSM5630030	normal_skin	Ankylosing_Spondylitis	Male	47	
+GSM5630031	lesion	Psoriasis	Male	34	P25
+GSM5630032	non-lesion	Psoriasis	Male	34	P25
+GSM5630033	normal_skin	Ankylosing_Spondylitis	Female	48	
+GSM5630034	lesion	Psoriasis	Female	41	P26
+GSM5630035	non-lesion	Psoriasis	Female	41	P26
+GSM5630036	normal_skin	Ankylosing_Spondylitis	Male	52	

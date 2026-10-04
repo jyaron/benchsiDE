@@ -24,6 +24,9 @@ des <- read.delim("demo/GSE63310_design.tsv")
 grp <- factor(des$celltype[match(colnames(cnt), des$sample)])
 lcov <- log2(colSums(cnt))
 blk <- rep(c("b1", "b2"), length.out = ncol(cnt))
+# sequencing lane, as in the limma/Glimma/edgeR workflow (Law et al., F1000Research 5:1408, 2016)
+stopifnot(identical(colnames(cnt), c("GSM1545535","GSM1545536","GSM1545538","GSM1545539","GSM1545540","GSM1545541","GSM1545542","GSM1545544","GSM1545545")))
+lane <- factor(rep(c("L004", "L006", "L008"), c(3, 4, 2)))
 
 keep <- filterByExpr(cnt, group = grp)
 m <- cnt[keep, ]
@@ -112,6 +115,25 @@ idx <- c(1:25, seq(1000, N, by = 997))   # compared genes: first 25 plus a sprea
 f12 <- function(x) as.numeric(format(x, digits = 15))
 # co-expression table: every compared gene against gene 1 (Pearson r, OLS slope on gene 1, cor.test p)
 cidx <- setdiff(idx, 1)
+
+# the workflow article's analysis: design ~0 + group + lane, voom, contrasts.fit, eBayes or treat(lfc = 1)
+XA <- model.matrix(~0 + grp + lane); colnames(XA) <- gsub("grp", "", colnames(XA))
+cmA <- makeContrasts(LPvsBasal = LP - Basal, MLvsBasal = ML - Basal, levels = colnames(XA))
+vA <- voom(dge, XA); fA <- contrasts.fit(lmFit(vA, XA), cmA)
+eA <- eBayes(fA); trA <- treat(fA, lfc = 1)
+dtA <- decideTests(trA)
+art <- list(t = f12(eA$t[idx, 1]), df0 = f12(eA$df.prior), hits = hits(topTable(eA, coef = 1, number = Inf, sort.by = "none")),
+            treat_t = f12(trA$t[idx, 1]), treat_p = f12(trA$p.value[idx, 1]),
+            venn = c(sum(dtA[, 1] != 0), sum(dtA[, 2] != 0), sum(dtA[, 1] != 0 & dtA[, 2] != 0)))
+# voom with the synthetic block, and limma-trend TREAT, all groups
+fblk <- factor(blk); XB <- model.matrix(~0 + grp + fblk); colnames(XB) <- gsub("grp", "", colnames(XB))
+cmB <- makeContrasts(LPvsBasal = LP - Basal, levels = colnames(XB))
+fvb <- eBayes(contrasts.fit(lmFit(voom(dge, XB), XB), cmB))
+X0 <- model.matrix(~0 + grp); colnames(X0) <- gsub("grp", "", colnames(X0))
+trM <- treat(contrasts.fit(lmFit(lg, X0), makeContrasts(LPvsBasal = LP - Basal, levels = colnames(X0))), lfc = 1, trend = TRUE)
+treat_mod <- list(t = f12(trM$t[idx, 1]), p = f12(trM$p.value[idx, 1]), df0 = f12(trM$df.prior),
+                  hits = c(sum(p.adjust(trM$p.value[, 1], "BH") <= 0.05 & trM$coefficients[, 1] > 0), sum(p.adjust(trM$p.value[, 1], "BH") <= 0.05 & trM$coefficients[, 1] < 0)))
+
 coex <- t(sapply(cidx, function(g) c(cor(lg[g, ], lg[1, ]), coef(lm(lg[g, ] ~ lg[1, ]))[2],
                                      cor.test(lg[g, ], lg[1, ])$p.value)))
 # hub neighbourhood, within-group mode: partial correlation of each compared gene with gene 1 given
@@ -187,7 +209,8 @@ ref <- list(
   packages = list(R = paste(R.version$major, R.version$minor, sep = "."),
                   edgeR = as.character(packageVersion("edgeR")), limma = as.character(packageVersion("limma")),
                   RRHO = as.character(packageVersion("RRHO")), RNASeqPower = as.character(packageVersion("RNASeqPower"))),
-  covariates = list(lcov = f12(lcov), blk = blk),
+  covariates = list(lcov = f12(lcov), blk = blk, lane = as.character(lane)),
+  article = art, full_voom_blk = list(t = f12(fvb$t[idx, 1]), df0 = f12(fvb$df.prior), hits = hits(topTable(fvb, coef = 1, number = Inf, sort.by = "none"))), treat_mod = treat_mod,
   n_kept = N, kept_checksum = sum(which(keep)),
   tmm = f12(nf),
   compared_genes = idx - 1,

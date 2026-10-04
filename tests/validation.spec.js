@@ -17,7 +17,7 @@ test("GSE63310: application matches R reference values", async ({ page }) => {
     [read("demo/GSE63310_counts.tsv"), read("demo/GSE63310_design.tsv"), read("validation/gse63310_reference.json")]);
   expect(res.fixture.nS).toBe(9);
   expect(res.fixture.nG).toBe(16624);
-  expect(res.rows.length).toBe(59);
+  expect(res.rows.length).toBe(70);
   for (const row of res.rows) {
     expect(row.pass, `${row.name}: max deviation ${row.delta} exceeds ${row.tol}`).toBe(true);
   }

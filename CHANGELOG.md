@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0-rc.2 (2026-10-04)
+
+Differential expression
+- NEW: covariates can be used with voom. The design is ~0 + group + covariates; voom estimates the precision weights from this design, and the B - A contrast is taken as limma's contrasts.fit does, so results equal the standard limma workflow (voom, lmFit, contrasts.fit, eBayes). Previously covariates applied to the moderated t only, and voom results with a covariate selected were unadjusted (with a warning).
+- NEW: "test the threshold (TREAT)" option: tests whether |log2FC| is greater than the value in the |log2FC| box (McCarthy & Smyth 2009; limma treat()), for the moderated t and voom. The table, volcano plot, CSV export (t_treat, p_treat, FDR_treat), Venn diagram, all-contrasts table, contrast comparison and methods text then report TREAT values and say so. GSEA, the barcode plot and the cross-dataset analyses keep ranking and pooling by the ordinary moderated t. Saved in sessions.
+- CHANGED: Interaction card with voom and a covariate: the contrast standard error now follows limma's contrasts.fit, as in the DE tab, so that results equal the standard limma workflow. On GSE143688 (four groups, adjusted for day) the interaction gives 765 significant genes instead of 760.
+- FIXED: when a covariate is aliased with the groups (for example a batch that coincides with the groups), it was dropped from the model, as limma does, but the summary and methods text still said the comparison was adjusted for it. Both now state that the covariate could not be estimated and that the comparison is not adjusted for it.
+- CHANGED: the captions of the Venn diagram, the all-contrasts table and the contrast comparison state the test, the call rule and the covariates.
+
+Validation
+- External validation: 11 checks added (voom with a blocking factor, TREAT with the moderated t, and the analysis of the limma/Glimma/edgeR workflow article: voom adjusted for sequencing lane, ordinary and TREAT, including its Venn counts), 70 in total.
+- New engine check covariates_treat (voom with covariates and TREAT against limma on GSE63310 and GSE186063, and the corresponding text, export and session behaviour), and a browser test reproducing the workflow article's TREAT result.
+
 ## 1.0.0-rc.1 (2026-10-03)
 Release candidate for version 1.0 (design freeze). The default meta-analysis changes in this release: re-run meta-analyses made with earlier versions before reporting them.
 
@@ -17,6 +30,7 @@ Privacy
 - NEW: both builds carry a Content-Security-Policy that forbids the page from opening any network connection or loading content from another server; the online build may load only Plotly.js from its CDN, now pinned by a subresource-integrity hash. The offline build allows no server. A new CI test confirms in Chromium, Firefox and WebKit that a full analysis makes no outside request and that attempts to reach another server are refused. The Privacy page describes how to check this in the browser.
 
 Fixes from the release-candidate check
+- FIXED: the user guide's demo tutorial gave the gene counts of the two-groups-only fit (2,810 up, 3,338 down); with the default all-groups fit they are 2,781 and 3,301.
 - FIXED: printing the page cut scrolling panels (for example the enrichment table) at their on-screen height, leaving a row of half-printed text; they now print in full. Plots are refitted to the page width once the print layout is applied, so angled labels are not cut at the page edge.
 - FIXED: the GSEA running-score plot stayed on screen under a later over-representation result.
 - FIXED: in the enrichment tables, long gene-set names were broken mid-word and p-values were split across lines; names now wrap at underscores and numbers are never split.
