@@ -2,7 +2,7 @@
 
 This guide takes you from an expression matrix to reportable results, one step at a time. Each tutorial names the exact controls you will use. Concepts, statistical definitions and troubleshooting are covered in more depth in the [Knowledgebase](../wiki/Home.md).
 
-Version covered: 0.19.x. The application is at <https://www.benchside.org>; source code and releases are at <https://github.com/jyaron/benchsiDE>.
+Version covered: 1.0.0-rc.1. The application is at <https://www.benchside.org>; source code and releases are at <https://github.com/jyaron/benchsiDE>.
 
 ## Contents
 
@@ -13,11 +13,11 @@ Version covered: 0.19.x. The application is at <https://www.benchside.org>; sour
 5. [Tutorial C: a time course](#5-tutorial-c-a-time-course)
 6. [Tutorial D: gene-set testing](#6-tutorial-d-gene-set-testing)
 7. [Tutorial E: the Discovery screen](#7-tutorial-e-the-discovery-screen)
-7b. [Tutorial E2: sample traits](#7b-tutorial-e2-sample-traits-clinical-scores-ihc-counts-and-other-per-sample-measurements)
-8. [Tutorial F: comparing datasets and species](#8-tutorial-f-comparing-datasets-and-species)
-9. [Tutorial G: figures, reports, sessions and methods text](#9-tutorial-g-figures-reports-sessions-and-methods-text)
-10. [Tutorial H: verifying the statistics in your own browser](#10-tutorial-h-verifying-the-statistics-in-your-own-browser)
-11. [Checklist before you report results](#11-checklist-before-you-report-results)
+8. [Tutorial E2: sample traits](#8-tutorial-e2-sample-traits-clinical-scores-ihc-counts-and-other-per-sample-measurements)
+9. [Tutorial F: comparing datasets and species](#9-tutorial-f-comparing-datasets-and-species)
+10. [Tutorial G: figures, reports, sessions and methods text](#10-tutorial-g-figures-reports-sessions-and-methods-text)
+11. [Tutorial H: verifying the statistics in your own browser](#11-tutorial-h-verifying-the-statistics-in-your-own-browser)
+12. [Checklist before you report results](#12-checklist-before-you-report-results)
 
 ---
 
@@ -42,6 +42,8 @@ Version covered: 0.19.x. The application is at <https://www.benchside.org>; sour
 1. Open the browser developer tools (F12, or Cmd+Option+I on macOS) and select the **Network** tab.
 2. Load your data and run an analysis.
 3. Observe that no request carries your data. With the offline build you can disconnect from the network entirely.
+
+Both builds also carry a Content-Security-Policy that the browser enforces: the page may not open any network connection, and may load nothing from another server except, in the hosted build, the plotting library from its CDN, pinned by an integrity hash. The offline build allows no server at all. Any blocked attempt appears in the browser console as a policy violation. See the [Privacy and architecture](../wiki/Privacy-and-Architecture.md) page.
 
 ---
 
@@ -104,6 +106,8 @@ For mouse, human and rat, built-in annotation converts Ensembl and Entrez IDs to
 ### 2.5 Large datasets
 
 benchsiDE runs entirely in the browser, so computation time grows with the size of the data. As a guide, GEO GSE54456 (171 samples, 19,518 genes after filtering) takes about 5 s to analyze, and FRY on GO Biological Process (7,608 sets) takes about 7 s on a recent laptop. Long computations show a progress bar with the current step, elapsed time and an estimate of time remaining; the page remains responsive while they run. Chrome, Edge, Firefox and Safari are supported; a 64-bit browser with at least 8 GB of system memory is recommended for datasets of this size.
+
+After **Analyze →**, the line above the dashboard gives the load time in your browser: reading and parsing each file, and the analysis up to the first display (time spent on the review step is not counted). **copy** puts these timings and your browser details on the clipboard. For a standard comparison, **Validate statistics → Timing benchmark…** runs a fixed analysis on synthetic datasets of increasing size; the same datasets can be exported to time other tools on the same computer.
 
 ## 3. Tutorial A: your first analysis with the demo dataset
 
@@ -331,7 +335,7 @@ Click **Run discovery**. For two-group designs, each module is tested with CAMER
 
 ---
 
-## 7b. Tutorial E2: sample traits (clinical scores, IHC counts and other per-sample measurements)
+## 8. Tutorial E2: sample traits (clinical scores, IHC counts and other per-sample measurements)
 
 1. Add the measurement as a column of the design file, one value per sample (blank or NA where it was not measured), or add it in the review step with **Edit the design → Add column**.
 2. Open the **Sample traits** tab and choose the trait. Choose a transformation if needed: log₂(x + 1) for counts, logit for percentages, rank when a few samples have extreme values.
@@ -341,7 +345,7 @@ Click **Run discovery**. For two-group designs, each module is tested with CAMER
 6. The arrow next to a gene, or **Open in Gene Explorer** under the plot, opens the gene in Gene Explorer; **← back** returns to the Traits tab.
 7. With a gene-set library loaded (Enrichment tab), **Gene sets (CAMERA)** tests whole sets. **Module × trait matrix** tests hub neighbourhoods, gene sets or Discovery modules against every trait at once, and shows how the traits correlate with each other. Click a cell, or a gene-set name, to list its genes with links to Gene Explorer.
 
-## 8. Tutorial F: comparing datasets and species
+## 9. Tutorial F: comparing datasets and species
 
 The Compare datasets tab relates your session (dataset A) to any number of other datasets. There is no fixed limit on the number of datasets; the limit is memory. Each dataset uses about 8 bytes per gene per sample (roughly 30 MB for 20,000 genes × 170 samples). The slot list shows the total, warns above 1.5 GB, and refuses a dataset that would take the total above 3 GB. Each dataset is filtered, normalized and tested on its own; raw values are never merged across datasets.
 
@@ -398,6 +402,19 @@ Results:
 
 A gene enters the shared signature only if it is significant after pooling, has a pooled effect at least the chosen size, and changes in the same direction in every dataset. With the prediction-interval option, the 95% prediction interval, the range expected for the effect in a new comparable study, must also exclude 0. This asks whether the direction replicates while allowing the size of the change to differ between studies. I² is not a good default filter: large studies measure fold changes so precisely that a log₂ fold change of 9 in one study and 7 in another (512-fold and 128-fold) counts as heterogeneous, so an I² limit removes the largest, best-established effects (for psoriasis, S100A7–9, SERPINB3/4, PI3). Click any gene for its forest plot, which then shows the pooled estimate as a diamond. With two or three datasets, I² and τ² are imprecise; read the leave-one-out table before relying on the signature.
 
+**Power with few datasets.** The Hartung–Knapp test refers each pooled estimate to a t distribution on k − 1 degrees of freedom, where k is the number of datasets, and the FDR is controlled across thousands of genes. In benchsiDE's simulations it detected almost no true effects with two or three datasets, 5–37% with four and 26–57% with five, while keeping false discoveries near the nominal rate even when effects differed between datasets. The z test detected far more but did not control the FDR when effects differed between datasets. The summary states this whenever two to four datasets are combined. With two or three datasets, report the pooled estimates and the per-dataset results; if you need a signature for exploration, choose **test: z (normal)** and say so in the methods.
+
+**Samples behind the result.** Each dataset's checkbox shows its group sizes. After the run, a table lists for each dataset the samples compared, other samples used only for the variance estimate, samples left out for a missing covariate value, the number of subjects when a patient or pair column is adjusted for, the dataset's median share of the pooled weight, and the number of genes it contributed. The gene table and CSV give the number of samples behind each gene's pooled estimate.
+
+**Leave-one-dataset-out.** For each omitted dataset the table gives the signature recomputed without it and, in the last column, the number of signature genes whose pooled estimate keeps its direction at nominal p ≤ 0.05. The last column does not depend on the correction across genes, so it is the better guide when the Hartung–Knapp test loses a degree of freedom.
+
+**More views of the result.**
+
+- **heatmap**: 25, 50 or 100 signature genes, ranked by |pooled log₂FC| or meta p.
+- **multi-gene forest**: type gene symbols, or leave the box blank for the signature genes with the largest pooled effects, choose how many, and click **Draw**. Each gene shows its estimate in every dataset and the pooled estimate with its interval; the axis is symmetric about 0.
+- **table**: the shared signature or all tested genes, 50 to 500 rows.
+- **pathway enrichment of**: choose the shared signature or the top N genes (ranked by meta p or by |pooled log₂FC|), and up, down or both, then click **Run in Enrichment tab**. The background is the genes tested in the meta-analysis. As with any top-ranked list, these p-values are optimistic for co-regulated genes.
+
 ### Step 6. Score homology families (cross-species)
 
 Many genes have no one-to-one ortholog (for example the mouse Serpinb3a to Serpinb3d genes and human SERPINB3 and SERPINB4). These families are excluded from gene-level matching but are not lost:
@@ -408,15 +425,30 @@ Many genes have no one-to-one ortholog (for example the mouse Serpinb3a to Serpi
 4. Click a point, or **plot** in a table row, for per-sample scores in both datasets.
 5. **Clear** resets the panel.
 
-### Step 7. Transfer a signature
+**Family dot plot across all datasets.** Under the scatter, type member symbols of either species into **family dot plot** (for example `SERPINB3, S100A7, LCE3`; a prefix such as `LCE3` matches every LCE3 member), choose how many families, and click **Draw**. Leave the box blank for the families significant in the same direction in the most datasets. Every loaded human or mouse dataset with a two-group contrast is drawn, one coloured point per dataset; filled points are significant at the DE FDR within that dataset, open points are not. Each family is scored in each dataset on that species' own members, so raw values are never merged. Click a family for its per-sample scores in every dataset. The plot does not depend on the X and Y chosen above.
+
+### Step 7. Hub neighbourhoods across datasets
+
+1. In the Co-expression tab, under **Network hub genes**, choose the number of variable genes and the soft power β, and click **Find hubs**.
+2. Click **neighborhood** in a hub's table row to open its **Hub neighbourhood** card: the hub and its strongest partners, with correlation computed across all samples or within groups.
+3. Click **Across datasets**. The Compare datasets tab opens the **Hub across datasets** card. Click **Analyze this neighbourhood** to answer four questions in every comparison dataset:
+   1. Is the neighbourhood preserved? WGCNA module-preservation Z-scores, and a permutation p-value against random gene sets matched for differential expression.
+   2. Is it a hub in every dataset? The hub's connectivity rank in each dataset.
+   3. Does it rewire between conditions? The change in each hub–partner correlation between the two contrast groups (Fisher z test), per dataset and pooled.
+   4. How do the members behave in the meta-analysis? Their pooled effects, with and without the dataset in which the hubs were found.
+4. **Find consensus hubs** ranks genes by their connectivity across all datasets (robust rank aggregation). **Export tables (CSV)** saves every table.
+
+A neighbourhood found in one dataset should be judged by its preservation in the others, not by its strength in the dataset where it was found.
+
+### Step 8. Transfer a signature
 
 Under **Signature transfer**, choose a module from dataset A (up- or down-regulated DE genes, or a Discovery module) and click **Score**. The module is scored in each other dataset and compared with random signatures of the same size.
 
 ---
 
-## 9. Tutorial G: figures, reports, sessions and methods text
+## 10. Tutorial G: figures, reports, sessions and methods text
 
-### 9.1 Figure exports
+### 10.1 Figure exports
 
 - Saving a figure opens a preview first: check it, choose SVG or PNG and the file name, then click **Save** (or **Close** to cancel). Untick **Figure settings → Preview** to save at once.
 - Open **Figure settings** in the header. **Export size** sets the shape of exported figures (as shown; single column 4:3 or 1:1; double column 7:4 or wide).
@@ -428,35 +460,45 @@ Under **Signature transfer**, choose a module from dataset A (up- or down-regula
 - **Summary figure** (header) composes a four-panel overview with a caption.
 - In the Gene Explorer, add genes with **+ Add to comparison**, then choose **Export panel figure** for a multi-panel figure with statistics.
 
-### 9.2 Methods text
+### 10.2 Methods text
 
 The **Auto-generated methods text** card on the Overview & QC tab describes exactly what you ran, with citations. It updates as you change settings. Click **Copy to clipboard** and paste it into your manuscript.
 
-### 9.3 Report
+### 10.3 Report
 
 **Generate report** (header) produces a single HTML file with results, figures, methods and citations.
 
-### 9.4 Sessions
+### 10.4 Sessions
 
 **Save session** writes a JSON file containing all settings: group assignments, design type, method, thresholds, covariates and Discovery settings. **Load session** restores them. The file records the application version, and a warning appears if you load it into a different version. **Load different data** returns to the start screen.
 
-### 9.5 DESeq2 cross-check
+### 10.5 DESeq2 cross-check
 
 **DESeq2 script (R)** (Differential Expression tab) downloads an R script, pre-filled with your contrast and sample selection, that runs DESeq2 on your original files.
 
 ---
 
-## 10. Tutorial H: verifying the statistics in your own browser
+## 11. Tutorial H: verifying the statistics in your own browser
+
+### 11.1 Self-test (in the application)
 
 1. Click **Validate statistics** in the header.
-2. benchsiDE regenerates a fixed synthetic dataset and runs it through the same functions the tabs use.
-3. Sixteen components are compared with reference values computed in R (edgeR, limma), scipy and statsmodels. The panel shows every compared value side by side with its tolerance.
+2. benchsiDE regenerates fixed synthetic datasets and runs them through the same functions the tabs use; there is no separate test-only code path.
+3. The 21 components (filterByExpr, TMM, MDS, the moderated t and its empirical Bayes prior, voom, significant-gene calls, Benjamini–Hochberg FDR, the moderated F, CAMERA and its inter-gene correlation, FRY, over-representation p-values, a regression fit, the power model, and five meta-analysis models and tests) are compared with reference values computed in R (edgeR, limma, metafor, RNASeqPower), scipy and statsmodels. The badge reads **✓ all 21 components pass** when every value is within its tolerance. Click a row to see the compared values side by side.
 4. Click **Download evidence (JSON)** to save the record, which includes your browser's engine string.
 5. If any component fails, open an issue on GitHub and attach the evidence file.
 
+### 11.2 Timing benchmark
+
+**Validate statistics → Timing benchmark…** runs a fixed analysis on synthetic datasets of increasing size in your browser and reports the time for each step. Close other tabs first. The datasets can be exported to time other tools on the same computer.
+
+### 11.3 Validation on public data (repository)
+
+The repository's validation on public data is not run from the application. It compares the application's results on GEO GSE63310 with R results (59 checks), and is run automatically in Chromium, Firefox and WebKit on every change to the repository (the Actions tab on GitHub shows the result). To run it yourself, see [VALIDATION.md](../VALIDATION.md). The full validation record, with parity on seven public datasets and the false-positive calibration, is in the repository's `validation/` folder.
+
 ---
 
-## 11. Checklist before you report results
+## 12. Checklist before you report results
 
 - [ ] QC reviewed; any excluded sample is justified and stated in the methods.
 - [ ] Design type matches the experiment (numeric only for ordered variables).
@@ -464,5 +506,6 @@ The **Auto-generated methods text** card on the Overview & QC tab describes exac
 - [ ] Covariates are included where the design requires them, and are not confounded with the groups.
 - [ ] Gene-set results state which test was used and what question it answers.
 - [ ] Discovery results are reported as hypotheses unless they survive FDR and are replicated.
+- [ ] A meta-analysis states the model and test, the number of datasets and the samples in each; with two or three datasets, any signature from the z test is reported as exploratory.
 - [ ] The methods text has been copied from the application after the final analysis.
 - [ ] The session file and application version are archived with the data.
