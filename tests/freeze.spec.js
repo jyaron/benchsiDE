@@ -36,3 +36,45 @@ test("interaction card: runs, draws, lists genes and exports", async ({ page }) 
   const n = await page.evaluate(() => IXRES.lfc.length);
   expect(n).toBe(await page.evaluate(() => nG));
 });
+
+test("angled category labels stay inside the figure after the window is narrowed", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(PAGE);
+  await page.evaluate(() => {
+    const d = document.createElement("div"); d.id = "refittest"; d.style.width = "100%"; d.style.height = "420px";
+    document.body.prepend(d);
+    const cats = Array.from({ length: 15 }, (_, i) => "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION_" + i);
+    Plotly.react(d, [{ type: "heatmap", x: cats, y: cats, z: cats.map(() => cats.map(() => 1)) }],
+      { margin: { t: 30, b: 130, l: 220, r: 10 }, height: 420, font: { size: 9 }, xaxis: { tickangle: 45 } }, { responsive: true });
+  });
+  await page.setViewportSize({ width: 700, height: 900 });
+  await page.waitForTimeout(900);
+  const over = await page.evaluate(() => {
+    const d = document.getElementById("refittest"), box = d.querySelector(".main-svg").getBoundingClientRect();
+    let worst = -1e9;
+    d.querySelectorAll(".xtick text").forEach((t) => { const r = t.getBoundingClientRect(); worst = Math.max(worst, r.right - box.right, box.left - r.left, r.bottom - box.bottom); });
+    return worst;
+  });
+  expect(over, "a tick label crosses the figure edge by " + over + " px").toBeLessThanOrEqual(1);
+});
+
+test("FRY results replace the panels and notes of an earlier GSEA or ORA run", async ({ page }) => {
+  await page.goto(PAGE);
+  await page.evaluate(([m, d]) => {
+    document.getElementById("species").value = "mouse"; useBuiltinAnno();
+    document.getElementById("normsel").value = "tmm"; document.getElementById("fmode").value = "fbe";
+    loadFromText(m, d); GROUPTYPE = "auto"; analyzeNow(); switchTab("enrich"); useBuiltin("hallmark_mm");
+  }, [read("demo/GSE63310_counts.tsv"), read("demo/GSE63310_design.tsv")]);
+  await page.click('#enrmethod button[data-e="gsea"]');
+  await expect(page.locator("#gseapermwrap")).toBeVisible();
+  await page.click("#enrrun");
+  await expect(page.locator("#enrinfo")).toContainText("GSEA", { timeout: 60000 });
+  await page.click('#enrmethod button[data-e="fry"]');
+  await expect(page.locator("#gseapermwrap")).toBeHidden();
+  await expect(page.locator("#enrmethodnote")).toContainText("FRY (limma)");
+  await page.click("#enrrun");
+  await expect(page.locator("#enrinfo")).toContainText("FRY self-contained test", { timeout: 60000 });
+  expect(await page.locator("#p_leadedge").innerHTML()).toBe("");
+  await expect(page.locator("#enrfootnote")).toBeHidden();
+  await expect(page.locator("#enrtable")).toContainText("p (mixed)");
+});

@@ -305,6 +305,16 @@ Click **Run enrichment**. The table lists each set with its statistic, p-value a
 3. **Jaccard heatmap**: overlap between the top sets. Click a cell to list shared genes.
 4. **Leading-edge matrix** (GSEA): which genes drive which sets.
 
+Each method has its own table and plots:
+
+| Method | Table columns | Plots |
+|---|---|---|
+| ORA | size, overlap, ratio, p, FDR, overlapping genes | lollipop chart, ridgeline, Jaccard heatmap |
+| GSEA | size, NES, p, FDR (sample permutation only), leading-edge genes | lollipop chart, running-score plot, ridgeline, Jaccard heatmap, leading-edge matrix |
+| FRY | size, direction, p and FDR (directional), p and FDR (mixed) | ridgeline, Jaccard heatmap |
+
+FRY's directional p asks whether the set's genes change together in one direction; the mixed p asks whether they change in either direction. A set can have a large directional p and a very small mixed p when its genes change strongly in opposite directions. With many samples or a strong treatment, FRY finds most sets significant; that is a property of a self-contained test, and CAMERA or GSEA show which sets change more than the other genes.
+
 ### Step 4. Test every contrast at once
 
 With three or more groups, click **Enrichment across all contrasts**. The heatmap shows signed −log₁₀ FDR for each set in each pairwise contrast (red: up, blue: down). Click a cell to open the barcode plot for that set and contrast. **Export matrix CSV** saves all sets, not only the 25 displayed.

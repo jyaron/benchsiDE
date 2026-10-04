@@ -666,11 +666,11 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
         <div class="toggle" id="enrmethod"><button data-e="ora" class="on">ORA (gene list)</button><button data-e="gsea">GSEA</button><button data-e="fry">FRY (self-contained)</button></div>
         <span id="enrsrcwrap">Query: <select id="enrsrc"></select></span>
         set size <input type="text" id="enrmin" value="5" style="width:40px">&ndash;<input type="text" id="enrmax" value="2000" style="width:60px">
-        <span id="gseapermwrap" title="Sample permutation (Subramanian et al. 2005) keeps the correlation between genes and gives valid FDR; it needs at least 1000 distinct labelings (about 7 samples per group). Gene permutation (preranked) is fast but ignores gene correlation, so its p-values and FDR are too small for co-regulated sets; use it only to rank.">permute <select id="gseaperm"><option value="auto" selected>samples (auto)</option><option value="gene">genes (preranked, exploratory)</option></select></span>
+        <span id="gseapermwrap" style="display:none" title="Sample permutation (Subramanian et al. 2005) keeps the correlation between genes and gives valid FDR; it needs at least 1000 distinct labelings (about 7 samples per group). Gene permutation (preranked) is fast but ignores gene correlation, so its p-values and FDR are too small for co-regulated sets; use it only to rank.">permute <select id="gseaperm"><option value="auto" selected>samples (auto)</option><option value="gene">genes (preranked, exploratory)</option></select></span>
         <button class="act" id="enrrun">Run enrichment</button>
         <button class="act ghost" id="enrexport" style="display:none">Export results (CSV)</button>
       </div>
-      <div class="footer-note" id="enrmethodnote" style="margin-bottom:6px">GSEA ranks all kept genes by the current DE contrast's t-statistic (no significance cutoff) and tests each set for coordinated enrichment. Use it when few or no genes pass FDR. Significance by gene-set permutation; NES = ES normalized to same-sign permutation mean.</div>
+      <div class="footer-note" id="enrmethodnote" style="margin-bottom:6px"></div>
       <textarea id="enrpaste" rows="2" style="width:100%;display:none" placeholder="Paste gene symbols/IDs"></textarea>
       <div id="enrinfo" class="footer-note" style="margin:6px 0"></div>
       <div id="p_enrlolli" style="display:none"></div>
@@ -690,7 +690,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
       <div id="enrmatnote" class="footer-note" style="margin:4px 0"></div>
       <div id="enrgenes" style="display:none;margin:10px 0;padding:10px 12px;background:#f8fafc;border-radius:8px;line-height:2"></div>
       <div id="enrtable" style="max-height:480px;overflow-y:auto"></div>
-      <div class="footer-note">One-sided hypergeometric (Fisher exact) test of query&ndash;set overlap; universe = all kept genes; Benjamini&ndash;Hochberg FDR across tested sets. DE-based queries use the current Differential Expression contrast, method, and thresholds.</div>
+      <div class="footer-note" id="enrfootnote" style="display:none">One-sided hypergeometric (Fisher exact) test of query&ndash;set overlap; universe = the kept genes annotated in the library; Benjamini&ndash;Hochberg FDR across tested sets. DE-based queries use the current Differential Expression contrast, method, and thresholds.</div>
     </div>
   </div>
 
@@ -1456,9 +1456,34 @@ function figPreviewPlot(gd){
 }
 const IMG_BTN={name:"Save image (preview, SVG or PNG)", icon:(Plotly.Icons&&Plotly.Icons.camera)||{width:1000,height:1000,path:"M150 300h200l60-100h180l60 100h200v500H150z M500 380a150 150 0 1 0 0.1 0z"}, click:gd=>figPreviewPlot(gd)};
 const _plreact=Plotly.react.bind(Plotly);
+// Margins and tick-label lengths are fitted to the plot's width when it is drawn. Plotly redraws a responsive
+// plot at the new width when the window is resized or the page is printed, without refitting them, so long
+// angled labels could run past the edge. Each guarded plot's input is kept, and plots whose width changed are
+// refitted (debounced on resize; immediately when printing starts).
+const PLREG=new Map();
+function plClone(o){ try{ return structuredClone(o); }catch(e){ return JSON.parse(JSON.stringify(o)); } }
+function reguardPlots(force){
+  for(const [id,r] of PLREG){
+    const d=document.getElementById(id);
+    if(!d||!d._fullLayout){ PLREG.delete(id); continue; }
+    const w=d.clientWidth||0;
+    if(!w||(!force&&Math.abs(w-r.w)<3)) continue;
+    let lay=plClone(r.layout0); if(FONTSCALE!==1) fontWalk(lay);
+    try{ layoutGuard(d, r.traces, lay); plotAreaGuard(d, lay); }catch(e){}
+    let tr=r.traces; if(TH_ON){ tr=thWalk(tr,""); lay=thWalk(lay,""); }
+    r.w=w;
+    try{ _plreact(d, tr, lay, r.cfg); }catch(e){}
+  }
+}
+let _rgT=null;
+window.addEventListener("resize", ()=>{ clearTimeout(_rgT); _rgT=setTimeout(()=>reguardPlots(false), 250); });
+window.addEventListener("beforeprint", ()=>{ for(const id of PLREG.keys()){ const d=document.getElementById(id); try{ if(d&&d._fullLayout) Plotly.Plots.resize(d); }catch(e){} } reguardPlots(true); });
+window.addEventListener("afterprint", ()=>{ setTimeout(()=>reguardPlots(true), 50); });
 Plotly.react=function(div,traces,layout,cfg){
+  const d0=typeof div==="string"? document.getElementById(div) : div; const noG=layout&&layout.__noGuard; if(noG) delete layout.__noGuard;
+  const layout0= (!noG&&d0&&d0.id&&d0.id!=="p_panel_tmp"&&layout)? plClone(layout) : null;
   if(FONTSCALE!==1){ fontWalk(traces); fontWalk(layout); }
-  const d0=typeof div==="string"? document.getElementById(div) : div; const noG=layout&&layout.__noGuard; if(noG) delete layout.__noGuard; try{ if(!noG){ layoutGuard(d0, traces, layout); plotAreaGuard(d0, layout); } }catch(e){}
+  try{ if(!noG){ layoutGuard(d0, traces, layout); plotAreaGuard(d0, layout); } }catch(e){}
   // a figure that only shows a message (no traces) has nothing to export: no mode bar
   if(Array.isArray(traces)&&traces.length===0) cfg=Object.assign({}, cfg||{}, {displayModeBar:false});
   if(cfg&&cfg.displayModeBar!==false&&!(cfg.modeBarButtonsToAdd||[]).includes(DATA_BTN))
@@ -1466,6 +1491,7 @@ Plotly.react=function(div,traces,layout,cfg){
       modeBarButtonsToRemove:(cfg.modeBarButtonsToRemove||[]).concat(["toImage"])});
   // a plot with an explicit height gets a container of that height, so it never draws over the element below
   if(layout&&layout.height&&d0&&d0.style&&d0.id!=="p_panel_tmp") d0.style.height=Math.ceil(layout.height)+"px";
+  if(layout0) PLREG.set(d0.id, {traces, layout0, cfg, w:(d0.clientWidth||0)});
   if(TH_ON){ traces=thWalk(traces,""); layout=thWalk(layout,""); }
   return _plreact(div,traces,layout,cfg);
 };
@@ -4145,7 +4171,7 @@ function exportIx(){
 }
 el("ixrun").addEventListener("click", runInteraction);
 el("ixexp").addEventListener("click", exportIx);
-el("ixenr").addEventListener("click", ()=>{ if(!IXRES) return; switchTab("enrich"); enrMethod="ora"; document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e==="ora"));
+el("ixenr").addEventListener("click", ()=>{ if(!IXRES) return; switchTab("enrich"); enrMethod="ora"; document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e==="ora")); setEnrMethodUI();
   el("enrsrcwrap").style.display="inline"; refreshEnrSrc(); el("enrsrc").value="ix"; el("enrpaste").style.display="none";
   if(!GMT){ el("enrinfo").innerHTML='<span class="warnchip">Choose a gene-set library (step 1), then click Run enrichment.</span>'; return; } runEnrichment(); });
 
@@ -4154,7 +4180,7 @@ el("ixenr").addEventListener("click", ()=>{ if(!IXRES) return; switchTab("enrich
 el("metaenrgo").addEventListener("click",()=>{
   if(!META){ return; }
   switchTab("enrich");
-  enrMethod="ora"; document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e==="ora"));
+  enrMethod="ora"; document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e==="ora")); setEnrMethodUI();
   el("enrsrcwrap").style.display="inline"; refreshEnrSrc(); el("enrsrc").value="meta"; el("enrpaste").style.display="none";
   if(!GMT){ el("enrinfo").innerHTML='<span class="warnchip">Choose a gene-set library (step 1), then click Run enrichment.</span>'; return; }
   runEnrichment();
@@ -4216,7 +4242,9 @@ el("enrmethod").querySelectorAll("button").forEach(b=>b.addEventListener("click"
   enrMethod=b.dataset.e; document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x===b));
   el("enrsrcwrap").style.display=enrMethod==="ora"?"inline":"none";
   el("enrpaste").style.display=(enrMethod==="ora"&&el("enrsrc").value==="paste")?"block":"none";
+  setEnrMethodUI();
 }));
+setEnrMethodUI();
 el("enrrun").addEventListener("click",()=>{ if(enrMethod==="ora") runEnrichment();
   else if(enrMethod==="gsea") runProgress("GSEA: "+(GMTname||"gene sets"), runGSEAGen());
   else runProgress("FRY: "+(GMTname||"gene sets"), runFRYGen()); });
@@ -4344,6 +4372,7 @@ function* gseaPhenoGen(sets, a, b){
 }
 let GSEAB=0;
 function* runGSEAGen(){
+  resetEnrPanels("gsea");
   if(!GMT){ clearEnrDisplay("Load a GMT gene-set library first (step 1)."); return; }
   const res=computeDE();
   if(res.err){ clearEnrDisplay("GSEA needs a valid DE contrast: "+res.err); return; }
@@ -4521,6 +4550,7 @@ function* runEnrMatrixGen(){
 }
 function runFRY(){ return runSync(runFRYGen()); }
 function* runFRYGen(){
+  resetEnrPanels("fry");
   if(!GMT){ clearEnrDisplay("Load a GMT gene-set library first (step 1)."); return; }
   const mn=parseInt(el("enrmin").value,10)||5, mx=parseInt(el("enrmax").value,10)||2000;
   const sets=[];
@@ -4555,7 +4585,7 @@ function* runFRYGen(){
   }));
 }
 function clearEnrDisplay(msg){
-  enrResults=null;
+  enrResults=null; el("enrfootnote").style.display="none";
   el("enrinfo").innerHTML=`<span style="display:inline-block;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px;color:#78350f">${msg}</span>`;
   el("p_enrlolli").style.display="none";
   el("esplotwrap").style.display="none";
@@ -4563,7 +4593,24 @@ function clearEnrDisplay(msg){
   el("enrtable").innerHTML="";
   el("enrexport").style.display="none";
 }
+function enrMethodText(m){
+  if(m==="gsea") return "GSEA ranks all kept genes by the current DE contrast's moderated t (no significance cutoff) and asks whether a set's genes lie towards the top or the bottom of the ranking. Use it when few or no genes pass the FDR threshold. By default the sample labels are permuted, which gives a valid FDR but needs about 7 samples per group and no covariates; otherwise the genes are permuted and the result is a ranking by NES and nominal p, without FDR. NES = ES divided by the mean ES of the same-sign permutations.";
+  if(m==="fry") return "FRY (limma) tests each set on the model of the current DE contrast, including any covariates, using every gene. The directional p asks whether the set's genes change together in one direction; the mixed p asks whether they change in either direction. It is a self-contained test: with many samples or a strong treatment most sets are significant, so compare with CAMERA (Discovery tab) or GSEA to see which sets change more than the other genes.";
+  return "ORA asks whether a gene list (for example the significant genes of the current contrast) overlaps a set more often than expected by chance: one-sided hypergeometric test against the kept genes annotated in the library, Benjamini–Hochberg FDR. It treats genes as independent, so for lists of co-regulated genes its p-values are too small.";
+}
+function setEnrMethodUI(){
+  el("enrmethodnote").textContent=enrMethodText(enrMethod);
+  el("gseapermwrap").style.display= enrMethod==="gsea"? "inline" : "none";
+}
+// panels that belong to one result: cleared at the start of every run so that a new result is never shown
+// next to plots or notes left from a previous method or contrast
+function resetEnrPanels(mode){
+  for(const id of ["p_barcode","p_setecdf","p_leadedge"]){ const d=el(id); if(!d) continue; try{ if(window.Plotly&&Plotly.purge) Plotly.purge(d); }catch(e){} d.innerHTML=""; }
+  el("jaccardgenes").innerHTML="";
+  el("enrfootnote").style.display= mode==="ora"? "block" : "none";
+}
 function runEnrichment(){
+  resetEnrPanels("ora");
   if(!GMT){ clearEnrDisplay("Load a GMT gene-set library first (step 1)."); return; }
   const qs=querySetIdx();
   if(qs.err){ clearEnrDisplay(qs.err); return; }
@@ -10316,7 +10363,7 @@ function applySession(ss){
     // note: symbols apply at analysis time; if the current view shows unmapped IDs, re-run Analyze from onboarding
   }
   enrMethod=ss.enrMethod||"ora";
-  document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e===enrMethod));
+  document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e===enrMethod)); setEnrMethodUI(); el("enrsrcwrap").style.display=enrMethod==="ora"?"inline":"none";
   if(ss.pat){ el("patN").value=ss.pat.N; el("patK").value=ss.pat.K; }
   if(ss.heatN) el("heatN").value=ss.heatN;
   const gi=nameToIdx[(ss.gene||"").toLowerCase()]; if(gi!==undefined) curGene=gi;
