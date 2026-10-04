@@ -3437,7 +3437,8 @@ function deRuleText(fdr, thr){
   // the call rule in words, for captions of every view that uses the DE-tab settings
   const cov=(deMethod!=="welch")? DECOVSEL.filter(v=>COVARS[v]) : [];
   const rule=(DETREAT&&deMethod!=="welch")? `TREAT test of |log₂FC| > ${thr}, FDR ≤ ${fdr}` : `FDR ≤ ${fdr}, |log₂FC| ≥ ${thr}`;
-  return `${rule}, ${deMethodLabel()}${cov.length?`, adjusted for ${cov.join(", ")}`:``}`;
+  const ml=deMethod==="mod"? "limma-trend moderated t" : deMethod==="voom"? "voom" : "Welch t";   // short label: captions put the rule in parentheses
+  return `${rule}, ${ml}${cov.length?`, adjusted for ${cov.join(", ")}`:``}`;
 }
 function syncTreatUI(){ const cb=el("detreat"); if(!cb) return; cb.checked=DETREAT; cb.disabled=deMethod==="welch"; el("detreatwrap").style.opacity=deMethod==="welch"? "0.5" : "1"; }
 el("detreat").addEventListener("change",()=>{ DETREAT=el("detreat").checked; deKey=""; drawDE(); });

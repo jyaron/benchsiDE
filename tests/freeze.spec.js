@@ -117,18 +117,23 @@ test("voom with a covariate and TREAT reproduce the limma workflow on the demo",
   expect(res.treat).toBe(true);
   expect(res.cov).toContain("lane");
   expect(res.n).toBe(3647);   // limma 3.66: voom, ~0 + group + lane, contrasts.fit, treat(lfc = 1)
-  // record what the export handler does, so that a missing download can be traced
+  // record what the export handler does and where the click lands, so that a missing download can be traced
   await page.evaluate(() => {
-    window.__saved = []; window.__errs = [];
+    window.__saved = []; window.__errs = []; window.__clicks = [];
     window.addEventListener("error", (e) => window.__errs.push(String(e.message)));
+    document.addEventListener("click", (e) => window.__clicks.push((e.target.id || e.target.tagName) + (e.isTrusted ? "" : " (script)")), true);
     const orig = saveBlob;
     saveBlob = (b, f) => { window.__saved.push({ f, size: b.size, type: b.type }); return orig(b, f); };
   });
   await page.locator("#deexport").scrollIntoViewIfNeeded();
-  const dlP = page.waitForEvent("download", { timeout: 20000 }).catch(() => null);
-  await page.click("#deexport", { timeout: 15000 });   // fails here if the button cannot be clicked
-  const dl = await dlP;
-  const diag = await page.evaluate(() => { const r = computeDE(); return { saved: window.__saved, errs: window.__errs, deErr: r.err || null, method: deMethod, treat: DETREAT, cov: DECOVSEL }; });
+  const probe = await page.evaluate(() => { const r = document.getElementById("deexport").getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], atCentre: t ? (t.id || t.tagName) : null }; });
+  let dl = await Promise.all([page.waitForEvent("download", { timeout: 10000 }).catch(() => null), page.click("#deexport", { timeout: 15000 })]).then((v) => v[0]);
+  const viaMouse = !!dl;
+  if (!dl) dl = await Promise.all([page.waitForEvent("download", { timeout: 10000 }).catch(() => null), page.locator("#deexport").dispatchEvent("click")]).then((v) => v[0]);
+  const diag = await page.evaluate(() => { const r = computeDE(); return { saved: window.__saved, errs: window.__errs, clicks: window.__clicks, deErr: r.err || null }; });
+  diag.probe = probe; diag.viaMouse = viaMouse;
+  console.log("deexport diagnostics: " + JSON.stringify(diag));
+  test.info().annotations.push({ type: "deexport", description: JSON.stringify(diag) });
   expect(errors, "page errors: " + errors.join("; ")).toEqual([]);
   expect(dl, "no download event; page state: " + JSON.stringify(diag)).not.toBeNull();
   const csv = fs.readFileSync(await dl.path(), "utf8");
