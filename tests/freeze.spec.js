@@ -95,6 +95,7 @@ test("FRY results replace the panels and notes of an earlier GSEA or ORA run", a
 });
 
 test("voom with a covariate and TREAT reproduce the limma workflow on the demo", async ({ page }) => {
+  const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(PAGE);
   // sequencing lane as in Law et al. (F1000Research 5:1408, 2016)
   const lane = { GSM1545535: "L004", GSM1545536: "L004", GSM1545538: "L004", GSM1545539: "L006", GSM1545540: "L006", GSM1545541: "L006", GSM1545542: "L006", GSM1545544: "L008", GSM1545545: "L008" };
@@ -116,7 +117,11 @@ test("voom with a covariate and TREAT reproduce the limma workflow on the demo",
   expect(res.treat).toBe(true);
   expect(res.cov).toContain("lane");
   expect(res.n).toBe(3647);   // limma 3.66: voom, ~0 + group + lane, contrasts.fit, treat(lfc = 1)
-  const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#deexport")]);
+  await page.locator("#deexport").scrollIntoViewIfNeeded();
+  const dlP = page.waitForEvent("download", { timeout: 30000 });
+  await page.click("#deexport", { timeout: 15000 });   // fails here if the button cannot be clicked
+  const dl = await dlP;                                 // fails here if the click starts no download
+  expect(errors, "page errors: " + errors.join("; ")).toEqual([]);
   const csv = fs.readFileSync(await dl.path(), "utf8");
   expect(csv).toContain("t_treat,p_treat,FDR_treat");
   await page.click('#demethod button[data-m="welch"]');

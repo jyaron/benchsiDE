@@ -1427,9 +1427,7 @@ function exportPlotData(gd){
   const {sheets}=plotToSheets(data, layout);
   const bytes=xlsxBytes(sheets);
   const base=(plainText(layout.title&&(layout.title.text||layout.title))||gd.id||"figure").replace(/[^\w\-]+/g,"_").replace(/^_+|_+$/g,"").slice(0,60)||"figure";
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
-  a.download=base+"_data.xlsx"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  saveBlob(new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), base+"_data.xlsx");
 }
 const DATA_BTN={name:"Download data (Excel, GraphPad Prism layout)", icon:{width:1000, height:1000,
   path:"M100 100h800v800H100z M160 160v160h300V160z M540 160v160h300V160z M160 400v160h300V400z M540 400v160h300V400z M160 640v160h300V640z M540 640v160h300V640z"},
@@ -1444,7 +1442,7 @@ function figPreview(o){
     const fmts=o.formats||["png"];
     const base=String(o.filename||"figure").replace(/\.(png|svg)$/i,"");
     let fmt=fmts.includes(o.format)? o.format : fmts[0];
-    const save=(url, f, name)=>{ const a=document.createElement("a"); a.href=url; a.download=name.replace(/\.(png|svg)$/i,"")+"."+f; a.click(); };
+    const save=(url, f, name)=>{ const a=document.createElement("a"); a.href=url; a.download=name.replace(/\.(png|svg)$/i,"")+"."+f; a.style.display="none"; document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(), 60000); };
     if(!el("figprevon")||!el("figprevon").checked){ try{ save(await o.render(fmt), fmt, base); resolve(true); }catch(e){ resolve(false); } return; }
     const show=async()=>{ el("fpnote").textContent="rendering…"; try{ FPSTATE.url=await o.render(fmt); el("fpimg").src=FPSTATE.url; el("fpnote").textContent=o.note||""; }catch(e){ el("fpnote").textContent="Could not render: "+e; } };
     FPSTATE={url:null, done:(ok)=>{ el("figprev").style.display="none"; el("fpimg").src=""; document.removeEventListener("keydown", FPSTATE.key); const r=FPSTATE; FPSTATE=null; resolve(ok); return r; }};
@@ -1946,9 +1944,14 @@ function kmeans(P0,k){
   }
   const asg0=new Array(n); ordK.forEach((i,k2)=>{ asg0[i]=best.asg[k2]; }); best.asg=asg0;
   return best; }
-function downloadCSV(text,fname){
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"text/csv"}));
-  a.download=fname; a.click(); URL.revokeObjectURL(a.href); }
+function saveBlob(blob, fname){
+  // The link is attached to the page while it is clicked, and the object URL is released a minute later:
+  // Firefox reads the blob after the click returns, and revoking the URL at once can cancel a large download.
+  const a=document.createElement("a"), url=URL.createObjectURL(blob);
+  a.href=url; a.download=fname; a.style.display="none"; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 60000);
+}
+function downloadCSV(text,fname){ saveBlob(new Blob([text],{type:"text/csv"}), fname); }
 
 /* ================= parsing ================= */
 let pending=null; // {header, sampleCols, idCol, nameCol, btCol, rows, sampleNames, factors, groups, factorNames}
@@ -6560,7 +6563,7 @@ function exportMetaGMT(){
   const up=META.sig.filter(r=>r.mu>0).map(r=>GENES[r.g].split(" (")[0]), dn=META.sig.filter(r=>r.mu<0).map(r=>GENES[r.g].split(" (")[0]);
   const desc=`benchsiDE shared signature: ${metaModelText(META,"short")} meta FDR<=${META.fdr}, |log2FC|>=${META.lfcMin}, same direction in all datasets${META.usePI?", 95% prediction interval excluding 0":""}${META.i2Max<100?`, I2<=${META.i2Max}%`:""}${(()=>{ const nId=up.concat(dn).filter(x=>/^\d+$/.test(x)).length; return nId? `; ${nId} members have no symbol in the built-in annotation and are listed as NCBI GeneIDs` : ""; })()}`;
   const txt=[`META_${nm}_UP\t${desc}\t${up.join("\t")}`, `META_${nm}_DOWN\t${desc}\t${dn.join("\t")}`].join("\n")+"\n";
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([txt],{type:"text/plain"})); a.download="shared_signature.gmt"; a.click();
+  saveBlob(new Blob([txt],{type:"text/plain"}), "shared_signature.gmt");
 }
 el("metarun").addEventListener("click", runMeta);
 el("metapi").addEventListener("change",()=>{ el("metapi")._touched=true; });
@@ -9724,7 +9727,7 @@ function openBenchmark(){
   el("bdata").onclick=()=>{ const enc=new TextEncoder(), files=[];
     BENCH_SIZES.forEach(n=>{ const d=benchDataset(n, 0xBE7C0000+n); files.push({name:`benchmark_${n}samples_counts.tsv`, data:enc.encode(d.matrix)}, {name:`benchmark_${n}samples_design.tsv`, data:enc.encode(d.design)}); });
     files.push({name:"README.txt", data:enc.encode(`benchsiDE ${APP_VERSION} benchmark datasets: deterministic negative-binomial counts, ${BENCH_GENES} genes, groups A and B of equal size, every 10th gene changed 2-fold in group B (every 20th up, the others down). Generated with mulberry32 seed 0xBE7C0000 + number of samples; regenerated identically by the application.\n`)});
-    const z=zipStore(files), a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([z],{type:"application/zip"})); a.download="benchside_benchmark_datasets.zip"; a.click(); };
+    const z=zipStore(files); saveBlob(new Blob([z],{type:"application/zip"}), "benchside_benchmark_datasets.zip"); };
 }
 /* ================= hub network view =================
    Nodes: the top hubs by connectivity, optionally with each hub's strongest correlation partners.
@@ -10247,15 +10250,12 @@ Analysis ran entirely client-side; this report is self-contained and shareable.$
   }
   for(const [id,title] of secOrder) if(imgs[id]) h+=`<h2>${esc(title)}</h2><img src="${imgs[id]}">`;
   h+=`</body></html>`;
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([h],{type:"text/html"}));
-  a.download=`rnaseq_report_${now.toISOString().slice(0,10)}.html`; a.click(); URL.revokeObjectURL(a.href);
+  saveBlob(new Blob([h],{type:"text/html"}), `rnaseq_report_${now.toISOString().slice(0,10)}.html`);
 });
 
 /* ================= manuscript summary figure ================= */
 function downloadText(text,fname){
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"text/plain"}));
-  a.download=fname; a.click(); URL.revokeObjectURL(a.href); }
+  saveBlob(new Blob([text],{type:"text/plain"}), fname); }
 el("sumfigbtn").addEventListener("click",makeSummaryFigure);
 async function makeSummaryFigure(){
   // render the four canonical panels with current settings
@@ -10318,9 +10318,7 @@ function sessionState(){
     pat:{N:el("patN").value, K:el("patK").value}, heatN:el("heatN").value, ix:{A1:el("ixA1").value, B1:el("ixB1").value, A2:el("ixA2").value, B2:el("ixB2").value, meth:el("ixmeth").value, fit:el("ixfit").value, fdr:el("ixfdr").value, lfc:el("ixlfc").value, cov:[...el("ixcov").querySelectorAll("input:checked")].map(x=>x.dataset.c)}, meta:{method:el("metamethod").value, hk:el("metahk").value, mink:el("metamink").value, fdr:el("metafdr").value, lfc:el("metalfc").value, pi:el("metapi").checked}};
 }
 el("savesess").addEventListener("click",()=>{
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(sessionState())],{type:"application/json"}));
-  a.download="rnaseq_session.json"; a.click(); URL.revokeObjectURL(a.href);
+  saveBlob(new Blob([JSON.stringify(sessionState())],{type:"application/json"}), "rnaseq_session.json");
 });
 el("selftestbtn").addEventListener("click",()=>{
   const box=el("selftestout"); box.style.display="block";

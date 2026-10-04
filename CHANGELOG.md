@@ -9,6 +9,9 @@ Differential expression
 - FIXED: when a covariate is aliased with the groups (for example a batch that coincides with the groups), it was dropped from the model, as limma does, but the summary and methods text still said the comparison was adjusted for it. Both now state that the covariate could not be estimated and that the comparison is not adjusted for it.
 - CHANGED: the captions of the Venn diagram, the all-contrasts table and the contrast comparison state the test, the call rule and the covariates.
 
+Downloads
+- CHANGED: every download (CSV, Excel, images, session, report, gene-set and benchmark files) goes through one routine that attaches the link to the page while it is clicked and releases the file a minute later instead of at once. In Firefox the differential-expression CSV export did not start in the continuous-integration test; Firefox reads the file after the click, and releasing it at once can cancel a large download.
+
 Validation
 - External validation: 11 checks added (voom with a blocking factor, TREAT with the moderated t, and the analysis of the limma/Glimma/edgeR workflow article: voom adjusted for sequencing lane, ordinary and TREAT, including its Venn counts), 70 in total.
 - New engine check covariates_treat (voom with covariates and TREAT against limma on GSE63310 and GSE186063, and the corresponding text, export and session behaviour), and a browser test reproducing the workflow article's TREAT result.
