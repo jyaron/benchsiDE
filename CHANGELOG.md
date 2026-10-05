@@ -8,9 +8,26 @@ Differential expression
 - CHANGED: Interaction card with voom and a covariate: the contrast standard error now follows limma's contrasts.fit, as in the DE tab, so that results equal the standard limma workflow. On GSE143688 (four groups, adjusted for day) the interaction gives 765 significant genes instead of 760.
 - FIXED: when a covariate is aliased with the groups (for example a batch that coincides with the groups), it was dropped from the model, as limma does, but the summary and methods text still said the comparison was adjusted for it. Both now state that the covariate could not be estimated and that the comparison is not adjusted for it.
 - CHANGED: the captions of the Venn diagram, the all-contrasts table and the contrast comparison state the test, the call rule and the covariates.
+- FIXED: with normalization "library-size CPM only" (no TMM) on raw counts, library sizes were the column totals of all genes instead of the genes kept after filtering, so log-CPM values and statistics differed slightly from edgeR (cpm on the filtered DGEList, keep.lib.sizes = FALSE). They now use the kept genes, as with TMM.
+- FIXED: covariates that could not be estimated (aliased with the groups or with other covariates) were still listed as adjusted for in the CSV export header, the Welch CSV header, the Interaction card and the contrast comparison; every output now lists only the covariates in the fitted model and names those left out. The summary line gives the number of covariate terms in the model.
+- FIXED: the methods text did not say that samples excluded by the user were left out of the model fits while gene filtering and normalization used all loaded samples; it now says so and names the excluded samples.
+- FIXED: for log-scale input with no negative values (read as log2(x + 1)), the input note said linear = 2^x; it now says 2^x − 1, which is what is computed.
+
+Comparison datasets and meta-analysis
+- FIXED: a comparison-dataset covariate that could not be estimated was dropped from the model but still described as adjusted for in the methods text and in the meta-analysis sample table (subjects counted from it). Both now use the covariates of the fitted model and name those left out.
+
+Gene Explorer
+- FIXED: pairwise Welch tests between two groups that both have identical values within the group were reported as p = 1 and counted in the Holm correction. A t-test is not defined in that case (R's t.test stops with an error); such pairs are now shown as "not testable" and left out of the correction. The same applies to the comparison-dataset gene view.
+
+Gene-set tests
+- FIXED: FRY refused to run ("design is singular") when a selected covariate was aliased with the groups, although the DE tab fits the same model by dropping that covariate. FRY now drops it in the same way and says so.
+- CHANGED: FRY keeps the samples in the order of the loaded file. FRY's standardization uses the largest squared residual effect, which depends on the order of the samples (in limma as well); with the file order, two-group fits equal limma::fry run on the same file, and in fits with several groups the remaining differences are of the size limma itself shows when the samples are reordered. The FRY result line and methods text state the model, the covariates used and that FRY uses unweighted log2 values (voom weights are not used).
 
 Downloads
 - CHANGED: every download (CSV, Excel, images, session, report, gene-set and benchmark files) goes through one routine that attaches the link to the page while it is clicked and releases the file a minute later instead of at once. Releasing the file at once can cancel a large download in some browsers.
+
+Plots
+- FIXED: in a browser without WebGL (WebGL switched off, some virtual machines and remote desktops), the large scatter plots (volcano, MA, co-expression and others) were replaced by the plotting library's "WebGL is not supported" notice, which could cover nearby controls; on the Differential Expression tab it covered the Export full table button. Without WebGL these plots are now drawn as ordinary (SVG) scatter plots.
 
 Validation
 - External validation: 11 checks added (voom with a blocking factor, TREAT with the moderated t, and the analysis of the limma/Glimma/edgeR workflow article: voom adjusted for sequencing lane, ordinary and TREAT, including its Venn counts), 70 in total.

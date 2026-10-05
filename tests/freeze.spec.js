@@ -131,11 +131,13 @@ test("voom with a covariate and TREAT reproduce the limma workflow on the demo",
   const viaMouse = !!dl;
   if (!dl) dl = await Promise.all([page.waitForEvent("download", { timeout: 10000 }).catch(() => null), page.locator("#deexport").dispatchEvent("click")]).then((v) => v[0]);
   const diag = await page.evaluate(() => { const r = computeDE(); return { saved: window.__saved, errs: window.__errs, clicks: window.__clicks, deErr: r.err || null }; });
-  diag.probe = probe; diag.viaMouse = viaMouse;
+  diag.probe = probe; diag.viaMouse = viaMouse; diag.webgl = await page.evaluate(() => WEBGL_OK);
   console.log("deexport diagnostics: " + JSON.stringify(diag));
   test.info().annotations.push({ type: "deexport", description: JSON.stringify(diag) });
   expect(errors, "page errors: " + errors.join("; ")).toEqual([]);
   expect(dl, "no download event; page state: " + JSON.stringify(diag)).not.toBeNull();
+  // the button must work with a real mouse click (without WebGL, Plotly's notice used to cover it)
+  expect(viaMouse, "the mouse click did not reach the export button: " + JSON.stringify(diag)).toBe(true);
   const csv = fs.readFileSync(await dl.path(), "utf8");
   expect(csv).toContain("t_treat,p_treat,FDR_treat");
   await page.click('#demethod button[data-m="welch"]');

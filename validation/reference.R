@@ -78,11 +78,12 @@ sets <- list(
   SET_TOP_LFC = order(-mod$tt$logFC)[1:40],
   SET_BLOCK = 1001:1080
 )
-fr <- fry(lg[, sel], index = sets, design = model.matrix(~g2), contrast = 2, sort = "none")
-frc <- fry(lg[, sel], index = sets, design = model.matrix(~lcov[sel] + g2), contrast = 3, sort = "none")
-# FRY's robust standardization depends on the basis of the residual space, hence on sample order:
-# use the application's order (group A, group B, then the other groups in order of appearance)
-ordF <- c(selA, selB, setdiff(seq_along(grp), c(selA, selB)))
+# FRY's robust standardization depends on the basis of the residual space, hence on sample order; the
+# application keeps the order of the loaded file, so the samples are used in that order here
+selS <- sort(sel); g2S <- factor(as.character(grp[selS]), levels = c("Basal", "LP"))
+fr <- fry(lg[, selS], index = sets, design = model.matrix(~g2S), contrast = 2, sort = "none")
+frc <- fry(lg[, selS], index = sets, design = model.matrix(~lcov[selS] + g2S), contrast = 3, sort = "none")
+ordF <- seq_along(grp)   # all samples, in the order of the loaded file
 frF <- fry(lg[, ordF], index = sets, design = XF[ordF, ], contrast = which(colnames(XF) == "gFLP"), sort = "none")
 
 # over-representation of LP-up hits in SET_TOP_LFC
