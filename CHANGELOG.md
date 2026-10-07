@@ -1,6 +1,21 @@
 # Changelog
 
+## 1.0.0-rc.3 (2026-10-07)
+
+Cross-dataset comparison
+- NEW: signature transfer carries genes without a one-to-one human–mouse ortholog through their homology family (option, on by default). Each family counts once and is scored on that species' members present in the dataset. Previously these genes were dropped, which removed families such as SERPINB3/4, S100A7 and LCE3 from mouse-to-human transfer. A table lists how each signature gene was matched in each dataset (one to one, through a family, or not found), with a CSV export.
+- NEW: replication across datasets. Each comparison dataset reports Hedges' g of the signature score; g is pooled over the independent comparison datasets with the model chosen in the meta-analysis card (default REML with the Hartung-Knapp test), shown in a forest plot with the discovery dataset for reference (not pooled), and exported as CSV or as an Excel/Prism sheet.
+- NEW: a signed signature of up- and down-regulated genes.
+- CHANGED: replication is reported only when the score differs between the groups (Welch t-test) and differs more than for random signatures (1,000, previously 200), in the expected direction. Random signatures are now drawn from the session's genes and transferred and scored in the same way as the signature, previously drawn from the comparison dataset's genes. Either test alone gave too many replication calls in one of two null settings; both together stayed within the expected rate. Results that differ between the groups but not more than random genes are labelled as such.
+- The setting is saved in sessions. Validation: `validation/rc3/SIGNATURE_TRANSFER.md`; new engine check `signature_transfer`.
+- FIXED: in the signature-replication forest plot the legend overlapped the x-axis title when few datasets were shown; the legend now sits above the plot.
+
 ## 1.0.0-rc.2 (2026-10-04)
+
+Figures
+- FIXED: with slanted axis labels, the label of the last group could be missing (for example in a five-group Gene Explorer bar plot whose last groups had long names). Slanted labels now lean towards the side that has room: when the long names are at the end of the axis they read upwards and end at their tick, so the plot keeps its width and every label is shown; when they are at the start, they lean the other way. This applies to the automatic choice and to the header's "45°" setting; angles set by individual plots are unchanged.
+- CHANGED: when a long label without spaces or underscores has to be wrapped, it is broken between words written together or between letters and digits ("Secukinumab / Treatment / Week12") rather than at an arbitrary character.
+- FIXED: Venn diagram set labels overlapped and became unreadable when contrast names were long (for example "Psoriasis_Secukinumab_TreatmentWeek12 vs Healthy"). Long names are now wrapped after "_", "-" or "." with the reference group ("vs …") on its own line; labels are aligned away from each other (left set right-aligned, right set left-aligned; in three-set diagrams the lower labels sit below their circles), and the plot area grows to fit them. Gene counts are shown with thousands separators. Short names are unchanged.
 
 Differential expression
 - NEW: covariates can be used with voom. The design is ~0 + group + covariates; voom estimates the precision weights from this design, and the B - A contrast is taken as limma's contrasts.fit does, so results equal the standard limma workflow (voom, lmFit, contrasts.fit, eBayes). Previously covariates applied to the moderated t only, and voom results with a covariate selected were unadjusted (with a warning).

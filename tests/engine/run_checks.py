@@ -223,6 +223,104 @@ def covariates_treat():
     u = U[0]; info["ui"] = u
     ok = ok and u["treat"] and u["csvTreatCols"] and u["csvRule"] and u["yTitle"] and u["methodsTreat"] and u["methodsVoomCov"] and u["sessionTreat"] and u["ebStandard"] and u["dsStandard"] and u["belowThreshold"] == 0
     return ok, info
+@check
+def venn_labels():
+    # long contrast names are wrapped and anchored away from each other, so that the set labels cannot overlap
+    o = run(APP, r"""
+  const labs=["Psoriasis_T vs Healthy","Psoriasis_Secukinumab_TreatmentWeek12 vs Healthy","AVeryLongNameWithoutAnyBreakCharacters vs B"];
+  const out={};
+  for(const n of [2,3]){
+    vennSets=function(){ return {sets2:labs.slice(0,n).map((_,k)=>new Set([1,2,3,k+10])), fdr:0.05, thr:1}; };
+    VENNSTATE={picks:labs.slice(0,n).map(l=>({label:l})), dir2:"any"}; drawVenn();
+    const c=plotlyCalls.filter(x=>x.id==="p_venn").pop(); const a=c.layout.annotations;
+    out["n"+n]={anchors:a.map(x=>x.xanchor), maxLine:Math.max(...a.map(x=>Math.max(...x.text.replace(/<b>|<\/b>/g,"").split("<br>").map(l=>l.length)))),
+      yTop:c.layout.yaxis.range[1]};
+  }
+  out.short=vennLabel("LP vs Basal");
+  print("RES " + JSON.stringify(out));""", timeout=300)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = (r["n2"]["anchors"] == ["right", "left"] and r["n3"]["anchors"] == ["center", "right", "left"]
+          and r["n2"]["maxLine"] <= 22 and r["n3"]["maxLine"] <= 22 and r["short"] == "LP vs Basal")
+    return ok, r
+
+
+@check
+def angled_labels():
+    # slanted group labels lean towards the side with room, so a long last group name is not hidden at the edge
+    def one(groups, cfg, width):
+        samp = [f"S{i:02d}" for i in range(10*len(groups))]
+        m = "gene\t" + "\t".join(samp) + "\n" + "\n".join(f"G{g}\t" + "\t".join(str(50 + (g*7 + i*13) % 400) for i in range(len(samp))) for g in range(200))
+        d = "sample\tgroup\n" + "\n".join(f"{x}\t{groups[i//10]}" for i, x in enumerate(samp))
+        o = run(APP, r"""
+  el("species").value="human"; el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(m) + ", " + J(d) + r"""); GROUPTYPE="categorical"; analyzeNow(); __drain();
+  Object.assign(LABELCFG, """ + J(cfg) + r"""); el("p_gene").clientWidth=""" + str(width) + r"""; curGene=0; switchTab("gene"); __drain(); drawGene(); __drain();
+  const c=plotlyCalls.filter(x=>x.id==="p_gene").pop(); print("RES " + JSON.stringify({ang:c.layout.xaxis.tickangle, r:c.layout.margin.r, l:c.layout.margin.l}));""", timeout=300)
+        R = lines_with(o, "RES "); return R[0] if R else {"error": o[-300:]}
+    late = ["Healthy", "Psoriasis_PreTreatment", "Psoriasis_SecukinumabTreatmentWeek2", "Psoriasis_SecukinumabTreatmentWeek4", "Psoriasis_SecukinumabTreatmentWeekTwelve"]
+    early = ["A_Psoriasis_SecukinumabTreatmentWeekTwelve", "B_Healthy", "C_Pre", "D_Wk2", "E_Wk4"]   # groups are shown in sorted order
+    a = one(late, {"angle": "45", "size": "auto", "long": "wrap"}, 680)
+    b = one(early, {"angle": "45", "size": "auto", "long": "wrap"}, 680)
+    ok = a.get("ang") == -45 and a.get("r", 999) <= 20 and b.get("ang") == 45
+    return ok, {"long_last": a, "long_first": b}
+
+
+MOUSE_SIG_SETUP = r"""
+  el("species").value="mouse"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE143688")) + ", " + J(des("GSE143688")) + r"""); applyFactor("Treatment"); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="Control"; el("selB").value="Aldara"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=["Line","Day"]; deKey="";
+  deCache=computeDE(); el("cmpspecies").value="human";
+  CMPB_TXT=""" + J(mat("GSE121212")) + r"""; CMPB_DES=""" + J(des("GSE121212")) + r"""; CMPB_NAME="GSE121212"; onAddDataset(); __drain();
+  CMPB_TXT=""" + J(mat("GSE83645")) + r"""; CMPB_DES=""" + J(des("GSE83645")) + r"""; CMPB_NAME="GSE83645"; onAddDataset(); __drain();
+  { const d=DSETS[0]; if(d.gfactor!=="Group") setDsFactor(d,"Group"); d.selA="PSO_non_lesional"; d.selB="PSO_lesional"; d.resKey=""; }
+  { const d=DSETS[1]; d.selA="uninvolved"; d.selB="psoriasis"; d.resKey=""; }
+  el("metamethod").value="REML"; el("metahk").value="hk"; refreshCmpUI(); buildSigSelector();
+"""
+
+@check
+def signature_transfer():
+    # mouse imiquimod signature scored in two human psoriasis cohorts (two datasets: the Hartung-Knapp pooled test on 1 df is
+    # expected not to reach p <= 0.05, which the check also confirms): scores recomputed independently, Hedges' g against the
+    # formula used by metafor escalc("SMD"), pooling through the metafor-validated meta-analysis, family rescue of genes
+    # without a one-to-one ortholog, verdicts, and determinism of the seeded random signatures
+    import numpy as np
+    from math import lgamma, exp, log
+    o = run(APP, MOUSE_SIG_SETUP + r"""
+  el("sigsel").value="de_up"; el("sigfam").checked=true; runSigTransfer(); const R=SIGRES, d=DSETS[1], r1=R.rows[1];
+  const rowsU=[...new Set(r1.M.units.flatMap(u=>u.rows))];
+  const sc=sigScoreUnits(d, r1.M.units, dsZ(d));
+  const out={units:r1.M.units.map(u=>({rows:u.rows, sign:u.sign})), L:Object.fromEntries(rowsU.map(r=>[r, Array.from(d.L.slice(r*d.nS,(r+1)*d.nS))])),
+    sc:Array.from(sc), A:d.gi[d.selA], B:d.gi[d.selB], g:r1.g, v:r1.v,
+    eff:R.rows.map(r=>[r.g, r.v]), pooled:{mu:R.pooled.mu, check:metaGene(R.rows.map(r=>r.g), R.rows.map(r=>r.v), "REML", "hk").mu},
+    verdicts:R.rows.map(r=>r.verdict), pEmp:R.rows.map(r=>r.pEmp), fams:R.rows.map(r=>r.M.nFamUnits), rep:R.pooled.replicates};
+  { const c=plotlyCalls.filter(x=>x.id==="p_sigforest").pop(); out.leg=c.layout.legend; out.mt=c.layout.margin.t; }
+  runSigTransfer(); out.det=SIGRES.rows.map(r=>r.pEmp);
+  const fidx=sigFamIndex("m"); const g=[]; for(let i=0;i<nG;i++) if(deCache.q[i]<=0.05&&deCache.lfc[i]>=1&&DSETS[0].matchAtoB[i]<0&&fidx[GENES[i].split(" (")[0].toLowerCase()]!==undefined) g.push(i);
+  sigSpec=()=>({genes:g, sign:g.map(()=>1), expect:1}); SIGLABELS.x="x"; el("sigsel").value="x";
+  runSigTransfer(); out.famOn=SIGRES.rows.map(r=>r.verdict); el("sigfam").checked=false; runSigTransfer(); out.famOff=SIGRES.rows.length;
+  print("RES " + JSON.stringify(out));""", timeout=1800)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]; nS_ = len(r["sc"]); sc = np.zeros(nS_)
+    for u in r["units"]:
+        acc = np.zeros(nS_)
+        for row in u["rows"]:
+            x = np.array(r["L"][str(row)]); acc += (x - x.mean()) / x.std()
+        sc += u["sign"] * acc / len(u["rows"])
+    sc /= len(r["units"]); dsc = float(np.abs(sc - np.array(r["sc"])).max())
+    a = sc[r["A"]]; b = sc[r["B"]]; n1, n2 = len(a), len(b); m = n1 + n2 - 2
+    sp = np.sqrt(((n1-1)*a.var(ddof=1) + (n2-1)*b.var(ddof=1)) / m); Jc = exp(lgamma(m/2) - 0.5*log(m/2) - lgamma((m-1)/2))
+    g = Jc*(b.mean()-a.mean())/sp; v = 1/n1 + 1/n2 + g*g/(2*(n1+n2))
+    dg, dv = abs(g - r["g"])/abs(g), abs(v - r["v"])/v
+    ok = (dsc < 1e-12 and dg < 1e-12 and dv < 1e-12 and abs(r["pooled"]["mu"] - r["pooled"]["check"]) < 1e-12
+          and all(x == "replicates" for x in r["verdicts"]) and not r["rep"] and r["det"] == r["pEmp"] and min(r["fams"]) > 0
+          and all(x in ("replicates", "partial replication") for x in r["famOn"][:1]) and r["famOff"] == 0
+          and r["leg"].get("y", 0) >= 1 and r["leg"].get("yanchor") == "bottom" and r["mt"] >= 56)
+    return ok, {"score_max_diff": dsc, "g_rel": dg, "v_rel": dv, "verdicts": r["verdicts"], "pooled_replicates": r["rep"], "families": r["fams"],
+                "deterministic": r["det"] == r["pEmp"], "family_only_with": r["famOn"], "family_only_without_scored": r["famOff"], "legend_above_plot": r["leg"].get("y", 0) >= 1}
+
 
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None

@@ -120,6 +120,16 @@ Below the meta-analysis summary, **pathway enrichment of** tests a list of meta-
 
 After the meta-analysis has run, type gene symbols into **multi-gene forest** (or leave the box blank for the genes of the shared signature with the largest pooled effects) and click **Draw**. Each gene is a row: coloured points are each dataset's own log₂FC, and the black diamond is the pooled estimate with its 95% confidence interval. The axis always includes 0. Genes not in the meta-analysis (not found, or measured in too few datasets) are listed under the plot.
 
+## Signature transfer and replication
+
+Choose a signature from the session (up-regulated, down-regulated, or both with signs; a hub neighbourhood; a Discovery module) and click **Score**. Each comparison dataset's samples are scored as the mean z-score of the signature's genes within that dataset, and its two selected groups are compared.
+
+- **Matching.** Same species: by symbol. Human–mouse: one-to-one orthologs, and, with **use homology families** ticked (default), genes without one through their homology family, scored once on the members present. The **Gene mapping** table shows how each gene was matched.
+- **Per dataset.** AUC (descriptive), Hedges' g, a Welch t-test of the score between the groups, and an empirical p against 1,000 random signatures (same size and numbers of up- and down-regulated genes, drawn from the session's genes and transferred the same way). *Replicates* requires both p ≤ 0.05 in the expected direction; *partial replication* the same with AUC between 0.6 and 0.9 (or 0.1 and 0.4).
+- **Pooled.** Hedges' g is pooled over the independent comparison datasets with the meta-analysis model and test chosen in the meta-analysis card; the discovery dataset is shown for reference and not pooled. Pooled replication also requires both the parametric and the random-signature p ≤ 0.05.
+- **Why two tests.** On null data, the Welch test alone gave false replication calls when the contrast changes many genes, and the random-signature test alone gave false calls for co-regulated signatures when the groups do not differ. Together they stayed within the expected rate (validation/rc3).
+- **Two datasets.** With the Hartung–Knapp test the pooled result rests on 1 degree of freedom and rarely reaches significance; read the per-dataset results.
+
 ## Homology-family dot plot
 
 Type member symbols of either species into **family dot plot** (for example `SERPINB3, S100A7, LCE3`; a prefix such as `LCE3` matches every LCE3 member), or leave the box blank for the families significant in the same direction in the most datasets, then click **Draw**. Every loaded human or mouse dataset with a two-group contrast is shown, one coloured point per dataset; filled points are significant at the DE FDR, open points are not. Each family is scored within each dataset on that species' own members (mean z of the members found), so raw values are never merged; the FDR in this plot is corrected across all families scored in that dataset. The plot does not depend on the X/Y pair chosen for **Score families**. This is the view for gene families with no one-to-one ortholog, such as the S100A7, SERPINB3/4 and LCE3 families.

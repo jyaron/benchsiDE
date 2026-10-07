@@ -1,0 +1,57 @@
+{
+ "random_30_30": {
+  "R": 200,
+  "per_dataset": [
+   9,
+   7,
+   9,
+   7
+  ],
+  "pooled": 6,
+  "selfcontained": [
+   161,
+   141,
+   99,
+   59
+  ]
+ },
+ "random_150_75": {
+  "R": 200,
+  "per_dataset": [
+   10,
+   8,
+   12,
+   13
+  ],
+  "pooled": 11,
+  "selfcontained": [
+   154,
+   142,
+   111,
+   63
+  ]
+ },
+ "healthy_splits": {
+  "R": 100,
+  "per_dataset": [
+   5,
+   2,
+   2
+  ],
+  "pooled": 2,
+  "competitive": [
+   19,
+   18,
+   26
+  ],
+  "selfcontained": [
+   6,
+   4,
+   4
+  ]
+ },
+ "bound": {
+  "200": 18,
+  "100": 11
+ }
+}

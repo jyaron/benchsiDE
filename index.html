@@ -912,13 +912,19 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
       <div id="hubxfnote" class="footer-note"></div><div id="p_hubxforest" style="height:480px;display:none"></div>
     </div>
     <div class="card" id="cmpsig" style="display:none">
-      <h3>Signature transfer: score B's samples with a module from A</h3>
+      <h3>Signature transfer and replication: score each comparison dataset with a signature from the session</h3>
       <div class="controls">
-        Module: <select id="sigsel"></select>
+        Signature: <select id="sigsel"></select>
+        <label title="Human–mouse transfer: genes without a one-to-one ortholog are carried through their homology family (scored on that species' members) instead of being dropped." style="display:inline-flex;align-items:center;gap:3px;font-size:12.5px"><input type="checkbox" id="sigfam" checked> use homology families for genes without a one-to-one ortholog</label>
         <button class="act" id="sigrun">Score</button>
+        <button class="act ghost" id="sigexp" style="display:none">Export results (CSV)</button>
+        <button class="act ghost" id="sigmapexp" style="display:none">Export gene mapping (CSV)</button>
       </div>
       <div id="siginfo" class="footer-note" style="margin:6px 0"></div>
+      <div id="p_sigforest" style="height:300px;display:none"></div>
+      <div id="sigforestnote" class="footer-note" style="margin:4px 0 10px"></div>
       <div id="p_sig" style="height:340px"></div>
+      <details id="sigmapwrap" style="display:none;margin-top:8px"><summary style="cursor:pointer;font-size:13px">Gene mapping in each dataset</summary><div id="sigmap" style="max-height:360px;overflow:auto"></div></details>
     </div>
   </div>
 
@@ -1020,7 +1026,7 @@ function covIsContinuous(name, levels, allValues){
   if(COVTYPE[name]) return COVTYPE[name]==="numeric";
   return !covLooksLikeId(name, allValues||(COVARS[name]? Object.values(COVARS[name]) : levels));
 }
-const APP_VERSION="1.0.0-rc.2 (2026-10-04)";
+const APP_VERSION="1.0.0-rc.3 (2026-10-07)";
 document.getElementById("appver").textContent="v"+APP_VERSION;
 let FONTSCALE=1;
 let LABELCFG={angle:"auto", size:"auto", long:"wrap"};   // axis tick-label controls (header)
@@ -1072,6 +1078,11 @@ function wrapLabel(s, size, px){
     if(cur&&textW((cur+t).trimEnd(),size)>px){ lines.push(cur.trimEnd()); cur=""; }
     while(textW(t.trimEnd(),size)>px&&t.length>1){
       let k=t.length; while(k>1&&textW(t.slice(0,k),size)>px) k--;
+      // prefer a break inside the token at a word boundary: "SecukinumabTreatment|Week12", "Week|12"
+      const lo=Math.max(2, Math.ceil(k*0.4)); let kb=-1;
+      for(let b=k; b>=lo&&kb<0; b--){ if(/[a-z]/.test(t[b-1])&&/[A-Z]/.test(t[b])) kb=b; }          // camelCase
+      for(let b=k; b>=lo&&kb<0; b--){ if(/[A-Za-z]/.test(t[b-1])!==/[A-Za-z]/.test(t[b]||"")&&/[0-9]/.test(t[b-1]+t[b])) kb=b; }   // letters | digits
+      if(kb>0) k=kb;
       lines.push(t.slice(0,k)); t=t.slice(k);
     }
     cur+=t;
@@ -1193,6 +1204,18 @@ function layoutGuard(div, traces, L){
         const w=LC.long==="wrap"? plain.map(v=>wrapLabel(v,xs,slot)) : null;
         if(w&&widest(w)<=slot&&Math.max(...w.map(v=>v.split("<br>").length))<=3){ labs=w; ang=0; }
         else ang = uc.length*2*xs<=plotW? 45 : 90;
+      }
+      // Slanted labels run from their tick to the right (positive angle) or to the left (negative angle). When the
+      // angle is the application's choice or the header's "45°" (not an angle set by a particular plot), slant them
+      // towards the side that needs less extra margin: groups with long names at the end of the axis read upwards
+      // and end at their tick, and the plot keeps its width.
+      if(Math.abs(ang)===45 && (LC.angle!=="auto" || xa.tickangle===undefined || xa.tickangle==="auto") && uc.length>1){
+        const divW=(div&&div.clientWidth)||620, n=uc.length, c=Math.cos(Math.PI/4), pw=Math.max(100, divW-M.l-M.r);
+        const wl=labs.map(v=>Math.max(...String(v).split("<br>").map(p=>textW(p,xs))));
+        let needR=0, needL=0;
+        for(let i=0;i<n;i++){ const xi=M.l+(i+0.5)*pw/n, ext=wl[i]*c*1.03+xs*0.5+3;
+          needR=Math.max(needR, xi+ext-divW); needL=Math.max(needL, ext-xi); }
+        ang = needL<needR? -45 : 45;
       }
       const a=Math.abs(ang)*Math.PI/180;
       // Angled labels run sideways from their tick (to the right for positive angles, to the left for negative
@@ -4876,7 +4899,7 @@ function genMethods(){
   const nInc=included.filter(Boolean).length;
   const kGroups=GROUPS.filter(g=>S.filter((s,i)=>included[i]&&s.group===g).length>0).length;
   const txt=
-`Expression data (${FILTER.ng0.toLocaleString()} features × ${nS} samples) were analyzed with benchsiDE version ${APP_VERSION} (client-side, in-browser; https://www.benchside.org, source at https://github.com/jyaron/benchsiDE). ${NORMNOTE} ${FILTER.mode==="fbe"?`Genes were filtered with edgeR filterByExpr at default settings (Chen Y, Lun ATL & Smyth GK, F1000Research 5:1438, 2016), retaining ${nG.toLocaleString()} genes.`:`Genes with expression ≥ ${FILTER.thr} in at least ${FILTER.minS} samples were retained (${nG.toLocaleString()} genes).`} Expression values were ${HASCOUNTS?`log₂ counts per million with a library-size-scaled prior count of 2 (edgeR cpm, log = TRUE)`:DATALOG?`the supplied log₂ values`:`log₂(x + 1)-transformed values`}${HASCOUNTS&&deMethod==="voom"?` (voom used its own transform, below)`:``}. The design comprised ${nInc} included samples in ${kGroups} groups (factor: ${FACTOR}, treated as ${NUMERIC?"an ordered numeric variable (time course / dose–response)":"unordered categorical conditions"}).${nInc<nS?` Gene filtering and normalization used all ${nS} loaded samples; the ${nS-nInc} excluded sample${nS-nInc===1?"":"s"} (${S.filter((x,q)=>!included[q]).map(x=>x.id).join(", ")}) ${nS-nInc===1?"was":"were"} left out of every model fit and comparison.`:``} Principal component analysis used the 2,000 most variable genes, gene-centered. Multidimensional scaling used pairwise leading-logFC distances (root-mean of the top 500 per-pair squared log₂ differences) with classical scaling, as in limma plotMDS (Ritchie ME et al., Nucleic Acids Res 43:e47, 2015). ${deMethodsText()}${kGroups>2&&curGene!=null?`In Gene Explorer, differences across all groups for a single gene were assessed by one-way ANOVA and Kruskal–Wallis tests${NUMERIC?", and monotonic trends by Spearman correlation with the numeric group value":""}. `:``}${patState?`Group patterns were identified by k-means clustering (k-means++ initialization) of per-group mean z-score profiles of the most variable genes. `:``}${BATCHDISP?`For display, PCA/heatmap/gene plots show values adjusted for ${BATCHDISP} with the removeBatchEffect procedure (group effects retained; limma); all statistics were computed on unadjusted values. `:``}${MODF?`Genome-wide differences across all groups were tested per gene with a moderated one-way F-statistic (between-group mean square over the empirical-Bayes posterior variance; limma eBayes; Smyth GK, Stat Appl Genet Mol Biol 3:Article3, 2004), with BH correction. `:``}${DSETS.length?`${DSETS.length===1?`A second dataset was`:`${DSETS.length} additional datasets were`} analyzed with independent pipelines (filterByExpr, TMM, log₂ CPM as above, and a limma-trend moderated t for the chosen contrast${DEFIT==="all"?", fitted to all groups of that dataset":""}${DSETS.some(d=>(d.covSel||[]).length)?`, adjusted within each dataset for ${DSETS.filter(d=>(d.covSel||[]).length).map(d=>{ const r=d.res&&!d.res.err? d.res : null; const fit=r? (r.cov||"none") : d.covSel.join(" + "); const out=r&&r.covNotEstimable&&r.covNotEstimable.length? ` (${r.covNotEstimable.join(", ")} not estimable, left out)` : ""; return d.label+": "+fit+out; }).join("; ")}`:``}); raw expression values were never merged or renormalized across datasets. Cross-dataset comparisons used genes matched by case-normalized symbol (same-species) or by strict 1:1 mouse-human orthologs from Mouse Genome Informatics (HOM_MouseHumanSequence.rpt; Baldarelli RM et al., Genetics 2024;227(1):iyae031; restricted to genes with exactly one partner: homology classes with multiple members in either species, and genes in more than one class, excluded)${DSETS.some(d=>d.nCust)?`, supplemented by a user-supplied identifier mapping (${DSETS.filter(d=>d.nCust).map(d=>`${d.custName}: ${d.nCust.toLocaleString()} pairs for ${d.label}`).join("; ")}) applied before the built-in matching`:``} and operated on within-dataset statistics only, restricted to genes present in the session dataset${CMPLAST?`: Pearson correlation of log₂ fold changes and moderated t-statistics, one-sided hypergeometric tests of directional hit-set overlap, and rank-rank hypergeometric overlap maps computed as in the Bioconductor RRHO package (Plaisier SB, Taschereau R, Wong JA, Graeber TG, Nucleic Acids Res 38:e169, 2010; descriptive, as these p-values assume independent genes)`:``}${CONSENSUS?`${CMPLAST?"; ":": "}across all datasets, a consensus vote count of within-dataset significance (no pooled p-values)`:``}. ${FAMROWS&&FAMROWS.length?`Many-to-many homology families (MGI classes merged by shared membership; the families the strict 1:1 table excludes) were analyzed as modules: each family scored as the mean z of its member genes within each dataset separately, group effects tested by Welch t within each dataset with BH correction across tested families, and cross-species agreement reported as direction concordance - no one-to-one gene assignment is made for these families. `:``}${SIGRAN?`Module signature transfer scored each sample as the mean z-score of matched module genes, with z computed entirely within the scored dataset; separation of the dataset's contrast groups was summarized by the Mann-Whitney AUC (descriptive) and tested by the Welch t statistic of the scores against 200 seeded size-matched random gene signatures scored identically (empirical p; a competitive random-set null, cf. Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012); replication required the separation in the direction of the signature. `:``}`:``}${ALLPAIRS?`All pairwise group contrasts were computed with the same per-contrast statistics as the primary comparison; no joint model was fitted, and FDR control is within-contrast. `:``}${HUBS?`Network hub genes were ranked by soft connectivity, defined as the sum over all gene pairs of ${HUBS.signed?"signed":"unsigned"} correlation adjacencies (|r| raised to β = ${HUBS.beta}) among the ${HUBS.M.toLocaleString()} most variable genes, following the WGCNA connectivity definition (Zhang B & Horvath S, Stat Appl Genet Mol Biol 4:Article17, 2005; Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008); connectivity rankings at small sample sizes were treated as screening output. ${HUBNET?`The network view showed the ${HUBNET.H} most connected genes${HUBNET.nb?` and their ${HUBNET.nb} most strongly correlated partners`:``}, with edges for gene pairs with |r| ≥ ${HUBNET.rmin}${HUBNET.m?`, each gene keeping its ${HUBNET.m} strongest`:``} (${HUBNET.layout==="circle"?"circular layout ordered by average-linkage clustering on 1 − |r|":"seeded force-directed layout (Fruchterman TMJ & Reingold EM, Softw Pract Exp 21:1129, 1991)"}). `:``}${HUBNB?`The neighbourhood of ${geneTitle(HUBNB.hub)} was defined as its ${HUBNB.N} most strongly correlated genes (largest |r|) among the same ${HUBNB.M.toLocaleString()} genes, using ${HUBNB.mode==="within"?`the partial correlation given group, computed as the Pearson correlation of the residuals after removing each group's mean (Baba K, Shibata R & Sibuya M, Aust N Z J Stat 46:657, 2004), so that correlation produced only by shared group differences was not counted as co-expression (cf. Parsana P et al., Genome Biol 20:94, 2019); p-values used a t test on n − G − 1 = ${HUBNB.df} degrees of freedom`:`Pearson correlation across all ${HUBNB.n} included samples; p-values used a t test on n − 2 = ${HUBNB.df} degrees of freedom`}. It was displayed as an ego network centred on the hub (Everett M & Borgatti SP, Soc Netw 27:31, 2005), as a heatmap of per-sample z-scores with samples grouped by condition (Eisen MB, Spellman PT, Brown PO & Botstein D, Proc Natl Acad Sci USA 95:14863, 1998), and as a per-sample neighbourhood score, the mean of the members' z-scores with negatively correlated members sign-reversed (cf. Lee E, Chuang HY, Kim JW, Ideker T & Lee D, PLoS Comput Biol 4:e1000217, 2008); the score was used descriptively because the members were selected from the same samples. Its gene-set enrichment was tested by the hypergeometric test against the screened genes annotated in the library, with BH correction, and the node and edge tables were exported for Cytoscape (Shannon P et al., Genome Res 13:2498, 2003). `:``}${HUBX?`Its preservation in each independent comparison dataset (contrast samples only) was quantified by the WGCNA module-preservation statistic Zsummary (Langfelder P, Luo R, Oldham MC & Horvath S, PLoS Comput Biol 7:e1001057, 2011), computed as in WGCNA 1.74 (unsigned adjacency |r|^6; Zdensity from the proportion of variance explained, mean sign-aware kME, mean sign-aware correlation and mean adjacency; Zconnectivity from the correlations of intramodular connectivity, kME and pairwise correlations), each Z against 100 random gene sets of the same size in the test dataset${HUBX.mode==="within"?", with correlations computed after removing each group's mean":""}. Because random gene sets, and random sets of differentially expressed genes, also exceeded the published thresholds in calibration on psoriasis datasets, Zsummary was compared empirically, in the same dataset, with 100 random gene sets of the same size, with 100 random sets whose members came from the same log₂FC deciles of the discovery contrast (DE-matched), and with 100 neighbourhoods of random seed genes built by the same procedure; preservation beyond its shared differential expression required an empirical p ≤ 0.05 against the DE-matched sets. Rewiring was tested per dataset by Fisher's z test of the hub–partner correlation between the two contrast groups (Fisher RA, Biometrika 10:507, 1915; cf. Fukushima A, Gene 518:209, 2013), calibrated against 1,000 random gene pairs from the same log₂FC deciles as the hub and the partner (two-sided empirical p), with BH correction across partners; datasets were not pooled, and replication was counted across the independent comparison datasets (the discovery dataset excluded). `:``}${HUBXCONS?`Consensus hubs were identified by robust rank aggregation (Kolde R, Laur S, Adler P & Vilo J, Bioinformatics 28:573, 2012; RRA score, BH-adjusted) of soft-connectivity ranks (|r|^${HUBXCONS.beta}) computed in each of ${HUBXCONS.nLists} datasets over one common universe of ${HUBXCONS.N.toLocaleString()} genes matched in every dataset, chosen by median variance rank. `:``}`:``}${META?`Effect sizes were combined across datasets (${META.idxs.map((i,a)=>dsLabel(i)+": "+META.clabels[a]+(META.nInfo?`, ${META.nInfo[a].nB} vs ${META.nInfo[a].nA} samples${META.nInfo[a].subj?` from ${META.nInfo[a].subj.n} ${META.nInfo[a].subj.col} levels`:""}`:"")).join("; ")}${META.nInfo?`; ${META.nInfo.reduce((x,m)=>x+m.n,0)} samples in total`:""}) by ${metaModelText(META,"adj")} meta-analysis of each dataset's own log₂ fold change and its standard error (${META.method==="REML"? "between-dataset variance by restricted maximum likelihood; Viechtbauer W, J Educ Behav Stat 30:261, 2005" : META.method==="REM"? "DerSimonian R & Laird N, Control Clin Trials 7:177, 1986" : "inverse-variance weights"}${META.hk? `; ${META.hk==="adhoc"?"truncated ":""}Hartung-Knapp-Sidik-Jonkman standard error and t test on k−1 degrees of freedom: Hartung J & Knapp G, Stat Med 20:3875, 2001; Sidik K & Jonkman JN, Stat Med 21:3153, 2002${META.hk==="adhoc"?"; Knapp G & Hartung J, Stat Med 22:2693, 2003":""}` : "; Wald z test"}; computed as metafor::rma, Viechtbauer W, J Stat Softw 36(3), 2010)${META_DFADJ?`; because each standard error is estimated from few residual degrees of freedom, it was replaced by |log₂FC|/|z|, where z is the normal quantile with the same two-sided tail probability as the dataset's moderated t on its own degrees of freedom`:``}, with Cochran's Q and I² as heterogeneity measures (Higgins JPT & Thompson SG, Stat Med 21:1539, 2002${META.method==="REML"?"; I² computed from the REML estimate of τ², as in metafor":""}), ${META.hk? `a Hartung-Knapp t test on k − 1 degrees of freedom` : `a Wald z test`} and Benjamini-Hochberg correction across the ${META.nTested.toLocaleString()} genes matched in at least ${META.minK} datasets; raw expression values were not combined. The shared signature comprised genes with meta FDR ≤ ${META.fdr}, |pooled log₂FC| ≥ ${META.lfcMin} and the same direction of change in every contributing dataset${META.usePI?`, whose 95% prediction interval for a new study (t distribution with k − 2 df; Riley RD, Higgins JPT & Deeks JJ, BMJ 342:d549, 2011) excluded 0`:``}${META.i2Max<100?`, and I² ≤ ${META.i2Max}%`:``} (${META.sig.length.toLocaleString()} genes)${META.loo.length?`; its robustness was assessed by recomputing it with each dataset omitted`:``}. `:``}${DISCO?`Discovery screening scored gene families (symbol-prefix heuristic) and library gene sets as modules (mean z-score of member genes per sample) and tested group effects with ${DISCO.rows.length&&DISCO.rows[0].camera?"the CAMERA competitive gene-set test accounting for inter-gene correlation (Wu MD & Smyth GK, Nucleic Acids Res 40:e133, 2012)":"a competitive null of "+DISCO.B+" size-matched random gene sets (seeded permutations)"}, BH-FDR across ${DISCO.rows.length} modules (overlapping modules: BH under positive dependence). This is a descriptive screen for coordinated regulation. `:``}${enrResults&&enrResults.mode==="fry"?`${ENRMAT?`The enrichment-across-contrasts matrix ran the same FRY test for each pairwise contrast${DEFIT==="all"?", each within the model fitted to all groups,":", each fitted on its two groups only,"} with BH correction within each contrast. `:``}Self-contained gene-set testing used the FRY fast-rotation test at default settings (posterior-sd standardization; Wu D et al., Bioinformatics 26:2176-2182, 2010 [ROAST], as implemented in limma), BH-corrected, on the unweighted log₂-CPM values${HASCOUNTS?"":" (the log₂ expression values used for differential expression)"} with the linear model of the differential-expression contrast (${DEFIT==="all"?"all groups":"the two compared groups"}${enrResults.covUsed&&enrResults.covUsed.length?", adjusted for "+enrResults.covUsed.join(", "):""}${enrResults.covOut&&enrResults.covOut.length?"; "+enrResults.covOut.join(", ")+" not estimable and left out":""}; ${enrResults.nFit||""} samples)${deMethod==="voom"?"; voom precision weights are not used by FRY":""}. `:``}${enrResults&&enrResults.mode==="gsea"?(GSEAMODE==="samples"?`Gene-set enrichment analysis (Subramanian A et al., PNAS 102:15545-15550, 2005) ranked genes by moderated t and assessed each set with ${GSEAB} sample-label permutations; FDR was estimated from the pooled normalized enrichment scores of the permutations. `:`Preranked gene-set enrichment analysis (gene-set permutation) was used for ranking only; its p-values do not account for correlation between genes. `):``}${enrResults&&!enrResults.mode&&GMT?`Gene-set over-representation used one-sided hypergeometric tests against ${GMTBUILTIN?`the built-in ${GMTname} library (${GMTCITE})`:`a user-supplied GMT library`} with all retained genes as universe, BH-corrected.`:``}${heatClusters&&GMT?` Enrichment of k-means heatmap clusters uses the same test but is reported descriptively: the clusters are data-derived (selected from top DE or most-variable genes), so cluster-level FDR values should not be read as confirmatory hypothesis tests.`:``}${TRAITRES?` Association of gene expression with the sample trait ${TRAITRES.o.trait}${TRAITRES.o.transform!=="none"?` (${TRAITRES.D.trLab}-transformed)`:""} was tested with limma linear models (${traitModelText(TRAITRES).replace("log₂ expression","log₂-CPM")}; the trait standardized, effects reported per unit and per SD) and empirical Bayes moderation with an intensity trend (eBayes(trend = TRUE)) over ${TRAITRES.mode==="means"?`${TRAITRES.n} ${TRAITRES.o.block} means of ${TRAITRES.D.cols.length} samples: because the trait is constant within ${TRAITRES.o.block}, each ${TRAITRES.o.block} was summarized by the mean of its samples${TRAITRES.agg.withinG?", after removing the group effect estimated within blocks,":""} and the means were analysed as independent observations`:`${TRAITRES.n} samples${TRAITRES.blockMode==="dupcor"?`, with ${TRAITRES.o.block} as a random block: the intra-block correlation (${TRAITRES.rho.toFixed(3)}) was estimated by duplicateCorrelation and used in generalized least squares (lmFit with block and correlation; Smyth GK, Michaud J & Scott HS, Bioinformatics 21:2067, 2005)`:""}`}; BH-adjusted p-values. Influential observations were flagged by Cook's distance > 1 (Cook RD, Technometrics 19:15, 1977). `:``}${TRAITCAM?`Gene sets (${TRAITCAM.lib}, 5–500 genes) were tested against the trait coefficient by CAMERA with the inter-gene correlation estimated from the data (Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012). `:``}${TRAITMOD?`Module–trait relationships were tested as in WGCNA (Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008): the eigengene of each module (first principal component of its scaled genes) was tested in the same linear model, reported as the partial correlation t/√(t² + df), with BH correction over the module × trait matrix. `:``}${ANNO?` Gene identifiers were mapped to official ${el("species").value==="human"?"HGNC":el("species").value==="mouse"?"MGI":""} symbols using ${ANNO.source} (${ANNO.name}; ${ANNO.n.toLocaleString()} mappings). Reference: ${ANNO.citation}.`:""}${IXRES?" "+ixMethodsText():""}`;
+`Expression data (${FILTER.ng0.toLocaleString()} features × ${nS} samples) were analyzed with benchsiDE version ${APP_VERSION} (client-side, in-browser; https://www.benchside.org, source at https://github.com/jyaron/benchsiDE). ${NORMNOTE} ${FILTER.mode==="fbe"?`Genes were filtered with edgeR filterByExpr at default settings (Chen Y, Lun ATL & Smyth GK, F1000Research 5:1438, 2016), retaining ${nG.toLocaleString()} genes.`:`Genes with expression ≥ ${FILTER.thr} in at least ${FILTER.minS} samples were retained (${nG.toLocaleString()} genes).`} Expression values were ${HASCOUNTS?`log₂ counts per million with a library-size-scaled prior count of 2 (edgeR cpm, log = TRUE)`:DATALOG?`the supplied log₂ values`:`log₂(x + 1)-transformed values`}${HASCOUNTS&&deMethod==="voom"?` (voom used its own transform, below)`:``}. The design comprised ${nInc} included samples in ${kGroups} groups (factor: ${FACTOR}, treated as ${NUMERIC?"an ordered numeric variable (time course / dose–response)":"unordered categorical conditions"}).${nInc<nS?` Gene filtering and normalization used all ${nS} loaded samples; the ${nS-nInc} excluded sample${nS-nInc===1?"":"s"} (${S.filter((x,q)=>!included[q]).map(x=>x.id).join(", ")}) ${nS-nInc===1?"was":"were"} left out of every model fit and comparison.`:``} Principal component analysis used the 2,000 most variable genes, gene-centered. Multidimensional scaling used pairwise leading-logFC distances (root-mean of the top 500 per-pair squared log₂ differences) with classical scaling, as in limma plotMDS (Ritchie ME et al., Nucleic Acids Res 43:e47, 2015). ${deMethodsText()}${kGroups>2&&curGene!=null?`In Gene Explorer, differences across all groups for a single gene were assessed by one-way ANOVA and Kruskal–Wallis tests${NUMERIC?", and monotonic trends by Spearman correlation with the numeric group value":""}. `:``}${patState?`Group patterns were identified by k-means clustering (k-means++ initialization) of per-group mean z-score profiles of the most variable genes. `:``}${BATCHDISP?`For display, PCA/heatmap/gene plots show values adjusted for ${BATCHDISP} with the removeBatchEffect procedure (group effects retained; limma); all statistics were computed on unadjusted values. `:``}${MODF?`Genome-wide differences across all groups were tested per gene with a moderated one-way F-statistic (between-group mean square over the empirical-Bayes posterior variance; limma eBayes; Smyth GK, Stat Appl Genet Mol Biol 3:Article3, 2004), with BH correction. `:``}${DSETS.length?`${DSETS.length===1?`A second dataset was`:`${DSETS.length} additional datasets were`} analyzed with independent pipelines (filterByExpr, TMM, log₂ CPM as above, and a limma-trend moderated t for the chosen contrast${DEFIT==="all"?", fitted to all groups of that dataset":""}${DSETS.some(d=>(d.covSel||[]).length)?`, adjusted within each dataset for ${DSETS.filter(d=>(d.covSel||[]).length).map(d=>{ const r=d.res&&!d.res.err? d.res : null; const fit=r? (r.cov||"none") : d.covSel.join(" + "); const out=r&&r.covNotEstimable&&r.covNotEstimable.length? ` (${r.covNotEstimable.join(", ")} not estimable, left out)` : ""; return d.label+": "+fit+out; }).join("; ")}`:``}); raw expression values were never merged or renormalized across datasets. Cross-dataset comparisons used genes matched by case-normalized symbol (same-species) or by strict 1:1 mouse-human orthologs from Mouse Genome Informatics (HOM_MouseHumanSequence.rpt; Baldarelli RM et al., Genetics 2024;227(1):iyae031; restricted to genes with exactly one partner: homology classes with multiple members in either species, and genes in more than one class, excluded)${DSETS.some(d=>d.nCust)?`, supplemented by a user-supplied identifier mapping (${DSETS.filter(d=>d.nCust).map(d=>`${d.custName}: ${d.nCust.toLocaleString()} pairs for ${d.label}`).join("; ")}) applied before the built-in matching`:``} and operated on within-dataset statistics only, restricted to genes present in the session dataset${CMPLAST?`: Pearson correlation of log₂ fold changes and moderated t-statistics, one-sided hypergeometric tests of directional hit-set overlap, and rank-rank hypergeometric overlap maps computed as in the Bioconductor RRHO package (Plaisier SB, Taschereau R, Wong JA, Graeber TG, Nucleic Acids Res 38:e169, 2010; descriptive, as these p-values assume independent genes)`:``}${CONSENSUS?`${CMPLAST?"; ":": "}across all datasets, a consensus vote count of within-dataset significance (no pooled p-values)`:``}. ${FAMROWS&&FAMROWS.length?`Many-to-many homology families (MGI classes merged by shared membership; the families the strict 1:1 table excludes) were analyzed as modules: each family scored as the mean z of its member genes within each dataset separately, group effects tested by Welch t within each dataset with BH correction across tested families, and cross-species agreement reported as direction concordance - no one-to-one gene assignment is made for these families. `:``}${SIGRAN&&SIGRES?`Signature transfer scored each sample of each comparison dataset as the mean, over the signature's genes, of the z-score computed entirely within that dataset${SIGRES.spec.sign.some(x=>x<0)? " (genes down-regulated in the session with reversed sign)" : ""}${SIGRES.useFam&&SIGRES.maps.some(m=>m.M.cross)? "; between human and mouse, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI human–mouse homology graph), each family scored once as the mean z of its members present in the dataset" : ""}. Separation of each dataset's contrast groups was summarized by the Mann-Whitney AUC (descriptive) and by Hedges' g (bias-corrected standardized mean difference of the score), and tested in two ways: by the Welch t-test of the scores between the groups (self-contained), and by the Welch t statistic against ${SIGRES.NNULL} seeded random signatures (gene sets of the same size and numbers of up- and down-regulated genes drawn from the session's genes, transferred and scored in the same way, the same random gene set in every dataset) (empirical p; a competitive random-set null, cf. Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012); replication required both p-values ≤ 0.05 and the separation in the direction of the signature (the self-contained test alone is not calibrated when the contrast changes many genes, and the competitive test alone is not calibrated for a co-regulated signature when the groups do not differ). ${SIGRES.pooled? `Hedges' g was pooled over the ${SIGRES.pooled.k} independent comparison datasets (the discovery dataset excluded) with a ${({REML:"REML random-effects",REM:"DerSimonian-Laird random-effects",FEM:"fixed-effect"})[SIGRES.pooled.method]} model${SIGRES.pooled.hk? " and the Hartung-Knapp-Sidik-Jonkman test" : ""} (as metafor::rma on escalc(measure = "SMD") values; Viechtbauer W, J Stat Softw 36(3), 2010), and the pooled effect was also compared with the pooled effects of the random signatures, pooled the same way (empirical p); pooled replication likewise required both p-values ≤ 0.05. ` : ""}`:``}`:``}${ALLPAIRS?`All pairwise group contrasts were computed with the same per-contrast statistics as the primary comparison; no joint model was fitted, and FDR control is within-contrast. `:``}${HUBS?`Network hub genes were ranked by soft connectivity, defined as the sum over all gene pairs of ${HUBS.signed?"signed":"unsigned"} correlation adjacencies (|r| raised to β = ${HUBS.beta}) among the ${HUBS.M.toLocaleString()} most variable genes, following the WGCNA connectivity definition (Zhang B & Horvath S, Stat Appl Genet Mol Biol 4:Article17, 2005; Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008); connectivity rankings at small sample sizes were treated as screening output. ${HUBNET?`The network view showed the ${HUBNET.H} most connected genes${HUBNET.nb?` and their ${HUBNET.nb} most strongly correlated partners`:``}, with edges for gene pairs with |r| ≥ ${HUBNET.rmin}${HUBNET.m?`, each gene keeping its ${HUBNET.m} strongest`:``} (${HUBNET.layout==="circle"?"circular layout ordered by average-linkage clustering on 1 − |r|":"seeded force-directed layout (Fruchterman TMJ & Reingold EM, Softw Pract Exp 21:1129, 1991)"}). `:``}${HUBNB?`The neighbourhood of ${geneTitle(HUBNB.hub)} was defined as its ${HUBNB.N} most strongly correlated genes (largest |r|) among the same ${HUBNB.M.toLocaleString()} genes, using ${HUBNB.mode==="within"?`the partial correlation given group, computed as the Pearson correlation of the residuals after removing each group's mean (Baba K, Shibata R & Sibuya M, Aust N Z J Stat 46:657, 2004), so that correlation produced only by shared group differences was not counted as co-expression (cf. Parsana P et al., Genome Biol 20:94, 2019); p-values used a t test on n − G − 1 = ${HUBNB.df} degrees of freedom`:`Pearson correlation across all ${HUBNB.n} included samples; p-values used a t test on n − 2 = ${HUBNB.df} degrees of freedom`}. It was displayed as an ego network centred on the hub (Everett M & Borgatti SP, Soc Netw 27:31, 2005), as a heatmap of per-sample z-scores with samples grouped by condition (Eisen MB, Spellman PT, Brown PO & Botstein D, Proc Natl Acad Sci USA 95:14863, 1998), and as a per-sample neighbourhood score, the mean of the members' z-scores with negatively correlated members sign-reversed (cf. Lee E, Chuang HY, Kim JW, Ideker T & Lee D, PLoS Comput Biol 4:e1000217, 2008); the score was used descriptively because the members were selected from the same samples. Its gene-set enrichment was tested by the hypergeometric test against the screened genes annotated in the library, with BH correction, and the node and edge tables were exported for Cytoscape (Shannon P et al., Genome Res 13:2498, 2003). `:``}${HUBX?`Its preservation in each independent comparison dataset (contrast samples only) was quantified by the WGCNA module-preservation statistic Zsummary (Langfelder P, Luo R, Oldham MC & Horvath S, PLoS Comput Biol 7:e1001057, 2011), computed as in WGCNA 1.74 (unsigned adjacency |r|^6; Zdensity from the proportion of variance explained, mean sign-aware kME, mean sign-aware correlation and mean adjacency; Zconnectivity from the correlations of intramodular connectivity, kME and pairwise correlations), each Z against 100 random gene sets of the same size in the test dataset${HUBX.mode==="within"?", with correlations computed after removing each group's mean":""}. Because random gene sets, and random sets of differentially expressed genes, also exceeded the published thresholds in calibration on psoriasis datasets, Zsummary was compared empirically, in the same dataset, with 100 random gene sets of the same size, with 100 random sets whose members came from the same log₂FC deciles of the discovery contrast (DE-matched), and with 100 neighbourhoods of random seed genes built by the same procedure; preservation beyond its shared differential expression required an empirical p ≤ 0.05 against the DE-matched sets. Rewiring was tested per dataset by Fisher's z test of the hub–partner correlation between the two contrast groups (Fisher RA, Biometrika 10:507, 1915; cf. Fukushima A, Gene 518:209, 2013), calibrated against 1,000 random gene pairs from the same log₂FC deciles as the hub and the partner (two-sided empirical p), with BH correction across partners; datasets were not pooled, and replication was counted across the independent comparison datasets (the discovery dataset excluded). `:``}${HUBXCONS?`Consensus hubs were identified by robust rank aggregation (Kolde R, Laur S, Adler P & Vilo J, Bioinformatics 28:573, 2012; RRA score, BH-adjusted) of soft-connectivity ranks (|r|^${HUBXCONS.beta}) computed in each of ${HUBXCONS.nLists} datasets over one common universe of ${HUBXCONS.N.toLocaleString()} genes matched in every dataset, chosen by median variance rank. `:``}`:``}${META?`Effect sizes were combined across datasets (${META.idxs.map((i,a)=>dsLabel(i)+": "+META.clabels[a]+(META.nInfo?`, ${META.nInfo[a].nB} vs ${META.nInfo[a].nA} samples${META.nInfo[a].subj?` from ${META.nInfo[a].subj.n} ${META.nInfo[a].subj.col} levels`:""}`:"")).join("; ")}${META.nInfo?`; ${META.nInfo.reduce((x,m)=>x+m.n,0)} samples in total`:""}) by ${metaModelText(META,"adj")} meta-analysis of each dataset's own log₂ fold change and its standard error (${META.method==="REML"? "between-dataset variance by restricted maximum likelihood; Viechtbauer W, J Educ Behav Stat 30:261, 2005" : META.method==="REM"? "DerSimonian R & Laird N, Control Clin Trials 7:177, 1986" : "inverse-variance weights"}${META.hk? `; ${META.hk==="adhoc"?"truncated ":""}Hartung-Knapp-Sidik-Jonkman standard error and t test on k−1 degrees of freedom: Hartung J & Knapp G, Stat Med 20:3875, 2001; Sidik K & Jonkman JN, Stat Med 21:3153, 2002${META.hk==="adhoc"?"; Knapp G & Hartung J, Stat Med 22:2693, 2003":""}` : "; Wald z test"}; computed as metafor::rma, Viechtbauer W, J Stat Softw 36(3), 2010)${META_DFADJ?`; because each standard error is estimated from few residual degrees of freedom, it was replaced by |log₂FC|/|z|, where z is the normal quantile with the same two-sided tail probability as the dataset's moderated t on its own degrees of freedom`:``}, with Cochran's Q and I² as heterogeneity measures (Higgins JPT & Thompson SG, Stat Med 21:1539, 2002${META.method==="REML"?"; I² computed from the REML estimate of τ², as in metafor":""}), ${META.hk? `a Hartung-Knapp t test on k − 1 degrees of freedom` : `a Wald z test`} and Benjamini-Hochberg correction across the ${META.nTested.toLocaleString()} genes matched in at least ${META.minK} datasets; raw expression values were not combined. The shared signature comprised genes with meta FDR ≤ ${META.fdr}, |pooled log₂FC| ≥ ${META.lfcMin} and the same direction of change in every contributing dataset${META.usePI?`, whose 95% prediction interval for a new study (t distribution with k − 2 df; Riley RD, Higgins JPT & Deeks JJ, BMJ 342:d549, 2011) excluded 0`:``}${META.i2Max<100?`, and I² ≤ ${META.i2Max}%`:``} (${META.sig.length.toLocaleString()} genes)${META.loo.length?`; its robustness was assessed by recomputing it with each dataset omitted`:``}. `:``}${DISCO?`Discovery screening scored gene families (symbol-prefix heuristic) and library gene sets as modules (mean z-score of member genes per sample) and tested group effects with ${DISCO.rows.length&&DISCO.rows[0].camera?"the CAMERA competitive gene-set test accounting for inter-gene correlation (Wu MD & Smyth GK, Nucleic Acids Res 40:e133, 2012)":"a competitive null of "+DISCO.B+" size-matched random gene sets (seeded permutations)"}, BH-FDR across ${DISCO.rows.length} modules (overlapping modules: BH under positive dependence). This is a descriptive screen for coordinated regulation. `:``}${enrResults&&enrResults.mode==="fry"?`${ENRMAT?`The enrichment-across-contrasts matrix ran the same FRY test for each pairwise contrast${DEFIT==="all"?", each within the model fitted to all groups,":", each fitted on its two groups only,"} with BH correction within each contrast. `:``}Self-contained gene-set testing used the FRY fast-rotation test at default settings (posterior-sd standardization; Wu D et al., Bioinformatics 26:2176-2182, 2010 [ROAST], as implemented in limma), BH-corrected, on the unweighted log₂-CPM values${HASCOUNTS?"":" (the log₂ expression values used for differential expression)"} with the linear model of the differential-expression contrast (${DEFIT==="all"?"all groups":"the two compared groups"}${enrResults.covUsed&&enrResults.covUsed.length?", adjusted for "+enrResults.covUsed.join(", "):""}${enrResults.covOut&&enrResults.covOut.length?"; "+enrResults.covOut.join(", ")+" not estimable and left out":""}; ${enrResults.nFit||""} samples)${deMethod==="voom"?"; voom precision weights are not used by FRY":""}. `:``}${enrResults&&enrResults.mode==="gsea"?(GSEAMODE==="samples"?`Gene-set enrichment analysis (Subramanian A et al., PNAS 102:15545-15550, 2005) ranked genes by moderated t and assessed each set with ${GSEAB} sample-label permutations; FDR was estimated from the pooled normalized enrichment scores of the permutations. `:`Preranked gene-set enrichment analysis (gene-set permutation) was used for ranking only; its p-values do not account for correlation between genes. `):``}${enrResults&&!enrResults.mode&&GMT?`Gene-set over-representation used one-sided hypergeometric tests against ${GMTBUILTIN?`the built-in ${GMTname} library (${GMTCITE})`:`a user-supplied GMT library`} with all retained genes as universe, BH-corrected.`:``}${heatClusters&&GMT?` Enrichment of k-means heatmap clusters uses the same test but is reported descriptively: the clusters are data-derived (selected from top DE or most-variable genes), so cluster-level FDR values should not be read as confirmatory hypothesis tests.`:``}${TRAITRES?` Association of gene expression with the sample trait ${TRAITRES.o.trait}${TRAITRES.o.transform!=="none"?` (${TRAITRES.D.trLab}-transformed)`:""} was tested with limma linear models (${traitModelText(TRAITRES).replace("log₂ expression","log₂-CPM")}; the trait standardized, effects reported per unit and per SD) and empirical Bayes moderation with an intensity trend (eBayes(trend = TRUE)) over ${TRAITRES.mode==="means"?`${TRAITRES.n} ${TRAITRES.o.block} means of ${TRAITRES.D.cols.length} samples: because the trait is constant within ${TRAITRES.o.block}, each ${TRAITRES.o.block} was summarized by the mean of its samples${TRAITRES.agg.withinG?", after removing the group effect estimated within blocks,":""} and the means were analysed as independent observations`:`${TRAITRES.n} samples${TRAITRES.blockMode==="dupcor"?`, with ${TRAITRES.o.block} as a random block: the intra-block correlation (${TRAITRES.rho.toFixed(3)}) was estimated by duplicateCorrelation and used in generalized least squares (lmFit with block and correlation; Smyth GK, Michaud J & Scott HS, Bioinformatics 21:2067, 2005)`:""}`}; BH-adjusted p-values. Influential observations were flagged by Cook's distance > 1 (Cook RD, Technometrics 19:15, 1977). `:``}${TRAITCAM?`Gene sets (${TRAITCAM.lib}, 5–500 genes) were tested against the trait coefficient by CAMERA with the inter-gene correlation estimated from the data (Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012). `:``}${TRAITMOD?`Module–trait relationships were tested as in WGCNA (Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008): the eigengene of each module (first principal component of its scaled genes) was tested in the same linear model, reported as the partial correlation t/√(t² + df), with BH correction over the module × trait matrix. `:``}${ANNO?` Gene identifiers were mapped to official ${el("species").value==="human"?"HGNC":el("species").value==="mouse"?"MGI":""} symbols using ${ANNO.source} (${ANNO.name}; ${ANNO.n.toLocaleString()} mappings). Reference: ${ANNO.citation}.`:""}${IXRES?" "+ixMethodsText():""}`;
   el("methodstext").textContent=txt;
 }
 el("copymethods").addEventListener("click",()=>{
@@ -6639,6 +6662,7 @@ function buildSigSelector(){
     for(let g=0;g<nG;g++) if(res.q[g]<=fdr&&Math.abs(res.lfc[g])>=thr){ if(res.lfc[g]>0)up++; else dn++; }
     if(up>=3){ s.add(new Option(`A: up-regulated DE genes (n=${up})`,"de_up")); SIGLABELS.de_up=`A: up-regulated DE genes (n=${up})`; }
     if(dn>=3){ s.add(new Option(`A: down-regulated DE genes (n=${dn})`,"de_dn")); SIGLABELS.de_dn=`A: down-regulated DE genes (n=${dn})`; }
+    if(up>=3&&dn>=3){ const lab=`A: up and down DE genes, signed (n=${up}+${dn})`; s.add(new Option(lab,"de_both")); SIGLABELS.de_both=lab; }
   }
   if(HUBNB){ const pos=nbMembers().filter((gg,i)=>i===0||HUBNB.partners[i-1].r>0); const lab=`Hub neighbourhood: ${geneTitle(HUBNB.hub)} (positively correlated members, n=${pos.length})`; s.add(new Option(lab,"hubnb")); SIGLABELS["hubnb"]=lab; }
   if(DISCO&&DISCO.rows) DISCO.rows.slice(0,15).forEach((r,i)=>{ s.add(new Option(`Discovery: ${r.name} (n=${r.m})`,"disco_"+i)); SIGLABELS["disco_"+i]=`Discovery: ${r.name} (n=${r.m})`; });
@@ -6673,63 +6697,269 @@ function aucOf(a, b2){
   for(const y of b2) for(const x of a) u += y>x?1 : y===x?0.5 : 0;
   return u/(a.length*b2.length);
 }
-function runSigTransfer(){
+// Signature specification: session gene indices, a sign per gene (+1, or -1 for the down-regulated half of a signed
+// signature), and the direction expected in the comparison datasets (+1: higher in B, -1: lower in B, null: not assessed).
+function sigSpec(){
+  const v=el("sigsel").value;
+  if(v==="de_both"){
+    const fdr=parseFloat(el("selFDR").value)||0.05, thr=Math.abs(parseFloat(el("fcthr").value))||0, res=deCache, g=[], sg=[];
+    for(let i=0;i<nG;i++) if(res.q[i]<=fdr&&Math.abs(res.lfc[i])>=thr){ g.push(i); sg.push(res.lfc[i]>0? 1 : -1); }
+    return {genes:g, sign:sg, expect:1};
+  }
+  const g=sigGenes();
+  return {genes:g, sign:g.map(()=>1), expect: v==="de_up"? 1 : v==="de_dn"? -1 : null};
+}
+// session-species symbol -> index of its homology family
+let SIGFAMIDX=null;
+function sigFamIndex(lk){
+  if(SIGFAMIDX&&SIGFAMIDX.lk===lk) return SIGFAMIDX.map;
+  const map={}; ORTHO_FAM.forEach((f,k)=>f[lk].forEach(n=>{ const key=n.toLowerCase(); if(map[key]===undefined) map[key]=k; }));
+  SIGFAMIDX={lk, map}; return map;
+}
+// Map a signature into comparison dataset d. A unit is one scored element: a gene matched one to one (same species, or a
+// one-to-one ortholog), or a homology family (human–mouse only, when enabled) for signature genes without a one-to-one
+// ortholog, scored on the members of that family present in d. Several signature genes in one family form one unit.
+function sigMapper(d, useFam){
+  // reusable mapper of session genes into dataset d (lookups built once)
+  const sessSp=el("species").value, la=famList(sessSp), lb=famList(d.species), cross=!!(la&&lb&&la!==lb);
+  const byB={}; if(cross&&useFam) d.genes.forEach((nm,k2)=>{ const key=nm.split(" (")[0].toLowerCase(); if(byB[key]===undefined) byB[key]=k2; });
+  const fidx= cross&&useFam? sigFamIndex(la) : null;
+  const famRows={};   // family index -> member rows of d
+  const sym=GENES.map(n=>n.split(" (")[0].toLowerCase());
+  return function(spec){
+    const units=[], used=new Set(), unmapped=[], famUnit={};
+    for(let i=0;i<spec.genes.length;i++){
+      const g=spec.genes[i], sg=spec.sign[i], b=d.matchAtoB[g];
+      if(b>=0&&!used.has(b)){ used.add(b); units.push({rows:[b], kind:cross?"ortholog":"same", src:[g], sign:sg}); continue; }
+      if(fidx){
+        const k=fidx[sym[g]];
+        if(k!==undefined){
+          const key=k+"|"+sg;
+          if(famUnit[key]){ famUnit[key].src.push(g); continue; }
+          if(!famRows[k]) famRows[k]=ORTHO_FAM[k][lb].map(n=>byB[n.toLowerCase()]).filter(r=>r!==undefined);
+          const rows=famRows[k].filter(r=>!used.has(r));
+          if(rows.length){ rows.forEach(r=>used.add(r)); const u={rows, kind:"family", fam:k, src:[g], sign:sg}; units.push(u); famUnit[key]=u; continue; }
+        }
+      }
+      unmapped.push(g);
+    }
+    return {units, unmapped, cross,
+      nGenes:units.reduce((a,u)=>a+u.src.length,0), nOrth:units.filter(u=>u.kind!=="family").length,
+      nFamUnits:units.filter(u=>u.kind==="family").length, nFamGenes:units.filter(u=>u.kind==="family").reduce((a,u)=>a+u.src.length,0)};
+  };
+}
+function sigUnitsFor(d, spec, useFam){ return sigMapper(d, useFam)(spec); }
+// z of every row of d across all of d's samples, computed once per dataset
+function dsZ(d){
+  if(d._z&&d._z.nS===d.nS&&d._z.nG===d.nG&&d._z.L===d.L) return d._z.z;
+  const z=new Float64Array(d.nG*d.nS);
+  for(let r=0;r<d.nG;r++){ let s1=0,s2=0; for(let q=0;q<d.nS;q++){ const v=d.L[r*d.nS+q]; s1+=v; s2+=v*v; }
+    const m=s1/d.nS, sd=Math.sqrt(Math.max(s2/d.nS-m*m,0))||1; for(let q=0;q<d.nS;q++) z[r*d.nS+q]=(d.L[r*d.nS+q]-m)/sd; }
+  d._z={z, nS:d.nS, nG:d.nG, L:d.L}; return z;
+}
+// signature score per sample: mean over units of (sign x mean z of the unit's rows); for single-gene units this is the
+// mean z of the matched genes, as before
+function sigScoreUnits(d, units, z){
+  const sc=new Float64Array(d.nS);
+  for(const u of units){ const w=u.sign/u.rows.length; for(const r of u.rows){ const o=r*d.nS; for(let q=0;q<d.nS;q++) sc[q]+=w*z[o+q]; } }
+  for(let q=0;q<d.nS;q++) sc[q]/=units.length;
+  return sc;
+}
+// Hedges' g of the score, B - A, and its large-sample variance (metafor escalc(measure = "SMD"))
+function hedgesG(a, b){
+  const n1=a.length, n2=b.length; if(n1<2||n2<2) return null;
+  const m1=mean(a), m2=mean(b), v1=variance(a,m1), v2=variance(b,m2), mdf=n1+n2-2;
+  const sp=Math.sqrt(((n1-1)*v1+(n2-1)*v2)/mdf); if(!(sp>0)) return null;
+  const J=Math.exp(logGamma(mdf/2)-0.5*Math.log(mdf/2)-logGamma((mdf-1)/2));
+  const g=J*(m2-m1)/sp; return {g, v:1/n1+1/n2+g*g/(2*(n1+n2)), n1, n2};
+}
+let SIGRES=null;
+function runSigTransfer(){ return runSync(runSigTransferGen()); }
+function* runSigTransferGen(){
   if(!DSETS.length) return;
-  const gsA=sigGenes();
-  if(gsA.length<3){ el("siginfo").innerHTML='<span class="warnchip">Module has fewer than 3 genes.</span>'; return; }
-  const traces=[]; const verdicts=[];
-  const NNULL=200; SIGRAN=true;
-  DSETS.forEach((d,k2)=>{
-    const mapped=gsA.map(g=>d.matchAtoB[g]).filter(b2=>b2>=0);
-    if(mapped.length<3){ verdicts.push(`<b>${d.label}</b>: fewer than 3 module genes matched; not scored.`); return; }
-    const scores=sigScoreInB(d, mapped);
-    const gk=Object.keys(d.gi);
-    gk.forEach((g,gi2)=>{
-      traces.push({y:d.gi[g].map(q=>scores[q]), x:d.gi[g].map(()=>d.label+" · "+g),
-        text:d.gi[g].map(q=>d.sampleNames[q]),
-        type:"box", name:d.label+" · "+g, boxpoints:"all", jitter:0.5, pointpos:0,
-        marker:{color:PAL[(k2*3+gi2)%PAL.length]}, showlegend:false,
+  const spec=sigSpec(), useFam=el("sigfam").checked;
+  if(spec.genes.length<3){ el("siginfo").innerHTML='<span class="warnchip">Signature has fewer than 3 genes.</span>'; return; }
+  const NNULL=1000; SIGRAN=true;
+  const traces=[], verdicts=[], rows=[], maps=[];
+  // the session itself: the discovery effect, shown but never pooled
+  let disc=null;
+  { const gi=groupsIdx(), A=el("selA").value, B=el("selB").value;
+    if(gi[A]&&gi[B]){ const {sc, idx}=scoreSessionRowsSigned(spec); const pos={}; idx.forEach((q,k)=>pos[q]=k);
+      const a=gi[A].filter(q=>pos[q]!==undefined).map(q=>sc[pos[q]]), b=gi[B].filter(q=>pos[q]!==undefined).map(q=>sc[pos[q]]);
+      const h=hedgesG(a,b); if(h) disc=Object.assign({label:dsLabel(0), A, B, species:el("species").value}, h); } }
+  // Random signatures: gene sets of the same size and the same numbers of up- and down-regulated genes drawn from all of
+  // the session's genes, transferred into every dataset exactly as the signature is (same matching, same families) and
+  // scored identically. The k-th random signature is the same gene set in every dataset, so that the pooled comparison
+  // keeps the correlation between datasets that a fixed gene list has.
+  const mappers=DSETS.map(d=>sigMapper(d, useFam)), Z=DSETS.map(d=>dsZ(d));
+  const ok=[];
+  for(let k2=0;k2<DSETS.length;k2++){ const d=DSETS[k2];
+    const M=mappers[k2](spec); maps.push({d, M});
+    if(M.units.length<3){ verdicts.push(`<b>${esc(d.label)}</b>: fewer than 3 signature genes or families matched; not scored.`); continue; }
+    const scores=sigScoreUnits(d, M.units, Z[k2]);
+    Object.keys(d.gi).forEach((g,gi2)=>{
+      traces.push({y:d.gi[g].map(q=>scores[q]), x:d.gi[g].map(()=>d.label+" · "+g), text:d.gi[g].map(q=>d.sampleNames[q]),
+        type:"box", name:d.label+" · "+g, boxpoints:"all", jitter:0.5, pointpos:0, marker:{color:PAL[(k2*3+gi2)%PAL.length]}, showlegend:false,
         hovertemplate:"%{text}: %{y:.3f}<extra></extra>"});
     });
-    if(!(d.selA&&d.selB&&d.selA!==d.selB)){ verdicts.push(`<b>${d.label}</b>: pick two groups to score discrimination.`); return; }
-    const a=d.gi[d.selA].map(q=>scores[q]), b2=d.gi[d.selB].map(q=>scores[q]);
-    const auc=aucOf(a,b2);
-    // null: size-matched random B gene sets, same scorer, same contrast (seeded).
-    // Calibration statistic is |Welch t| of the score, not AUC: at small n the AUC saturates.
-    // With four samples per group, a non-negligible fraction of random size-matched signatures
-    // reach AUC = 1.0, which floors the empirical p of an AUC-based null well above 0.05 even
-    // for a perfectly separating signature. The t statistic keeps resolution past that point.
-    const w=welch(a,b2);
-    const rnd=mulberry32(0x516A + mapped.length*2654435761 + d.nG*40503);
-    let asGood=0;
-    const tReal=w?Math.abs(w.t):0;
-    for(let t2=0;t2<NNULL;t2++){
-      const rset=[...sampleDistinct(mapped.length, d.nG, rnd)];
-      const rs=sigScoreInB(d, rset);
-      const w2=welch(d.gi[d.selA].map(q=>rs[q]), d.gi[d.selB].map(q=>rs[q]));
-      if(w2&&Math.abs(w2.t)>=tReal) asGood++;
+    const mapTxt=`${M.nGenes}/${spec.genes.length} genes matched`+(M.nFamUnits? ` (${M.nOrth} one to one, ${M.nFamGenes} through ${M.nFamUnits} homology famil${M.nFamUnits===1?"y":"ies"})` : "");
+    if(!(d.selA&&d.selB&&d.selA!==d.selB&&d.gi[d.selA]&&d.gi[d.selB])){ verdicts.push(`<b>${esc(d.label)}</b> (${mapTxt}): pick two groups to test replication.`); continue; }
+    const a=d.gi[d.selA].map(q=>scores[q]), b=d.gi[d.selB].map(q=>scores[q]);
+    const w=welch(a,b), h=hedgesG(a,b);
+    ok.push({d, k:k2, M, mapTxt, auc:aucOf(a,b), t:w? w.t : NaN, pW:w&&isFinite(w.p)? w.p : 1, g:h? h.g : NaN, v:h? h.v : NaN, nA:a.length, nB:b.length,
+      ge:0, gNull:new Float64Array(NNULL), vNull:new Float64Array(NNULL), dup:!!d.dupOf});
+  }
+  const nUp=spec.sign.filter(x=>x>0).length, nSig=spec.genes.length;
+  const rnd=mulberry32(0x516A + nSig*2654435761 + nUp*97 + nG*40503);
+  for(let t2=0;t2<NNULL;t2++){
+    const rg=sampleDistinct(nSig, nG, rnd);
+    for(let i=rg.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); const tt=rg[i]; rg[i]=rg[j]; rg[j]=tt; }
+    const rspec={genes:rg, sign:rg.map((_,i)=> i<nUp? 1 : -1)};
+    for(const r of ok){
+      const RM=mappers[r.k](rspec), d=r.d;
+      if(!RM.units.length){ r.gNull[t2]=0; r.vNull[t2]=1/r.nA+1/r.nB; continue; }
+      const rs=sigScoreUnits(d, RM.units, Z[r.k]), ra=d.gi[d.selA].map(q=>rs[q]), rb=d.gi[d.selB].map(q=>rs[q]);
+      const w2=welch(ra, rb); if(w2&&isFinite(r.t)&&Math.abs(w2.t)>=Math.abs(r.t)) r.ge++;
+      const h2=hedgesG(ra, rb); r.gNull[t2]=h2? h2.g : 0; r.vNull[t2]=h2? h2.v : (1/ra.length+1/rb.length);
     }
-    const pEmp=(1+asGood)/(1+NNULL);
-    // direction: an up-regulated signature should score higher in the test group (AUC > 0.5), a down-regulated one lower
-    const sv=el("sigsel").value, expectHigh= sv==="de_dn"? false : sv==="de_up"? true : null;
-    const sideOK= expectHigh===null? true : expectHigh? auc>0.5 : auc<0.5;
-    const strong=pEmp<=0.05&&Math.abs(auc-0.5)>=0.4&&sideOK;
-    const partial=pEmp<=0.05&&!strong&&sideOK;
-    const inverted=pEmp<=0.05&&!sideOK;
-    verdicts.push(`<b>${d.label}</b> (${mapped.length}/${gsA.length} genes matched): AUC = <b>${auc.toFixed(2)}</b> for ${d.selB} vs ${d.selA}: `+
-      `${strong?'<span style="color:#059669"><b>signature replicates</b></span>':partial?'<span style="color:#b45309"><b>partial replication</b></span>':inverted?'<span style="color:#7c3aed"><b>separates the groups in the opposite direction</b></span>':'<span style="color:#64748b"><b>does not replicate</b></span>'} `+
-      `(score t = ${w?w.t.toFixed(1):"–"}, stronger than ${(100*(1-pEmp)).toFixed(0)}% of ${NNULL} size-matched random signatures; empirical p = ${fmtP(pEmp)}).`);
-  });
-  if(!traces.length){ el("siginfo").innerHTML='<span class="warnchip">Module matched in no comparison dataset.</span>'; return; }
-  el("siginfo").innerHTML=`<div style="margin-bottom:4px">Module: <b>${SIGLABELS[el("sigsel").value]||el("sigsel").value}</b>. `+
-    `Question answered: <i>does this gene list separate each dataset's groups better than a random gene list of the same size?</i> `+
-    `AUC 0.5 = no separation, 1.0 (or 0.0, inverted direction) = perfect. Because AUC saturates at small n (a random large gene list can also reach 1.0 by riding the dominant expression axis), the evidence that it is THIS list is calibrated on the score t-statistic against random same-size signatures.</div>`+
-    verdicts.map(v=>`<div style="margin:2px 0">${v}</div>`).join("")+
-    `<div class="footer-note" style="margin-top:4px">Score = mean z of matched module genes, z computed entirely within each dataset; the session contributes only the gene list. Box magnitudes are within-dataset z-units and not comparable ACROSS datasets; compare AUCs instead. Null is seeded (reproducible).</div>`;
+    if(t2%50===49) yield {stage:"Signature transfer: random signatures", frac:(t2+1)/NNULL};
+  }
+  for(const r of ok){
+    const pEmp=(1+r.ge)/(1+NNULL);
+    const sideOK= spec.expect===null? true : spec.expect>0? r.auc>0.5 : r.auc<0.5;
+    // Replication needs both: the score differs between the groups (Welch test of the score: calibrated when the groups do
+    // not differ, even for a co-regulated signature) and it differs more than for random signatures (competitive:
+    // calibrated when the contrast changes many genes). Either test alone is not calibrated under the other null.
+    const both=pEmp<=0.05&&r.pW<=0.05;
+    const strong=both&&Math.abs(r.auc-0.5)>=0.4&&sideOK, partial=both&&!strong&&sideOK, inverted=both&&!sideOK;
+    const generic=!both&&r.pW<=0.05&&sideOK&&pEmp>0.05;
+    const verdict= strong? "replicates" : partial? "partial replication" : inverted? "opposite direction" : generic? "differs, but no more than random genes" : "does not replicate";
+    rows.push(Object.assign(r, {pEmp, verdict}));
+    const d=r.d;
+    verdicts.push(`<b>${esc(d.label)}</b> (${r.mapTxt}): AUC = <b>${r.auc.toFixed(2)}</b>, Hedges' g = ${isFinite(r.g)? r.g.toFixed(2) : "–"} for ${esc(d.selB)} vs ${esc(d.selA)}: `+
+      `${strong?'<span style="color:#059669"><b>signature replicates</b></span>':partial?'<span style="color:#b45309"><b>partial replication</b></span>':inverted?'<span style="color:#7c3aed"><b>separates the groups in the opposite direction</b></span>':generic?'<span style="color:#64748b"><b>the score differs, but no more than for random genes</b></span>':'<span style="color:#64748b"><b>does not replicate</b></span>'} `+
+      `(score t = ${isFinite(r.t)?r.t.toFixed(1):"–"}, Welch p = ${fmtP(r.pW)}; stronger than ${(100*(1-pEmp)).toFixed(1)}% of ${NNULL} random signatures transferred the same way, empirical p = ${fmtP(pEmp)})${d.dupOf?' <span class="warnchip">shares samples with another dataset: not pooled</span>':""}.`);
+  }
+  // pooled replication across independent comparison datasets (the session and duplicates excluded)
+  const pr=rows.filter(r=>!r.dup&&isFinite(r.g)&&r.v>0);
+  let pooled=null;
+  if(pr.length>=2){
+    let method=el("metamethod").value; if(!["REM","REML","FEM"].includes(method)) method="REML";
+    const hkv=el("metahk").value, hk= method==="FEM"? false : (["hk","adhoc"].includes(hkv)? hkv : false);
+    const mg=metaGene(pr.map(r=>r.g), pr.map(r=>r.v), method, hk);
+    // competitive pooled test: the pooled effect of the signature against the pooled effects of the random signatures
+    // (each random gene set pooled over the same datasets). The pooled effect, not its t statistic, is compared: random
+    // signatures have near-zero effects whose between-dataset spread can be tiny, which makes their Hartung-Knapp t
+    // statistics arbitrarily large.
+    const sObs=Math.abs(mg.mu); let ge=0;
+    for(let t2=0;t2<NNULL;t2++){ const m2=metaGene(pr.map(r=>r.gNull[t2]), pr.map(r=>r.vNull[t2]), method, hk); if(Math.abs(m2.mu)>=sObs) ge++; }
+    pooled=Object.assign({method, hk, k:pr.length, pEmp:(1+ge)/(1+NNULL), nRep:pr.filter(r=>r.verdict==="replicates"||r.verdict==="partial replication").length}, mg);
+    pooled.side= spec.expect===null? true : spec.expect*pooled.mu>0;
+    pooled.replicates= pooled.p<=0.05 && pooled.pEmp<=0.05 && pooled.side;
+  }
+  SIGRES={spec, rows, disc, pooled, maps, useFam, NNULL, label:SIGLABELS[el("sigsel").value]||el("sigsel").value};
+  if(!traces.length){ el("siginfo").innerHTML='<span class="warnchip">Signature matched in no comparison dataset.</span>'; return; }
+  const mname= pooled? ({REML:"REML random effects", REM:"DerSimonian–Laird random effects", FEM:"fixed effect"}[pooled.method] + (pooled.hk? `, ${pooled.hk==="adhoc"?"truncated ":""}Hartung–Knapp test` : ", z test")) : "";
+  const pooledTxt= pooled? `<div style="margin:6px 0"><b>Pooled over ${pooled.k} independent comparison datasets</b> (${mname}; the session is the discovery dataset and is not pooled): `+
+      `${pooled.replicates? '<span style="color:#059669"><b>the signature replicates</b></span>' : '<span style="color:#64748b"><b>replication not shown</b></span>'}. Hedges' g = <b>${pooled.mu.toFixed(2)}</b> (95% CI ${pooled.ciLo.toFixed(2)} to ${pooled.ciHi.toFixed(2)}), p = ${fmtP(pooled.p)}; I² = ${(100*pooled.I2).toFixed(0)}%; `+
+      `pooled effect larger than that of ${(100*(1-pooled.pEmp)).toFixed(1)}% of random signatures pooled the same way (empirical p = ${fmtP(pooled.pEmp)}). Replication is reported when both p-values are ≤ 0.05${spec.expect===null? "" : " and the effect is in the expected direction"}. Replicated (fully or partly) in ${pooled.nRep} of ${pooled.k} datasets.`+
+      (pooled.hk&&pooled.k<=3? ` <span class="warnchip">with ${pooled.k} datasets the Hartung–Knapp interval is wide (t on ${pooled.k-1} df)</span>` : "")+`</div>` : "";
+  el("siginfo").innerHTML=`<div style="margin-bottom:4px">Signature: <b>${esc(SIGRES.label)}</b>${spec.expect===null? "" : spec.expect>0? " (expected higher in each dataset's B group)" : " (expected lower in each dataset's B group)"}. `+
+    `Question answered: <i>does this signature separate each dataset's groups, more than random signatures transferred the same way, and by how much across datasets?</i> `+
+    `AUC 0.5 = no separation, 1.0 (or 0.0, opposite direction) = perfect. Because AUC saturates at small n, the evidence that it is this signature is calibrated on the score t statistic against random signatures.</div>`+
+    verdicts.map(v=>`<div style="margin:2px 0">${v}</div>`).join("")+pooledTxt+
+    `<div class="footer-note" style="margin-top:4px">Score = mean over the signature's genes of the z-score within the scored dataset${spec.genes.length&&spec.sign.some(x=>x<0)? " (down-regulated genes with reversed sign)" : ""}${useFam? "; a homology family counts once, as the mean z of its members present in that dataset" : ""}. The session contributes only the gene list. Box magnitudes are within-dataset z-units; Hedges' g puts the separation on a common scale. Random signatures are seeded (reproducible).</div>`;
   Plotly.react(el("p_sig"), traces, {margin:{t:10,b:88,l:60,r:10}, font:{size:11}, showlegend:false,
-    yaxis:{title:"module score (mean z, within dataset)", zeroline:true}, xaxis:{tickangle:30,tickfont:{size:10}}}, PL);
+    yaxis:{title:"signature score (mean z, within dataset)", zeroline:true}, xaxis:{tickangle:30,tickfont:{size:10}}}, PL);
+  drawSigForest(); renderSigMap();
+  el("sigexp").style.display="inline-block"; el("sigmapexp").style.display="inline-block";
 }
-el("sigrun").addEventListener("click",runSigTransfer);
+function scoreSessionRowsSigned(spec){
+  // session score of the signature (sign-aware), over included samples, z within the session
+  const idx=S.map((s2,i)=>i).filter(i=>included[i]); const sc=new Float64Array(idx.length);
+  spec.genes.forEach((g,i)=>{ let s1=0,s2=0; for(const q of idx){ const v=L[g*nS+q]; s1+=v; s2+=v*v; }
+    const m=s1/idx.length, sd=Math.sqrt(Math.max(s2/idx.length-m*m,0))||1; idx.forEach((q,k2)=>sc[k2]+=spec.sign[i]*(L[g*nS+q]-m)/sd); });
+  for(let k2=0;k2<idx.length;k2++) sc[k2]/=spec.genes.length;
+  return {sc, idx};
+}
+function drawSigForest(){
+  const R=SIGRES; if(!R||(!R.rows.length&&!R.disc)){ el("p_sigforest").style.display="none"; el("sigforestnote").textContent=""; return; }
+  const items=[];
+  if(R.disc) items.push({lab:`${R.disc.label} (${R.disc.species}; ${R.disc.n2} v ${R.disc.n1}), discovery`, g:R.disc.g, lo:R.disc.g-1.959963984540054*Math.sqrt(R.disc.v), hi:R.disc.g+1.959963984540054*Math.sqrt(R.disc.v), kind:"disc"});
+  R.rows.forEach(r=>{ const se=Math.sqrt(r.v); items.push({lab:`${r.d.label} (${r.d.species}; ${r.nB} v ${r.nA})`, g:r.g, lo:r.g-1.959963984540054*se, hi:r.g+1.959963984540054*se,
+    kind: r.dup? "dup" : (r.verdict==="replicates"||r.verdict==="partial replication")? "rep" : "no", p:r.pEmp}); });
+  const n=items.length, y=i=>n-i+ (R.pooled? 1 : 0);
+  const traces=[];
+  for(const kind of ["disc","rep","no","dup"]){
+    const it=items.map((o,i)=>({o,i})).filter(x=>x.o.kind===kind); if(!it.length) continue;
+    const filled= kind==="rep";
+    traces.push({x:it.map(x=>x.o.g), y:it.map(x=>y(x.i)), mode:"markers", type:"scatter",
+      name: kind==="disc"? "discovery (session; not pooled)" : kind==="rep"? "replicates (both tests p ≤ 0.05, expected direction)" : kind==="dup"? "shares samples (not pooled)" : "does not replicate",
+      marker:{symbol: kind==="disc"? "square" : "circle", size:9, color: filled? "#059669" : kind==="disc"? "#64748b" : "#ffffff", line:{width:1.6, color: kind==="disc"? "#64748b" : filled? "#059669" : "#94a3b8"}},
+      error_x:{type:"data", symmetric:false, array:it.map(x=>x.o.hi-x.o.g), arrayminus:it.map(x=>x.o.g-x.o.lo), color:"#475569", thickness:1.2, width:0},
+      hovertemplate:"%{x:.2f}<extra></extra>"});
+  }
+  const shapes=[]; let lo=Math.min(0,...items.map(o=>o.lo)), hi=Math.max(0,...items.map(o=>o.hi));
+  const tv=items.map((o,i)=>y(i)), tt=items.map(o=>esc(o.lab));
+  if(R.pooled){
+    const P=R.pooled; lo=Math.min(lo,P.ciLo); hi=Math.max(hi,P.ciHi);
+    shapes.push({type:"path", path:`M ${P.ciLo} 0.5 L ${P.mu} 0.72 L ${P.ciHi} 0.5 L ${P.mu} 0.28 Z`, fillcolor:"#0f172a", line:{color:"#0f172a", width:1}});
+    tv.push(0.5); tt.push(`<b>pooled (${P.k} datasets)</b>`);
+  }
+  const pad=0.06*(hi-lo||1);
+  // legend above the plot area, under the title, so that it cannot collide with the x-axis title at any height; the
+  // top margin allows two legend rows for narrow plots
+  const nLeg=traces.length, legRows= nLeg<=2? 1 : 2;
+  const H=Math.max(240, 46*(n+(R.pooled?1:0))+110+20*legRows);
+  Plotly.react(el("p_sigforest"), traces, {height:H, margin:{t:34+22*legRows,b:50,l:10,r:10}, font:{size:11}, shapes, showlegend:true,
+    title:{text:"Signature replication: Hedges' g of the score, B − A (95% CI)", font:{size:12}, y:1, yref:"container", yanchor:"top", pad:{t:6}},
+    xaxis:{title:{text:"Hedges' g (signature score, B − A)"}, range:[lo-pad, hi+pad], zeroline:true, zerolinecolor:"#334155", zerolinewidth:1},
+    yaxis:{tickvals:tv, ticktext:tt, range:[0, n+(R.pooled?1:0)+0.6], automargin:true, showgrid:false},
+    legend:{orientation:"h", xref:"container", x:0.01, xanchor:"left", y:1.01, yanchor:"bottom", font:{size:10.5}},
+    meta:{prismRows:[["dataset","Hedges g","CI low","CI high","empirical p","verdict"]].concat(items.map(o=>[o.lab, o.g, o.lo, o.hi, o.p!=null? o.p : null, ({disc:"discovery (not pooled)", rep:"replicates", no:"does not replicate", dup:"shares samples (not pooled)"})[o.kind]])).concat(R.pooled? [["pooled", R.pooled.mu, R.pooled.ciLo, R.pooled.ciHi, R.pooled.pEmp, "pooled"]] : []),
+      prismKind:"Grouped (datasets as rows; Hedges' g with lower and upper confidence limits)", prismHow:"Create a Grouped table with mean and lower/upper limits; datasets are the row titles."}}, PL);
+  el("p_sigforest").style.display="block";
+  el("sigforestnote").innerHTML=`Filled: the signature replicates in that dataset (the score differs between the groups and more than for random signatures, both p ≤ 0.05, in the expected direction); open: it does not. The diamond is the pooled estimate over the independent comparison datasets; the discovery dataset is shown for reference and not pooled. Intervals of individual datasets are Wald 95% intervals of Hedges' g.`;
+}
+function sigMapRows(){
+  const R=SIGRES; if(!R) return [];
+  const out=[];
+  R.spec.genes.forEach((g,i)=>{
+    const row={gene:GENES[g].split(" (")[0], sign:R.spec.sign[i]>0? "up" : "down", per:[]};
+    R.maps.forEach(({d,M})=>{
+      const u=M.units.find(u2=>u2.src.includes(g));
+      if(!u) row.per.push({txt:"not found", kind:"none"});
+      else if(u.kind==="family") row.per.push({txt:`family: ${u.rows.map(r=>d.genes[r].split(" (")[0]).join("/")}`, kind:"family"});
+      else row.per.push({txt:d.genes[u.rows[0]].split(" (")[0], kind:u.kind});
+    });
+    out.push(row);
+  });
+  return out;
+}
+function renderSigMap(){
+  const R=SIGRES, rows=sigMapRows(); if(!R||!rows.length){ el("sigmapwrap").style.display="none"; return; }
+  const cnt=R.maps.map(({M})=>`${M.nOrth} one to one, ${M.nFamGenes} through families, ${M.unmapped.length} not found`);
+  el("sigmap").innerHTML=`<table class="tbl"><tr><th>signature gene</th><th>direction</th>${R.maps.map(({d},j)=>`<th title="${esc(cnt[j])}">${esc(d.label)} (${esc(d.species)})</th>`).join("")}</tr>`+
+    rows.map(r=>`<tr><td><i>${esc(r.gene)}</i></td><td>${r.sign}</td>${r.per.map(p=>`<td style="${p.kind==="none"?"color:#94a3b8":p.kind==="family"?"color:#7c3aed":""}">${esc(p.txt)}</td>`).join("")}</tr>`).join("")+`</table>`+
+    `<div class="footer-note">${R.maps.map(({d},j)=>`${esc(d.label)}: ${cnt[j]}`).join("; ")}. Purple: carried through a homology family (scored once per family, on the members present in that dataset).</div>`;
+  el("sigmapwrap").style.display="block";
+}
+el("sigexp").addEventListener("click", ()=>{
+  const R=SIGRES; if(!R) return;
+  const q=v=>`"${String(v).replace(/"/g,'""')}"`, f=(x,d2)=> x==null||!isFinite(x)? "" : (+x).toPrecision(d2||6);
+  const lines=[`# benchsiDE signature transfer: ${R.label}; ${R.spec.genes.length} genes; homology families ${R.useFam?"used":"not used"}; ${R.NNULL} random signatures per dataset`,
+    ["dataset","species","B","A","n_B","n_A","units","genes_matched","one_to_one","genes_via_families","families","AUC","score_t","hedges_g","var_g","empirical_p","verdict","pooled"].join(",")];
+  if(R.disc) lines.push([q(R.disc.label), R.disc.species, q(R.disc.B), q(R.disc.A), R.disc.n2, R.disc.n1, "", R.spec.genes.length, "", "", "", "", "", f(R.disc.g), f(R.disc.v), "", "discovery", "no"].join(","));
+  R.rows.forEach(r=>lines.push([q(r.d.label), r.d.species, q(r.d.selB), q(r.d.selA), r.nB, r.nA, r.M.units.length, r.M.nGenes, r.M.nOrth, r.M.nFamGenes, r.M.nFamUnits, f(r.auc), f(r.t), f(r.g), f(r.v), f(r.pEmp), q(r.verdict), r.dup? "no" : "yes"].join(",")));
+  if(R.pooled){ const P=R.pooled; lines.push(["pooled","","","","","","","","","","","","",f(P.mu),"",f(P.pEmp),q(`${P.method}${P.hk?"+"+P.hk:""}; 95% CI ${f(P.ciLo,4)} to ${f(P.ciHi,4)}; p ${f(P.p,4)}; I2 ${f(100*P.I2,3)}%`),""].join(",")); }
+  downloadCSV(lines.join("\n")+"\n", "signature_transfer.csv");
+});
+el("sigmapexp").addEventListener("click", ()=>{
+  const R=SIGRES; if(!R) return; const rows=sigMapRows(); const q=v=>`"${String(v).replace(/"/g,'""')}"`;
+  const lines=[["signature_gene","direction"].concat(R.maps.map(({d})=>q(d.label))).join(",")].concat(rows.map(r=>[q(r.gene), r.sign].concat(r.per.map(p=>q(p.txt))).join(",")));
+  downloadCSV(lines.join("\n")+"\n", "signature_gene_mapping.csv");
+});
+el("sigrun").addEventListener("click",()=>runProgress("Signature transfer", runSigTransferGen()));
 /* ================= all-pairs DE + contrast comparison ================= */
 function runContrast(gA, gB){
   // compute a contrast without disturbing the visible selectors' cache
@@ -6769,6 +6999,24 @@ function vennRegions(sets2){
   });
   return reg;
 }
+function vennLabel(label, maxc){
+  // set names can be long (e.g. "Psoriasis_Secukinumab_TreatmentWeek12 vs Healthy"): put the reference group on
+  // its own line and wrap the rest after "_", "-", "." or a space, so that no line exceeds maxc characters
+  maxc=maxc||22;
+  const parts=String(label).length>maxc? String(label).split(/ (?=vs )/) : [String(label)];
+  const out=[];
+  for(const part of parts){
+    let rest=part;
+    while(rest.length>maxc){
+      let cut=-1;
+      for(let k=Math.min(maxc, rest.length-1); k>=Math.floor(maxc*0.45); k--){ if(/[_\-. ]/.test(rest[k-1])){ cut=k; break; } }
+      if(cut<0) cut=maxc;
+      out.push(rest.slice(0,cut).trim()); rest=rest.slice(cut);
+    }
+    if(rest.trim()) out.push(rest.trim());
+  }
+  return out.map(esc).join("<br>");
+}
 function drawVenn(){
   if(!VENNSTATE) return;
   const {picks, dir2}=VENNSTATE;
@@ -6795,14 +7043,21 @@ function drawVenn(){
     else if(mem.length===2&&n2===3){ x*=1.55; y*=1.55; }
     cx.push(x); cy.push(y); ct.push(String((reg[key]||[]).length)); cd.push(key);
   }
-  const annos=centers.map((c,k2)=>({x:c[0]*(n2===2?1:1.55), y:n2===2? R+0.16 : c[1]*1.55+(c[1]>=0?R*0.75:-R*0.75),
-    text:"<b>"+esc(picks[k2].label)+"</b><br>"+sets2[k2].size+" genes",
-    showarrow:false, font:{size:11,color:COLS[k2]}, xanchor:"center"}));
+  // set labels: wrapped, and anchored away from the centre so that two long names cannot run into each other
+  const annos=centers.map((c,k2)=>{
+    const lab="<b>"+vennLabel(picks[k2].label)+"</b><br>"+sets2[k2].size.toLocaleString()+" genes";
+    if(n2===2) return {x:c[0]+(k2===0? 0.27 : -0.27), y:R+0.06, yanchor:"bottom", xanchor:k2===0?"right":"left", align:k2===0?"right":"left",
+      text:lab, showarrow:false, font:{size:11,color:COLS[k2]}, hovertext:esc(picks[k2].label)};
+    const top=c[1]>=0;
+    return {x:top? c[0] : c[0]*1.25, y:top? c[1]+R+0.04 : c[1]-R-0.04, yanchor:top?"bottom":"top",
+      xanchor:top?"center":(c[0]<0?"right":"left"), align:top?"center":(c[0]<0?"right":"left"),
+      text:lab, showarrow:false, font:{size:11,color:COLS[k2]}, hovertext:esc(picks[k2].label)};
+  });
   Plotly.react(el("p_venn"), [{x:cx,y:cy,text:ct,mode:"text",type:"scatter",
     textfont:{size:15,color:"#1e293b"}, customdata:cd,
     hovertemplate:"%{text} genes<extra>click for the list</extra>"}],
     {margin:{t:30,b:20,l:20,r:20}, height:430, shapes, annotations:annos,
-     xaxis:{visible:false,range:[-1.6,1.6],scaleanchor:"y"}, yaxis:{visible:false,range:[-1.45,1.45]},
+     xaxis:{visible:false,range:[-1.6,1.6],scaleanchor:"y"}, yaxis:{visible:false,range:n2===2? [-0.8, R+0.16+0.17*Math.max(...annos.map(a=>a.text.split("<br>").length))] : [-1.75,1.75]},
      title:{text:`DEG Venn: ${dir2==="any"?"significant":dir2+"-regulated"} (${deRuleText(fdr, thr)}); counts exact, areas not proportional`, font:{size:11}}}, PL);
   onPlotClick(el("p_venn"), ev=>{
     const key=ev.points[0].customdata;
@@ -10338,7 +10593,7 @@ function sessionState(){
     gene:curGene!==null?GENES[curGene]:null, compare:compareList.map(g=>GENES[g]),
     gmt:GMT?(GMTBUILTIN?{builtin:GMTBUILTIN}:{name:GMTname, sets:GMT}):null, enrMethod,
     anno:ANNO?(ANNO.builtin?{builtin:ANNO.builtin}:ANNO):null, species:el("species").value,
-    pat:{N:el("patN").value, K:el("patK").value}, heatN:el("heatN").value, ix:{A1:el("ixA1").value, B1:el("ixB1").value, A2:el("ixA2").value, B2:el("ixB2").value, meth:el("ixmeth").value, fit:el("ixfit").value, fdr:el("ixfdr").value, lfc:el("ixlfc").value, cov:[...el("ixcov").querySelectorAll("input:checked")].map(x=>x.dataset.c)}, meta:{method:el("metamethod").value, hk:el("metahk").value, mink:el("metamink").value, fdr:el("metafdr").value, lfc:el("metalfc").value, pi:el("metapi").checked}};
+    pat:{N:el("patN").value, K:el("patK").value}, heatN:el("heatN").value, ix:{A1:el("ixA1").value, B1:el("ixB1").value, A2:el("ixA2").value, B2:el("ixB2").value, meth:el("ixmeth").value, fit:el("ixfit").value, fdr:el("ixfdr").value, lfc:el("ixlfc").value, cov:[...el("ixcov").querySelectorAll("input:checked")].map(x=>x.dataset.c)}, sig:{fam:el("sigfam").checked}, meta:{method:el("metamethod").value, hk:el("metahk").value, mink:el("metamink").value, fdr:el("metafdr").value, lfc:el("metalfc").value, pi:el("metapi").checked}};
 }
 el("savesess").addEventListener("click",()=>{
   saveBlob(new Blob([JSON.stringify(sessionState())],{type:"application/json"}), "rnaseq_session.json");
@@ -10465,6 +10720,7 @@ function applySession(ss){
   if(ss.disco){ el("dscfam").checked=!!ss.disco.fam; el("dsccur").checked=ss.disco.cur!==false; el("dscgmt").checked=!!ss.disco.gmt;
     el("dscmin").value=ss.disco.mn||"3"; el("dscmax").value=ss.disco.mx||"100"; el("dscperm").value=ss.disco.B||"1000"; }
   if(ss.ix){ ixRefreshUI(); ["A1","B1","A2","B2"].forEach(k=>{ if(ss.ix[k]) el("ix"+k).value=ss.ix[k]; }); el("ixmeth").value=ss.ix.meth||"mod"; el("ixfit").value=ss.ix.fit||"all"; el("ixfdr").value=ss.ix.fdr||"0.05"; el("ixlfc").value=ss.ix.lfc||"1"; el("ixcov").querySelectorAll("input").forEach(x=>{ x.checked=(ss.ix.cov||[]).includes(x.dataset.c); }); }
+  el("sigfam").checked= ss.sig? ss.sig.fam!==false : true;
   if(ss.meta){ el("metamethod").value=ss.meta.method||"REML"; el("metahk").value=ss.meta.hk!=null? ss.meta.hk : "hk"; el("metafdr").value=ss.meta.fdr||"0.05"; el("metalfc").value=ss.meta.lfc||"1"; el("metapi").checked=!!ss.meta.pi; METAMINK_PENDING=ss.meta.mink||null; }
   else { el("metamethod").value="REM"; el("metahk").value=""; }   // sessions saved before 1.0 used DerSimonian-Laird with the z test
   if(ss.appVersion && ss.appVersion!==APP_VERSION)

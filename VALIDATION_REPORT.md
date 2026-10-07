@@ -1,6 +1,10 @@
-# benchsiDE validation report (1.0.0-rc.2)
+# benchsiDE validation report (1.0.0-rc.3)
 
 This report summarizes the end-to-end validation of benchsiDE on public data. Detailed results for each part are in `validation/study/`: VAL_DE.md (differential expression against limma, edgeR and DESeq2), VAL_ENR.md (gene-set tests, Discovery, clustering), VAL_XDS.md (cross-dataset comparison and meta-analysis), VAL_CAL.md (false-positive calibration on null data and positive controls) and VAL_UNT.md (Gene Explorer, Patterns, QC, power, input handling, sessions, exports). The study tested 0.22.0-beta.
+
+## Release candidate 1.0.0-rc.3
+
+Signature transfer with homology families and pooled replication: scores agree with an independent recomputation to 3e-15, Hedges' g and the pooled estimate with metafor 5.0.1 to 3e-13; replication calls stayed within the binomial bound in three null settings (random mouse signatures in four human psoriasis cohorts, 200 replicates each at two signature sizes; the real imiquimod signature in 100 sets of healthy-skin splits). Details: `validation/rc3/SIGNATURE_TRANSFER.md`.
 
 ## Release candidate 1.0.0-rc.2
 

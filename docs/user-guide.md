@@ -2,7 +2,7 @@
 
 This guide takes you from an expression matrix to reportable results, one step at a time. Each tutorial names the exact controls you will use. Concepts, statistical definitions and troubleshooting are covered in more depth in the [Knowledgebase](../wiki/Home.md).
 
-Version covered: 1.0.0-rc.2. The application is at <https://www.benchside.org>; source code and releases are at <https://github.com/jyaron/benchsiDE>.
+Version covered: 1.0.0-rc.3. The application is at <https://www.benchside.org>; source code and releases are at <https://github.com/jyaron/benchsiDE>.
 
 ## Contents
 
@@ -458,7 +458,12 @@ A neighbourhood found in one dataset should be judged by its preservation in the
 
 ### Step 8. Transfer a signature
 
-Under **Signature transfer**, choose a module from dataset A (up- or down-regulated DE genes, or a Discovery module) and click **Score**. The module is scored in each other dataset and compared with random signatures of the same size.
+Under **Signature transfer and replication**, choose a signature from the session (up-regulated, down-regulated, or up and down with signs; a hub neighbourhood; or a Discovery module) and click **Score**.
+
+1. For human–mouse comparisons, leave **use homology families** ticked: genes without a one-to-one ortholog (for example *Serpinb3a/b/c*) are then scored through their family instead of being dropped. Open **Gene mapping in each dataset** to see how each gene was matched.
+2. Read each dataset's line. *Replicates* means the score differs between that dataset's groups (Welch t-test) and differs more than for 1,000 random signatures transferred the same way, both at p ≤ 0.05, in the expected direction. *The score differs, but no more than for random genes* means the contrast changes so many genes that this signature is not distinguishable from a random one.
+3. Read the forest plot: Hedges' g of the score in each dataset, the discovery dataset for reference, and the pooled estimate over the comparison datasets (model and test as chosen in the meta-analysis card). With two comparison datasets the pooled Hartung–Knapp test has 1 degree of freedom; rely on the per-dataset results.
+4. **Export results (CSV)** and **Export gene mapping (CSV)** save the tables; the forest plot's data button saves an Excel sheet in Prism layout.
 
 ---
 
