@@ -8,6 +8,7 @@ Cross-dataset comparison
 - NEW: a signed signature of up- and down-regulated genes.
 - CHANGED: replication is reported only when the score differs between the groups (Welch t-test) and differs more than for random signatures (1,000, previously 200), in the expected direction. Random signatures are now drawn from the session's genes and transferred and scored in the same way as the signature, previously drawn from the comparison dataset's genes. Either test alone gave too many replication calls in one of two null settings; both together stayed within the expected rate. Results that differ between the groups but not more than random genes are labelled as such.
 - The setting is saved in sessions. Validation: `validation/rc3/SIGNATURE_TRANSFER.md`; new engine check `signature_transfer`.
+- FIXED: Venn diagram region counts now use thousands separators, like the set totals (2,681, not 2681).
 - FIXED: in the signature-replication forest plot the legend overlapped the x-axis title when few datasets were shown; the legend now sits above the plot.
 
 ## 1.0.0-rc.2 (2026-10-04)

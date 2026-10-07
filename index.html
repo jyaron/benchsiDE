@@ -7041,11 +7041,11 @@ function drawVenn(){
     x/=mem.length; y/=mem.length;
     if(mem.length===1&&n2>1){ x*=1.72; y*=1.72; if(n2===2){x=centers[mem[0]][0]*1.9;} }
     else if(mem.length===2&&n2===3){ x*=1.55; y*=1.55; }
-    cx.push(x); cy.push(y); ct.push(String((reg[key]||[]).length)); cd.push(key);
+    cx.push(x); cy.push(y); ct.push((reg[key]||[]).length.toLocaleString("en-US")); cd.push(key);
   }
   // set labels: wrapped, and anchored away from the centre so that two long names cannot run into each other
   const annos=centers.map((c,k2)=>{
-    const lab="<b>"+vennLabel(picks[k2].label)+"</b><br>"+sets2[k2].size.toLocaleString()+" genes";
+    const lab="<b>"+vennLabel(picks[k2].label)+"</b><br>"+sets2[k2].size.toLocaleString("en-US")+" genes";
     if(n2===2) return {x:c[0]+(k2===0? 0.27 : -0.27), y:R+0.06, yanchor:"bottom", xanchor:k2===0?"right":"left", align:k2===0?"right":"left",
       text:lab, showarrow:false, font:{size:11,color:COLS[k2]}, hovertext:esc(picks[k2].label)};
     const top=c[1]>=0;
