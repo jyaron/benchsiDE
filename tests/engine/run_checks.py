@@ -322,6 +322,68 @@ def signature_transfer():
                 "deterministic": r["det"] == r["pEmp"], "family_only_with": r["famOn"], "family_only_without_scored": r["famOff"], "legend_above_plot": r["leg"].get("y", 0) >= 1}
 
 
+@check
+def export_full_names():
+    # figure data exports give full pathway and group names, not the shortened or wrapped labels drawn on the axis
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE54456")) + ", " + J(des("GSE54456")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  const out={}; const chk=(id, names)=>{ const c=plotlyCalls.filter(x=>x.id===id).pop(); if(!c){ out[id]=null; return; }
+    const sh=plotToSheets(c.traces, c.layout).sheets; const cells=[]; sh.forEach(S=>S.rows.forEach(r=>r.forEach(v=>{ if(typeof v==="string") cells.push(v); })));
+    out[id]={ell:cells.filter(v=>v.indexOf("\u2026")>=0).length, full:names.filter(n=>cells.some(v=>v.indexOf(n)>=0)).length, of:names.length}; };
+  useBuiltin("gobp_hs"); el("enrsrc").value="de_up"; el("enrmin").value="5"; el("enrmax").value="2000"; switchTab("enrich"); __drain(); runEnrichment(); __drain();
+  const nm=enrResults.rows.slice(0,15).map(r=>r.name);
+  chk("p_enrlolli", nm.filter(n=>n.length>44)); drawSetJaccard(); chk("p_setjaccard", nm.filter(n=>n.length>34));
+  drawRidgeline(); chk("p_ridge", enrResults.rows.slice(0,12).map(r=>r.name).filter(n=>n.length>30));
+  useBuiltin("hallmark_hs"); enrMethod="gsea"; runSync(runGSEAGen()); __drain(); drawLeadingEdge();
+  chk("p_leadedge", enrResults.rows.slice(0,10).filter(r=>r.leIdx&&r.leIdx.length).map(r=>r.name).filter(n=>n.length>30));
+  print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=1800)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = all(v is not None and v["ell"] == 0 and v["of"] > 0 and v["full"] == v["of"] for v in r.values())
+    return ok, r
+
+
+@check
+def relabel_reorder():
+    # renaming and reordering groups (session and comparison datasets), hiding the sample list, reordering datasets
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(des("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  const out={}; const cnt=()=>{ deKey=""; const r=computeDE(); let u=0,dn=0; for(let g=0;g<nG;g++) if(r.q[g]<=0.05&&Math.abs(r.lfc[g])>=1){ if(r.lfc[g]>0)u++; else dn++; } return [u,dn]; };
+  el("selA").value="CTRL_healthy"; el("selB").value="PSO_lesional"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DECOVSEL=[];
+  const de0=cnt(); moveGroup("PSO_lesional",-1); out.ren=renameSessionGroup("CTRL_healthy","Healthy skin");
+  out.sameDE=JSON.stringify(cnt())===JSON.stringify(de0); out.A=el("selA").value; out.groups=GROUPS.slice();
+  out.merge=!!renameSessionGroup("Healthy skin","PSO_lesional");
+  const ss=JSON.parse(JSON.stringify(sessionState())); out.sess=ss.design.filter(x=>x.group==="Healthy skin").length;
+  SBHIDE=true; buildSampleBar(); out.hidden=el("samplebar").style.display; SBHIDE=false;
+  el("cmpspecies").value="human";
+  CMPB_TXT=""" + J(mat("GSE186063")) + r"""; CMPB_DES=""" + J(des("GSE186063")) + r"""; CMPB_NAME="GSE186063"; onAddDataset(); __drain();
+  CMPB_TXT=""" + J(mat("GSE83645")) + r"""; CMPB_DES=""" + J(des("GSE83645")) + r"""; CMPB_NAME="GSE83645"; onAddDataset(); __drain();
+  const d=DSETS[0]; setDsFactor(d,"Type"); d.selA="non-lesion"; d.selB="lesion";
+  const dr=()=>{ d.resKey=""; const r=dsResult(1); let u=0; for(let g=0;g<d.nG;g++) if(r.q[g]<=0.05&&Math.abs(r.lfc[g])>=1) u++; return u; };
+  const ds0=dr(); out.dsRen=renameDsGroup(d,"lesion","Lesional skin"); moveDsGroup(d,"normal_skin",-1);
+  out.dsSame=dr()===ds0; out.dsKeys=Object.keys(d.gi); out.dsB=d.selB; out.dsMerge=!!renameDsGroup(d,"Lesional skin","non-lesion");
+  { const d2=DSETS[1]; d2.selA="uninvolved"; d2.selB="psoriasis"; }
+  document.querySelectorAll = (sel)=> sel==="#metads input.metaon"? [0,1,2].map(i=>({checked:true, dataset:{i:String(i)}})) : [];
+  el("metamethod").value="REML"; el("metahk").value="hk"; el("metamink").value="2"; el("metafdr").value="0.05"; el("metalfc").value="1"; el("metapi").checked=false; runMeta();
+  const lab0=META.idxs.map(i=>dsLabel(i)); moveDataset(0,1);
+  out.moveOrder=DSETS.map(x=>x.label); out.metaLabelsKept=JSON.stringify(META.idxs.map(i=>dsLabel(i)))===JSON.stringify(lab0);
+  print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=1800)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = (r["ren"] is None and r["sameDE"] and r["A"] == "Healthy skin" and r["groups"].index("PSO_lesional") < r["groups"].index("Healthy skin")
+          and r["merge"] and r["sess"] == 37 and r["hidden"] == "none" and r["dsRen"] is None and r["dsSame"]
+          and r["dsKeys"] == ["Lesional skin", "normal_skin", "non-lesion"] and r["dsB"] == "Lesional skin" and r["dsMerge"]
+          and r["moveOrder"] == ["GSE83645", "GSE186063"] and r["metaLabelsKept"])
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0

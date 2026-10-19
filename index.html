@@ -323,7 +323,9 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
   <div id="loadtiming" class="footer-note" style="margin:0 0 6px;text-align:right"></div>
   <div class="warn" id="qcwarn" style="display:none"></div>
   <div class="card">
-    <h3>Samples included in all statistics (toggle to recompute everything live)</h3>
+    <h3 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Samples included in all statistics (toggle to recompute everything live)
+      <button class="act ghost" id="sbtoggle" title="Hide or show the sample list; the inclusion settings are kept">Hide samples</button>
+      <span id="sbsummary" class="footer-note" style="font-weight:400"></span></h3>
     <div id="samplebar"></div>
     <div id="dashcheck" style="margin-top:8px"></div>
   </div>
@@ -1058,6 +1060,29 @@ function textW(s, size){
   }catch(e){}
   return Math.max(...lines.map(l=>l.length))*0.58*size;
 }
+// Full labels behind shortened ones. A figure may show a pathway or group name shortened ("…") or wrapped
+// onto several lines; the figure's data export must give the full name. Every shortening made while a figure
+// is drawn is recorded here (shown text -> full text) and attached to that figure as layout.meta.fullLabels.
+let FULLPEND=null;
+function noteFull(shown, full){
+  const a=plainText(shown), b=plainText(full);
+  if(a===b) return;
+  (FULLPEND=FULLPEND||{})[a]=b;
+}
+function shortName(full, max){
+  // shortens a name for display (head + "…") and records the full name; names that would become identical
+  // when shortened keep their ends instead, so different sets never share a label
+  full=String(full); if(full.length<=max) return full;
+  let t=full.slice(0,max-2)+"\u2026";
+  const taken=k=>FULLPEND&&FULLPEND[k]!==undefined&&FULLPEND[k]!==full;
+  for(let tail=4; taken(t)&&tail<full.length; tail+=2){ const h=Math.max(4, max-2-tail); t=full.slice(0,h)+"\u2026"+full.slice(full.length-tail); }
+  noteFull(t, full); return t;
+}
+function fullLabelOf(map, v){
+  let t=plainText(v);
+  for(let k=0;k<5&&map&&map[t]!==undefined&&map[t]!==t;k++) t=map[t];
+  return t;
+}
 function truncToPx(s, size, px){
   // middle ellipsis: keeps the head AND the tail, where replicate/sample suffixes live
   s=String(s);
@@ -1065,9 +1090,10 @@ function truncToPx(s, size, px){
   const cut=(k)=>{ const h=Math.ceil(k*0.45); return s.slice(0,h)+"\u2026"+s.slice(s.length-(k-h)); };
   let lo=2, hi=s.length-1;
   while(lo<hi){ const md=(lo+hi+1)>>1; if(textW(cut(md),size)<=px) lo=md; else hi=md-1; }
-  return cut(lo);
+  const r=cut(lo); noteFull(r, s); return r;
 }
 function wrapLabel(s, size, px){
+  const __wlIn=String(s);
   // greedy line filling at spaces, underscores, hyphens, slashes and dots (the break character stays on
   // the first line); a single token wider than the line is split by characters
   s=String(s);
@@ -1088,14 +1114,14 @@ function wrapLabel(s, size, px){
     cur+=t;
   }
   if(cur.trim()) lines.push(cur.trimEnd());
-  return lines.join("<br>");
+  const wr=lines.join("<br>"); noteFull(wr, __wlIn); return wr;
 }
 function truncAll(cats, size, px){
   let out=cats.map(c=>truncToPx(c,size,px));
   if(new Set(out).size<new Set(cats).size){
     // still ambiguous: fall back to tail-only, which is where distinguishing suffixes live
     out=cats.map(c=>{ c=String(c); if(textW(c,size)<=px) return c;
-      let k=c.length; while(k>1&&textW("\u2026"+c.slice(c.length-k),size)>px) k--; return "\u2026"+c.slice(c.length-k); });
+      let k=c.length; while(k>1&&textW("\u2026"+c.slice(c.length-k),size)>px) k--; const r="\u2026"+c.slice(c.length-k); noteFull(r, c); return r; });
   }
   return out;
 }
@@ -1341,42 +1367,44 @@ function plotToSheets(data, layout){
   // Converts the traces behind a figure into (1) a sheet laid out as a GraphPad Prism data table,
   // (2) every plotted value in long format, (3) notes on the layout and how to import it.
   const L=layout||{}, xa=L.xaxis||{}, ya=L.yaxis||{};
+  // shortened or wrapped labels are exported under their full names
+  const FULLMAP=(L.meta&&L.meta.fullLabels)||null, PT=v=>fullLabelOf(FULLMAP, v);
   // helper traces: CI bands, fitted/reference lines, hidden traces (all still listed under 'All values')
   const isHelper=t=>t.hoverinfo==="skip"||t.fill==="toself"||(t.marker&&t.marker.opacity===0)||t.visible===false||t.visible==="legendonly"||(t.mode==="lines"&&t.showlegend===false);
   const tr=(data||[]).filter(t=>t&&!isHelper(t));
-  const title=plainText(L.title&&(L.title.text||L.title)), xt=axisTitle(xa), yt=axisTitle(ya);
+  const title=PT(L.title&&(L.title.text||L.title)), xt=axisTitle(xa), yt=axisTitle(ya);
   const catMap=ax=>{ if(!Array.isArray(ax.tickvals)||!Array.isArray(ax.ticktext)||!ax.tickvals.every(v=>typeof v==="number")) return null;
-    const tv=ax.tickvals, tt=ax.ticktext.map(plainText);
-    return v=>{ if(typeof v!=="number") return plainText(v); let b=-1, bd=Infinity; tv.forEach((u,i)=>{ const d=Math.abs(u-v); if(d<bd){ bd=d; b=i; } });
+    const tv=ax.tickvals, tt=ax.ticktext.map(PT);
+    return v=>{ if(typeof v!=="number") return PT(v); let b=-1, bd=Infinity; tv.forEach((u,i)=>{ const d=Math.abs(u-v); if(d<bd){ bd=d; b=i; } });
       const gap=tv.length>1? Math.min(...tv.slice(1).map((u,i)=>Math.abs(u-tv[i]))) : 1; return bd<=gap*0.5? tt[b] : null; }; };
   const cx=catMap(xa), cy=catMap(ya);
   const errOf=(e,i,minus)=>{ if(!e||e.visible===false) return null; const arr=minus&&e.arrayminus? e.arrayminus : e.array; return Array.isArray(arr)? arr[i] : null; };
-  const lab=(t,i)=>{ const x=Array.isArray(t.text)? t.text[i] : (Array.isArray(t.hovertext)? t.hovertext[i] : null); return x!==null&&x!==undefined? plainText(x) : ""; };
+  const lab=(t,i)=>{ const x=Array.isArray(t.text)? t.text[i] : (Array.isArray(t.hovertext)? t.hovertext[i] : null); return x!==null&&x!==undefined? PT(x) : ""; };
   // long format: every value in the figure
   const long=[["series","type","label","x","x category","y","y category","x error -","x error +","y error -","y error +"]];
   const heat=tr.filter(t=>t.type==="heatmap");
   (data||[]).filter(t=>t&&t.type!=="heatmap"&&t.visible!==false&&t.fill!=="toself").forEach(t=>{
-    const nm=plainText(t.name||""), n=Math.max(Array.isArray(t.x)?t.x.length:0, Array.isArray(t.y)?t.y.length:0);
+    const nm=PT(t.name||""), n=Math.max(Array.isArray(t.x)?t.x.length:0, Array.isArray(t.y)?t.y.length:0);
     for(let i=0;i<n;i++){
       const x=Array.isArray(t.x)? t.x[i] : (t.type==="box"||t.type==="violin"? nm : null), y=Array.isArray(t.y)? t.y[i] : null;
-      long.push([nm, t.type||"scatter", lab(t,i), typeof x==="number"?x:null, typeof x==="number"? (cx?cx(x):"") : plainText(x), typeof y==="number"?y:null,
-        typeof y==="number"? (cy?cy(y):"") : plainText(y), errOf(t.error_x,i,true)??(errOf(t.error_x,i,false)), errOf(t.error_x,i,false), errOf(t.error_y,i,true)??(errOf(t.error_y,i,false)), errOf(t.error_y,i,false)]);
+      long.push([nm, t.type||"scatter", lab(t,i), typeof x==="number"?x:null, typeof x==="number"? (cx?cx(x):"") : PT(x), typeof y==="number"?y:null,
+        typeof y==="number"? (cy?cy(y):"") : PT(y), errOf(t.error_x,i,true)??(errOf(t.error_x,i,false)), errOf(t.error_x,i,false), errOf(t.error_y,i,true)??(errOf(t.error_y,i,false)), errOf(t.error_y,i,false)]);
     }
   });
-  heat.forEach(t=>{ const xs=t.x||[], ys=t.y||[]; (t.z||[]).forEach((row,r)=>row.forEach((v,c)=>long.push([plainText(t.name||"heatmap"),"heatmap","",null,plainText(xs[c]!==undefined?xs[c]:c),typeof v==="number"?v:null,plainText(ys[r]!==undefined?ys[r]:r),null,null,null,null]))); });
+  heat.forEach(t=>{ const xs=t.x||[], ys=t.y||[]; (t.z||[]).forEach((row,r)=>row.forEach((v,c)=>long.push([PT(t.name||"heatmap"),"heatmap","",null,PT(xs[c]!==undefined?xs[c]:c),typeof v==="number"?v:null,PT(ys[r]!==undefined?ys[r]:r),null,null,null,null]))); });
   let prism=null, kind="", howto="";
   // (0) figure-specific layout supplied by the plot (e.g. multi-gene grouped comparison)
   if(L.meta&&Array.isArray(L.meta.prismRows)){ prism=L.meta.prismRows; kind=L.meta.prismKind||"Grouped"; howto=L.meta.prismHow||""; }
   // (a) heatmap -> matrix
   if(!prism&&heat.length){ const t=heat[0]; const cyh=catMap(ya);
-    const xs=(t.x||[]).map(v=>typeof v==="number"&&cx? (cx(v)||String(v)) : plainText(v)), ys=(t.y||[]).map(v=>typeof v==="number"&&cyh? (cyh(v)||String(v)) : plainText(v));
+    const xs=(t.x||[]).map(v=>typeof v==="number"&&cx? (cx(v)||String(v)) : PT(v)), ys=(t.y||[]).map(v=>typeof v==="number"&&cyh? (cyh(v)||String(v)) : PT(v));
     prism=[[""].concat(xs.length?xs:(t.z[0]||[]).map((_,c)=>String(c+1)))].concat((t.z||[]).map((row,r)=>[ys[r]!==undefined?ys[r]:String(r+1)].concat(row.map(v=>typeof v==="number"?v:null))));
     kind="Grouped (row titles = first column, one column per sample or group)"; howto="Create a Grouped table with one replicate per cell, then import or paste the sheet with row titles.";
   }
   // (b) one column per group: box/violin traces, or point clouds that sit on a single category
-  const pointCol=t=>{ if(t.type==="box"||t.type==="violin") return plainText(t.name||t.x0||"");
+  const pointCol=t=>{ if(t.type==="box"||t.type==="violin") return PT(t.name||t.x0||"");
     if(t.type==="bar"||!Array.isArray(t.x)||!Array.isArray(t.y)||t.error_y&&t.error_y.visible!==false&&t.y.length===1) return null;
-    if(typeof t.x[0]==="string"){ return t.x.every(v=>v===t.x[0])? plainText(t.x[0]) : null; }
+    if(typeof t.x[0]==="string"){ return t.x.every(v=>v===t.x[0])? PT(t.x[0]) : null; }
     if(!cx) return null; const c0=cx(t.x[0]); return c0&&t.x.every(v=>cx(v)===c0)? c0 : null; };
   const summary=t=>t.meta==="summary"||/^(mean|median)/i.test(String(t.name||""))||(t.type==="bar"&&t.error_y&&t.error_y.visible!==false);
   const cols=[];
@@ -1397,9 +1425,9 @@ function plotToSheets(data, layout){
   if(!prism){
     const bars=tr.filter(t=>t.type==="bar"&&Array.isArray(t.x)&&Array.isArray(t.y));
     if(bars.length&&bars.length===tr.length){
-      const catOf=(t,i)=>typeof t.x[i]==="string"? plainText(t.x[i]) : (cx?cx(t.x[i]):String(t.x[i]));
+      const catOf=(t,i)=>typeof t.x[i]==="string"? PT(t.x[i]) : (cx?cx(t.x[i]):String(t.x[i]));
       const cats=[]; bars.forEach(t=>t.x.forEach((_,i)=>{ const c=catOf(t,i); if(!cats.includes(c)) cats.push(c); }));
-      const hdr=[""]; bars.forEach(t=>{ hdr.push(plainText(t.name||"value")); if(t.error_y&&t.error_y.visible!==false) hdr.push(plainText(t.name||"value")+" error"); });
+      const hdr=[""]; bars.forEach(t=>{ hdr.push(PT(t.name||"value")); if(t.error_y&&t.error_y.visible!==false) hdr.push(PT(t.name||"value")+" error"); });
       prism=[hdr].concat(cats.map(c=>{ const row=[c]; bars.forEach(t=>{ const i=t.x.findIndex((_,k)=>catOf(t,k)===c);
         row.push(i>=0?t.y[i]:null); if(t.error_y&&t.error_y.visible!==false) row.push(i>=0?errOf(t.error_y,i,false):null); }); return row; }));
       kind="Grouped"; howto="Create a Grouped table (one value per cell; add an error column format if error values are present), then import the sheet with row titles.";
@@ -1409,7 +1437,7 @@ function plotToSheets(data, layout){
   if(!prism&&cy){
     const hz=tr.filter(t=>Array.isArray(t.x)&&Array.isArray(t.y)&&t.x.every(v=>typeof v==="number")&&t.y.every(v=>typeof v==="number"));
     if(hz.length&&hz.length===tr.length){
-      const hdr=[""]; hz.forEach(t=>{ const nm=plainText(t.name||xt||"value"); hdr.push(nm);
+      const hdr=[""]; hz.forEach(t=>{ const nm=PT(t.name||xt||"value"); hdr.push(nm);
         if(t.error_x&&t.error_x.visible!==false){ hdr.push(nm+" lower"); hdr.push(nm+" upper"); } });
       prism=[hdr];
       const cats=[]; hz.forEach(t=>t.y.forEach(v=>{ const c=cy(v); if(c!==null&&!cats.includes(c)) cats.push(c); }));
@@ -1425,7 +1453,7 @@ function plotToSheets(data, layout){
   if(!prism){
     const xy=tr.filter(t=>Array.isArray(t.x)&&Array.isArray(t.y)&&t.x.every(v=>typeof v==="number"||v===null));
     if(xy.length){
-      const names=xy.map((t,k)=>plainText(t.name||(xy.length===1&&yt? yt : (yt? yt+" "+(k+1) : "series "+(k+1)))));
+      const names=xy.map((t,k)=>PT(t.name||(xy.length===1&&yt? yt : (yt? yt+" "+(k+1) : "series "+(k+1)))));
       const hasErr=xy.map(t=>!!(t.error_y&&t.error_y.visible!==false));
       const hdr=["Label", xt||"X"]; names.forEach((n,k)=>{ hdr.push(n); if(hasErr[k]) hdr.push(n+" error"); });
       prism=[hdr];
@@ -1527,9 +1555,12 @@ window.addEventListener("afterprint", ()=>{ setTimeout(()=>reguardPlots(true), 5
 Plotly.react=function(div,traces,layout,cfg){
   traces=noGL(traces);
   const d0=typeof div==="string"? document.getElementById(div) : div; const noG=layout&&layout.__noGuard; if(noG) delete layout.__noGuard;
+  const attachFull=()=>{ if(FULLPEND&&layout){ layout.meta=Object.assign({}, layout.meta, {fullLabels:Object.assign({}, layout.meta&&layout.meta.fullLabels, FULLPEND)}); } FULLPEND=null; };
+  attachFull();
   const layout0= (!noG&&d0&&d0.id&&d0.id!=="p_panel_tmp"&&layout)? plClone(layout) : null;
   if(FONTSCALE!==1){ fontWalk(traces); fontWalk(layout); }
   try{ if(!noG){ layoutGuard(d0, traces, layout); plotAreaGuard(d0, layout); } }catch(e){}
+  attachFull();
   // a figure that only shows a message (no traces) has nothing to export: no mode bar
   if(Array.isArray(traces)&&traces.length===0) cfg=Object.assign({}, cfg||{}, {displayModeBar:false});
   if(cfg&&cfg.displayModeBar!==false&&!(cfg.modeBarButtonsToAdd||[]).includes(DATA_BTN))
@@ -2775,45 +2806,78 @@ function moveGroup(g,dir){
   deKey=""; coKey=""; scorrKey=""; patState=null;
   refreshTab(curTab);
 }
+let SBHIDE=false, SBCOLL={};   // whole sample list hidden; groups whose sample boxes are collapsed
+function sampleBarSummary(){
+  const parts=GROUPS.map(g=>{ const m=S.map((s,i)=>i).filter(i=>S[i].group===g); const k=m.filter(i=>included[i]).length; return `${esc(g)} ${k}/${m.length}`; });
+  const tot=included.filter(Boolean).length;
+  el("sbsummary").innerHTML= SBHIDE? `${tot} of ${S.length} samples included · ${parts.join(" · ")}` : "";
+  el("sbtoggle").textContent= SBHIDE? "Show samples" : "Hide samples";
+}
 function buildSampleBar(){
   const bar=el("samplebar"); bar.innerHTML="";
+  bar.style.display= SBHIDE? "none" : "";
   const showArrows=!NUMERIC&&GROUPS.length>1;
   GROUPS.forEach((g,gi2)=>{
     const div=document.createElement("div"); div.className="grp";
-    let head=`<b style="color:${GCOL[g]}">${g}</b>`;
+    const coll=!!SBCOLL[g];
+    let head=`<span class="gcoll" data-g="${esc(g)}" title="${coll?"show":"hide"} the samples of this group" style="cursor:pointer;color:#64748b">${coll?"&#9656;":"&#9662;"}</span><b class="gname" data-g="${esc(g)}" style="color:${GCOL[g]}">${esc(g)}</b><span class="gren" data-g="${esc(g)}" title="rename this group" style="cursor:pointer;color:#64748b">&#9998;</span>`;
     if(showArrows) head=
-      `<span class="gmove" data-g="${g}" data-d="-1" title="move group left" style="cursor:pointer;color:${gi2===0?'#d1d5db':'#64748b'}">&#9664;</span>`+head+
-      `<span class="gmove" data-g="${g}" data-d="1" title="move group right" style="cursor:pointer;color:${gi2===GROUPS.length-1?'#d1d5db':'#64748b'}">&#9654;</span>`;
-    const gAll=S.every((s,i)=>s.group!==g||included[i]);
-    head+=`<label title="include/exclude every sample in ${g}" style="border-right:1px solid #cbd5e1;padding-right:6px;margin-right:2px"><input type="checkbox" class="grpall" data-g="${g}" ${gAll?"checked":""}> all</label>`;
+      `<span class="gmove" data-g="${esc(g)}" data-d="-1" title="move group left" style="cursor:pointer;color:${gi2===0?'#d1d5db':'#64748b'}">&#9664;</span>`+head+
+      `<span class="gmove" data-g="${esc(g)}" data-d="1" title="move group right" style="cursor:pointer;color:${gi2===GROUPS.length-1?'#d1d5db':'#64748b'}">&#9654;</span>`;
+    const mem=S.map((s,i)=>i).filter(i=>S[i].group===g), nIn=mem.filter(i=>included[i]).length;
+    const gAll=nIn===mem.length;
+    head+=`<label title="include/exclude every sample in ${esc(g)}" style="border-right:1px solid #cbd5e1;padding-right:6px;margin-right:2px"><input type="checkbox" class="grpall" data-g="${esc(g)}" ${gAll?"checked":""}> all</label>`;
+    if(coll) head+=`<span class="footer-note">${nIn} of ${mem.length} included</span>`;
     div.innerHTML=head;
-    S.forEach((s,i)=>{ if(s.group!==g)return;
+    if(!coll) S.forEach((s,i)=>{ if(s.group!==g)return;
       const lab=document.createElement("label");
       lab.title=`${s.id}: library ${(s.libsize/1e6).toFixed(2)}M, ${s.detected.toLocaleString()} genes detected. Untick to exclude; every statistic, plot, and test recomputes without this sample.`;
-      lab.innerHTML=`<input type="checkbox" ${included[i]?"checked":""} data-i="${i}"> ${s.id}`;
+      lab.innerHTML=`<input type="checkbox" ${included[i]?"checked":""} data-i="${i}"> ${esc(s.id)}`;
       div.appendChild(lab); });
     bar.appendChild(div);
   });
   bar.querySelectorAll(".gmove").forEach(sp=>sp.addEventListener("click",()=>moveGroup(sp.dataset.g,+sp.dataset.d)));
+  bar.querySelectorAll(".gcoll").forEach(sp=>sp.addEventListener("click",()=>{ SBCOLL[sp.dataset.g]=!SBCOLL[sp.dataset.g]; buildSampleBar(); }));
+  bar.querySelectorAll(".gren").forEach(sp=>sp.addEventListener("click",()=>{
+    const g=sp.dataset.g, b=sp.previousElementSibling;
+    const inp=document.createElement("input"); inp.type="text"; inp.value=g; inp.style.width=Math.max(80, 9*g.length)+"px";
+    let fin=false;
+    const done=apply=>{ if(fin) return; fin=true; const v=inp.value.trim(); if(apply&&v&&v!==g){ const r=renameSessionGroup(g, v); if(r){ alert(r); buildSampleBar(); } } else buildSampleBar(); };
+    inp.addEventListener("keydown",e=>{ if(e.key==="Enter") done(true); else if(e.key==="Escape") done(false); });
+    inp.addEventListener("blur",()=>done(true));
+    if(b&&b.parentNode){ b.parentNode.replaceChild(inp, b); inp.focus(); inp.select(); }
+  }));
+  sampleBarSummary();
   renderDashDesignCheck();
 }
-el("samplebar").addEventListener("change",e=>{
-  if(e.target.classList&&e.target.classList.contains("grpall")){
-    const g=e.target.dataset.g, on=e.target.checked;
-    S.forEach((s,i)=>{ if(s.group===g) included[i]=on; });
-    buildSampleBar();  // sync the per-sample checkboxes
-    deKey=""; coKey=""; scorrKey=""; refreshTab(curTab);
-    return;
+el("sbtoggle").addEventListener("click",()=>{ SBHIDE=!SBHIDE; buildSampleBar(); });
+function renameSessionGroup(oldG, newG){
+  // renames a sample group everywhere it is used; the samples, their grouping and all statistics stay the same
+  newG=String(newG).trim();
+  if(!newG||newG===oldG) return null;
+  if(GROUPS.includes(newG)) return `A group named "${newG}" already exists. Renaming would merge two groups, which changes filtering and normalization; to merge groups, edit the design and re-analyse.`;
+  const A=el("selA").value, B=el("selB").value;
+  const ix=["ixA1","ixB1","ixA2","ixB2"].map(id=>el(id).value);
+  S.forEach(s=>{ if(s.group===oldG) s.group=newG; });
+  if(pending){
+    if(pending.groups) pending.groups=pending.groups.map(g=>g===oldG? newG : g);
+    const f=pending.factors&&pending.factors[FACTOR];
+    if(f) for(const k of Object.keys(f)) if(String(f[k])===oldG) f[k]=newG;
   }
-  if(e.target.dataset.i===undefined)return;
-  included[+e.target.dataset.i]=e.target.checked;
-  // keep the group toggle consistent with its members
-  const grp=S[+e.target.dataset.i].group;
-  const boxes=el("samplebar").querySelectorAll(".grpall");
-  boxes.forEach(b=>{ if(b.dataset.g===grp) b.checked=S.every((s,i)=>s.group!==grp||included[i]); });
-  renderDashDesignCheck();
-  deKey=""; coKey=""; scorrKey=""; refreshTab(curTab);
-});
+  GROUPORDER=(GROUPORDER||GROUPS).map(g=>g===oldG? newG : g);   // keep the current order
+  if(GCUSTOM[oldG]!==undefined){ GCUSTOM[newG]=GCUSTOM[oldG]; delete GCUSTOM[oldG]; }
+  if(SBCOLL[oldG]!==undefined){ SBCOLL[newG]=SBCOLL[oldG]; delete SBCOLL[oldG]; }
+  deriveGroups(S.map(s=>s.group));
+  buildSampleBar(); buildDESelectors(); buildCCSelectors();
+  const rn=v=>v===oldG? newG : v;
+  el("selA").value=rn(A); el("selB").value=rn(B);
+  try{ ixRefreshUI(); ["ixA1","ixB1","ixA2","ixB2"].forEach((id,k)=>{ el(id).value=rn(ix[k]); }); }catch(e){}
+  try{ renderColourPanel(); }catch(e){}
+  if(el("hdrsub")){ el("hdrsub").textContent=el("hdrsub").textContent.split(" · ").map(p=>p.startsWith(oldG+" (n=")? newG+p.slice(oldG.length) : p).join(" · "); el("hdrsub").title=el("hdrsub").textContent; }
+  deKey=""; coKey=""; scorrKey=""; patState=null; IXRES=null;
+  refreshTab(curTab);
+  return null;
+}
 function buildDESelectors(){
   const sa=el("selA"), sb=el("selB"); sa.innerHTML=""; sb.innerHTML="";
   GROUPS.forEach(g=>{ sa.add(new Option(g,g)); sb.add(new Option(g,g)); });
@@ -4667,7 +4731,7 @@ function* runEnrMatrixGen(){
     const v=-Math.log10(Math.max(c[k2].q,1e-300));
     return c[k2].dir==="Down"? -v : v; }));
   ENRMAT={sets, ord, cols, contrasts};
-  const ylab=ord.map(k2=>sets[k2].name.length>42? sets[k2].name.slice(0,40)+"\u2026" : sets[k2].name);
+  const ylab=ord.map(k2=>shortName(sets[k2].name, 42));
   const zmax=Math.max(2, ...z.flat().map(Math.abs));
   Plotly.react(el("p_enrmat"), [{z, x:contrasts, y:ylab, type:"heatmap", colorscale:CS_RDBU, zmid:0, zmin:-zmax, zmax:zmax,
     colorbar:{title:"signed<br>\u2212log\u2081\u2080 FDR", thickness:12},
@@ -4801,7 +4865,7 @@ function drawEnrLolli(rows, mode){
   div.style.display="block";
   div.style.height=(130+Math.ceil(26*Math.max(1,FONTSCALE))*top.length)+"px";
   const rr=top.slice().reverse();
-  const names=rr.map(r=>r.name.length>44? r.name.slice(0,42)+"…" : r.name);
+  const names=rr.map(r=>shortName(r.name, 44));
   const sx=[], sy=[];
   rr.forEach((r,i)=>{ sx.push(base, r.ratio, null); sy.push(i, i, null); });
   // interaction hint lives in the info line, not the plot title, so exports stay clean
@@ -5487,7 +5551,11 @@ const gi={};
 function reindexDataset(d){
   // groups may have been edited: rebuild gi and default contrast selections
   d.gi={};
-  d.groups.forEach((g,q)=>{ (d.gi[g]=d.gi[g]||[]).push(q); });
+  // group order: the user's order (d.gorder) for groups still present, then any new groups in file order
+  const seen=[]; d.groups.forEach(g=>{ if(!seen.includes(g)) seen.push(g); });
+  d.gorder=(d.gorder||[]).filter(g=>seen.includes(g)).concat(seen.filter(g=>!(d.gorder||[]).includes(g)));
+  d.gorder.forEach(g=>{ d.gi[g]=[]; });
+  d.groups.forEach((g,q)=>{ d.gi[g].push(q); });
   const gk=Object.keys(d.gi).filter(g=>d.gi[g].length>=2);
   if(!gk.includes(d.selA)) d.selA=gk[0]||"";
   if(!gk.includes(d.selB)||d.selB===d.selA) d.selB=gk.find(g=>g!==d.selA)||"";
@@ -5645,7 +5713,7 @@ function renderCmpSlots(){
   if(sl){ const ap=()=>{ if(sl.value.trim()===dsLabel(0)) return; sl.value=relabelDataset(0, sl.value); };
     sl.addEventListener("change",ap); sl.addEventListener("keydown",e=>{ if(e.key==="Enter") ap(); }); }
   DSETS.forEach((d,k2)=>{
-    const gk=Object.keys(d.gi).filter(g=>d.gi[g].length>=2);
+    const gk=(d.gorder||Object.keys(d.gi)).filter(g=>d.gi[g]&&d.gi[g].length>=2);
     const slot=document.createElement("div");
     slot.className="grp"; slot.style.cssText="display:block;margin:6px 0;padding:8px 10px";
     slot.innerHTML=`<input type="text" class="slotlab" data-k="${k2}" value="${esc(d.label)}" title="Name used for this dataset in every plot, table, export and the methods text. Press Enter to apply." style="width:170px;font-weight:600">: ${d.nG.toLocaleString()} genes × ${d.nS} samples · ${d.nCust?`custom map (${d.nCust.toLocaleString()}) + `:``}${d.cross?"MGI 1:1 ortholog":"symbol"} match ${(100*d.matched/nG).toFixed(1)}%${d.hasCounts?" · TMM":""}${d.cross?" · "+d.species:""}${d.matchWarn?`<br><span class="warnchip">\u26a0 ${d.matchWarn}</span>`:""}${d.dupOf?`<br><span class="warnchip">\u26a0 ${d.dupN&&d.dupN<d.nS? `${d.dupN} of ${d.nS} samples` : `Same samples`} as in ${esc(d.dupOf==="session"? dsLabel(0) : d.dupOf.label)} (matched by sample ID or identical library size): the same data loaded twice${d.dupN&&d.dupN<d.nS?" in part":""}. It is left out of the meta-analysis by default; remove it, or it will also be counted twice in the consensus table.</span>`:""}
@@ -5653,7 +5721,8 @@ function renderCmpSlots(){
       vs <select class="slotB" data-k="${k2}">${gk.map(g=>`<option${g===d.selB?" selected":""}>${g}</option>`).join("")}</select>
       ${d.factorNames&&d.factorNames.length>1? `&nbsp; groups from <select class="slotF" data-k="${k2}">${d.factorNames.map(f=>`<option${f===d.gfactor?" selected":""}>${esc(f)}</option>`).join("")}</select>
         &nbsp; adjust for / pair by: ${d.factorNames.filter(f=>f!==d.gfactor).map(f=>`<label style="white-space:nowrap"><input type="checkbox" class="slotC" data-k="${k2}" data-f="${esc(f)}"${(d.covSel||[]).includes(f)?" checked":""}> ${esc(f)}</label>`).join(" ")}` : ""}
-      <button class="act ghost slotgrp" data-k="${k2}">Edit groups</button>
+      <button class="act ghost slotgrp" data-k="${k2}" title="Rename, reorder or reassign this dataset's groups">Edit groups</button>
+      <button class="act ghost slotmv" data-k="${k2}" data-d="-1" title="Move this dataset up"${k2===0?" disabled":""}>&#9650;</button><button class="act ghost slotmv" data-k="${k2}" data-d="1" title="Move this dataset down"${k2===DSETS.length-1?" disabled":""}>&#9660;</button>
       <button class="act ghost slotrm" data-k="${k2}">Remove</button>
       <div class="slotge" id="slotge_${k2}" style="display:none;margin-top:6px"></div>`;
     div.appendChild(slot);
@@ -5661,6 +5730,7 @@ function renderCmpSlots(){
   div.querySelectorAll(".slotA").forEach(s=>s.addEventListener("change",()=>{ const d=DSETS[+s.dataset.k]; d.selA=s.value; d.resKey=""; }));
   div.querySelectorAll(".slotB").forEach(s=>s.addEventListener("change",()=>{ const d=DSETS[+s.dataset.k]; d.selB=s.value; d.resKey=""; }));
   div.querySelectorAll(".slotrm").forEach(b=>b.addEventListener("click",()=>{ DSETS.splice(+b.dataset.k,1); refreshCmpUI(); }));
+  div.querySelectorAll(".slotmv").forEach(b=>b.addEventListener("click",()=>moveDataset(+b.dataset.k, +b.dataset.d)));
   div.querySelectorAll(".slotF").forEach(s=>s.addEventListener("change",()=>{ const d=DSETS[+s.dataset.k]; setDsFactor(d, s.value); refreshCmpUI(); }));
   div.querySelectorAll(".slotC").forEach(c=>c.addEventListener("change",()=>{ const d=DSETS[+c.dataset.k], f=c.dataset.f;
     d.covSel=(d.covSel||[]).filter(x=>x!==f); if(c.checked) d.covSel.push(f); d.resKey=""; }));
@@ -5673,7 +5743,14 @@ function renderCmpSlots(){
 }
 function renderSlotGroupEditor(k2){
   const d=DSETS[k2], box=el("slotge_"+k2);
+  const ord=d.gorder||Object.keys(d.gi);
   box.innerHTML=`
+    <div class="controls" style="margin-bottom:6px">Group names and order: ${ord.map((g,i)=>`<span class="grp" style="padding:2px 6px">
+      <span class="sgmv" data-g="${esc(g)}" data-d="-1" title="move group left" style="cursor:pointer;color:${i===0?'#d1d5db':'#64748b'}">&#9664;</span>
+      <input type="text" class="sgren" data-g="${esc(g)}" value="${esc(g)}" title="Rename this group; press Enter to apply" style="width:${Math.max(70, 8*g.length)}px">
+      <span class="footer-note">n = ${d.gi[g].length}</span>
+      <span class="sgmv" data-g="${esc(g)}" data-d="1" title="move group right" style="cursor:pointer;color:${i===ord.length-1?'#d1d5db':'#64748b'}">&#9654;</span></span>`).join(" ")}
+      <span class="sgrenmsg footer-note"></span></div>
     <div class="controls" style="margin-bottom:4px">
       match <input type="text" class="sgpat" placeholder="name contains…" style="width:120px">
       <button class="act ghost sgsel">select matching</button>
@@ -5695,6 +5772,39 @@ function renderSlotGroupEditor(k2){
     boxes().forEach(x=>{ if(x.checked){ d.groups[+x.dataset.q]=v; const inp=box.querySelector(`.sginp[data-q="${x.dataset.q}"]`); if(inp) inp.value=v; x.checked=false; } });
     reindexDataset(d); refreshCmpUI(); });
   box.querySelectorAll(".sginp").forEach(inp=>inp.addEventListener("input",()=>{ d.groups[+inp.dataset.q]=inp.value.trim()||"NA"; reindexDataset(d); }));
+  const reopen=()=>{ refreshCmpUI(); const b2=el("slotge_"+k2); if(b2){ b2.style.display="block"; renderSlotGroupEditor(k2); } };
+  box.querySelectorAll(".sgren").forEach(inp=>{
+    const ap=()=>{ const r=renameDsGroup(d, inp.dataset.g, inp.value); if(r){ box.querySelector(".sgrenmsg").innerHTML='<span class="warnchip">'+esc(r)+'</span>'; inp.value=inp.dataset.g; } else if(inp.value.trim()!==inp.dataset.g) reopen(); };
+    inp.addEventListener("change",ap); inp.addEventListener("keydown",e=>{ if(e.key==="Enter") ap(); }); });
+  box.querySelectorAll(".sgmv").forEach(sp=>sp.addEventListener("click",()=>{ moveDsGroup(d, sp.dataset.g, +sp.dataset.d); reopen(); }));
+}
+function renameDsGroup(d, oldG, newG){
+  // renames a group of a comparison dataset; samples and grouping are unchanged
+  newG=String(newG).trim();
+  if(!newG||newG===oldG) return null;
+  if(d.gi[newG]) return `"${newG}" is already a group of this dataset; merging groups changes filtering and normalization, so assign samples with the editor below instead.`;
+  d.groups=d.groups.map(g=>g===oldG? newG : g);
+  if(d.factors&&d.gfactor&&d.factors[d.gfactor]){ const f=d.factors[d.gfactor]; for(const k of Object.keys(f)) if(String(f[k])===oldG) f[k]=newG; }
+  if(d.gorder) d.gorder=d.gorder.map(g=>g===oldG? newG : g);
+  if(d.selA===oldG) d.selA=newG; if(d.selB===oldG) d.selB=newG;
+  reindexDataset(d);
+  return null;
+}
+function moveDsGroup(d, g, dir){
+  const o=(d.gorder||Object.keys(d.gi)).slice(), i=o.indexOf(g), j=i+dir;
+  if(i<0||j<0||j>=o.length) return;
+  [o[i],o[j]]=[o[j],o[i]]; d.gorder=o;
+  const keep=[d.selA, d.selB]; reindexDataset(d); d.selA=keep[0]; d.selB=keep[1];
+}
+function moveDataset(k, dir){
+  // moves comparison dataset k up or down; results that refer to datasets by position are re-pointed
+  const j=k+dir; if(j<0||j>=DSETS.length) return;
+  const map=new Map(); map.set(k+1, j+1); map.set(j+1, k+1);   // dataset numbering: 0 = session
+  [DSETS[k], DSETS[j]]=[DSETS[j], DSETS[k]];
+  for(const R of [META, CONSENSUS]) if(R&&Array.isArray(R.idxs)) R.idxs=R.idxs.map(i=>map.has(i)? map.get(i) : i);
+  try{ famReset(); }catch(e){}
+  refreshCmpUI();
+  try{ if(META){ renderMetaTable(); drawMetaHeat(); drawMetaForest(); } }catch(e){}
 }
 function refreshCmpUI(){
   renderCmpSlots();
@@ -7184,7 +7294,7 @@ function drawRidgeline(){
     const r=o.r;
     const pStat=r.q!==undefined? " (FDR "+fmtP(r.q)+")" : "";
     return {x:o.gs.map(g=>res.lfc[g]), type:"violin", side:"positive", orientation:"h",
-      y0:(r.name.length>30? r.name.slice(0,28)+"…" : r.name)+"  med "+o.med.toFixed(2)+pStat, width:1.7,
+      y0:(()=>{ const tl="  med "+o.med.toFixed(2)+pStat, sh=shortName(r.name, 30)+tl; noteFull(sh, r.name+tl); return sh; })(), width:1.7,
       line:{color:"#334155",width:1}, fillcolor:hexA(PAL[k2%PAL.length],0.45),
       points:false, meanline:{visible:true}, showlegend:false,
       hoverinfo:"skip"};   // violin outlines hover on every KDE vertex; one clean marker below instead
@@ -7296,7 +7406,7 @@ function drawSetJaccard(){
     order.push(bj); used.add(bj);
   }
   const Jo=order.map(a=>order.map(b2=>J[a][b2]));
-  const labs=order.map(a=>rows[a].name.length>34? rows[a].name.slice(0,32)+"…" : rows[a].name);
+  const labs=order.map(a=>shortName(rows[a].name, 34));
   Plotly.react(el("p_setjaccard"), [{z:Jo, x:labs, y:labs, type:"heatmap",
     colorscale:[[0,"#f8fafc"],[1,"#7c3aed"]], zmin:0, zmax:1, colorbar:{title:"Jaccard",thickness:12},
     hovertemplate:"%{y} ∩ %{x}<br>Jaccard %{z:.2f}<extra>click for shared genes</extra>"}],
@@ -7326,7 +7436,7 @@ function drawLeadingEdge(){
   const genes=[...cnt.entries()].sort((a,b)=>b[1]-a[1]).slice(0,40).map(e=>e[0]);
   const z=rows.map(r=>{ const s=new Set(r.leIdx); return genes.map(g=>s.has(g)?1:0); });
   Plotly.react(el("p_leadedge"), [{z, x:genes.map(g=>GENES[g].split(" (")[0]),
-    y:rows.map(r=>r.name.length>30?r.name.slice(0,28)+"…":r.name), type:"heatmap",
+    y:rows.map(r=>shortName(r.name, 30)), type:"heatmap",
     colorscale:[[0,"#f8fafc"],[1,"#334155"]], zmin:0, zmax:1, showscale:false}],
     {margin:{t:30,b:96,l:210,r:10}, height:130+22*rows.length+96, font:{size:9},
      title:{text:"Leading-edge membership: which genes drive which sets", font:{size:12}},
@@ -10583,7 +10693,7 @@ async function makeSummaryFigure(){
 
 /* ================= session save / restore ================= */
 function sessionState(){
-  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, deTreat:DETREAT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
+  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, deTreat:DETREAT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, sampleBar:{hide:SBHIDE, coll:SBCOLL}, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
     disco:{fam:el("dscfam").checked, cur:el("dsccur").checked, gmt:el("dscgmt").checked, mn:el("dscmin").value, mx:el("dscmax").value, B:el("dscperm").value},
     matrixName:pending&&pending.matrixName||"", nG0:FILTER.ng0, factor:FACTOR,
     factors:(pending&&pending.factors)? Object.fromEntries(baseFactorNames().map(f=>[f,pending.factors[f]])) : null,
@@ -10694,6 +10804,7 @@ function applySession(ss){
   if(ss.norm) el("normsel").value=ss.norm;
   if(ss.fontScale){ FONTSCALE=ss.fontScale; el("fontsel").value=String(ss.fontScale); }
   SESSLABEL=ss.sessLabel||"";
+  SBHIDE=!!(ss.sampleBar&&ss.sampleBar.hide); SBCOLL=Object.assign({}, ss.sampleBar&&ss.sampleBar.coll);
   if(ss.trait){ setTimeout(()=>{ try{ refreshTraitUI(); el("trsel").value=ss.trait.trait; el("trtf").value=ss.trait.transform; el("tradj").checked=!!ss.trait.adjustGroup; el("trblk").value=ss.trait.block||""; el("trbmode").value=ss.trait.blockMode||"auto";
     document.querySelectorAll("#trgroups input.trg").forEach(x=>x.checked=!ss.trait.groups.length||ss.trait.groups.includes(x.dataset.g)); document.querySelectorAll("#trcovs input.trc").forEach(x=>x.checked=ss.trait.covs.includes(x.dataset.c)); }catch(e){} }, 0); }
   if(ss.mforest){ el("mfgenes").value=ss.mforest.genes||""; el("mfn").value=ss.mforest.n||"20"; }

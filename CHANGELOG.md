@@ -2,6 +2,15 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Samples and groups
+- NEW: the sample list at the top of the dashboard can be hidden with **Hide samples**; a one-line summary then gives the number of samples included in each group. Each group's samples can also be collapsed individually (arrow before the group name). The view is saved in sessions.
+- NEW: session groups can be renamed after loading (pencil after the group name). The samples, the grouping and every statistic are unchanged; the new name is used in all plots, tables, exports, the methods text and sessions. Renaming a group to the name of another group is refused, because merging groups changes filtering and normalization; groups are merged in the design editor.
+- NEW: comparison datasets: under **Edit groups**, each group can be renamed and the groups reordered; the order is used in the contrast menus and in the dataset's plots. Merging by renaming is refused as for the session.
+- NEW: comparison datasets can be moved up or down in the list (arrows next to **Remove**); the order is used in comparison plots, tables and exports. A meta-analysis already computed keeps each result attached to the right dataset.
+
+Figures
+- FIXED: data exports (Excel, GraphPad Prism layout) of figures with shortened labels gave the shortened names with "…" instead of the full names. Affected were the enrichment dot plot, the gene-set overlap heatmap, the ridgeline plot, the leading-edge heatmap and the enrichment matrix across contrasts, and any axis label shortened to fit the margin. Every figure now keeps the full name behind each shortened or wrapped label, and its data export uses the full name. Wrapped labels (for example long group names) were exported with spaces where the lines broke; they are now exported as written. Two names that shorten to the same text keep different endings, so they are no longer drawn as one row.
+
 Cross-dataset comparison
 - NEW: signature transfer carries genes without a one-to-one human–mouse ortholog through their homology family (option, on by default). Each family counts once and is scored on that species' members present in the dataset. Previously these genes were dropped, which removed families such as SERPINB3/4, S100A7 and LCE3 from mouse-to-human transfer. A table lists how each signature gene was matched in each dataset (one to one, through a family, or not found), with a CSV export.
 - NEW: replication across datasets. Each comparison dataset reports Hedges' g of the signature score; g is pooled over the independent comparison datasets with the model chosen in the meta-analysis card (default REML with the Hartung-Knapp test), shown in a forest plot with the discovery dataset for reference (not pooled), and exported as CSV or as an Excel/Prism sheet.
