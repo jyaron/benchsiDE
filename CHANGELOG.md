@@ -2,6 +2,12 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Multi-gene comparison (Gene Explorer)
+- NEW: significance brackets on the grouped bar, box and violin charts when grouped by gene: for the DE contrast, for each group against the first group, or for all pairs of groups. The test is either the DE tab's model (method, fit, covariates, TREAT; FDR by Benjamini-Hochberg across all genes, so the values equal the DE table) or a Welch t-test per gene with Holm correction across the pairs shown. Labels as stars or values; the caption states the test and correction. **Export this figure** saves the figure as shown, with its brackets, as SVG or PNG; the data export (Excel, Prism layout) has a Statistics sheet with log2FC, p and adjusted p for every bracket.
+- CHANGED: the comparison holds up to 30 genes (was 10), also when sent from a volcano or MA selection.
+- FIXED: genes selected on the volcano or MA plot stayed marked when the user returned to the DE tab, but the selection table and its actions disappeared. Plotly reports a cleared selection when the plot is redrawn; such events no longer clear the selection.
+- FIXED: automatic label wrapping could break a short identifier such as a gene symbol inside the word ("S100A / 9"); such labels are now slanted instead.
+
 Samples and groups
 - NEW: the sample list at the top of the dashboard can be hidden with **Hide samples**; a one-line summary then gives the number of samples included in each group. Each group's samples can also be collapsed individually (arrow before the group name). The view is saved in sessions.
 - NEW: session groups can be renamed after loading (pencil after the group name). The samples, the grouping and every statistic are unchanged; the new name is used in all plots, tables, exports, the methods text and sessions. Renaming a group to the name of another group is refused, because merging groups changes filtering and normalization; groups are merged in the design editor.

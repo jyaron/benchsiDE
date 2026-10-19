@@ -423,8 +423,11 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
         <span id="cmparrwrap" style="font-weight:400;font-size:12px;margin-left:10px">group by <select id="cmparr" style="font-size:12px" title="Genes side by side within each condition, or conditions side by side within each gene"><option value="gene_in_cond">condition (genes side by side)</option><option value="cond_in_gene">gene (conditions side by side)</option></select></span>
         <label style="font-weight:400;font-size:12px;margin-left:10px"><input type="checkbox" id="cmppts" checked> show samples</label>
         <label style="font-weight:400;font-size:12px;margin-left:10px" title="Scale each gene to mean 0 and SD 1 across the included samples, so genes with different expression levels share one axis"><input type="checkbox" id="comparez"> z-score each gene</label>
+      <span id="cmpstatwrap" style="font-weight:400;font-size:12px;margin-left:10px">statistics <select id="cmpstat" style="font-size:12px" title="Significance brackets for each gene (drawn when grouped by gene)"><option value="none">none</option><option value="de">DE contrast (B vs A of the DE tab)</option><option value="first">each group vs the first group</option><option value="all">all pairs of groups</option></select>
+        <select id="cmptest" style="font-size:12px" title="DE model: the test and model of the DE tab (method, fit, covariates, TREAT), FDR by Benjamini-Hochberg across all genes. Welch: Welch t-test per gene on log2 expression, Holm-corrected across the pairs shown for that gene."><option value="de">DE model, FDR</option><option value="welch">Welch t, Holm</option></select>
+        <select id="cmpstatfmt" style="font-size:12px"><option value="stars">stars</option><option value="p">values</option></select></span>
         <button class="act ghost" id="clearcompare" style="float:right;font-size:11.5px;padding:3px 10px">clear</button>
-        <button class="act" id="panelfig" style="float:right;font-size:11.5px;padding:3px 10px;margin-right:8px">Export panel figure</button></h3>
+        <button class="act" id="panelfig" style="float:right;font-size:11.5px;padding:3px 10px;margin-right:8px" title="One panel per gene">Export panel figure</button><button class="act" id="cmpfigexp" style="float:right;font-size:11.5px;padding:3px 10px;margin-right:8px" title="This figure as shown, with its statistics, as SVG or PNG; the data (Excel, Prism layout) include a Statistics sheet">Export this figure</button></h3>
       <div id="p_panel_tmp" style="position:fixed;left:-9999px;top:0;width:520px;height:380px"></div>
       <div id="comparechips" style="margin-bottom:6px"></div>
       <div id="p_compare" style="height:360px"></div>
@@ -1228,7 +1231,10 @@ function layoutGuard(div, traces, L){
       } else if(uc.length*(widest(uc)+6)<=plotW){ ang=0; }
       else {
         const w=LC.long==="wrap"? plain.map(v=>wrapLabel(v,xs,slot)) : null;
-        if(w&&widest(w)<=slot&&Math.max(...w.map(v=>v.split("<br>").length))<=3){ labs=w; ang=0; }
+        // a short word that does not fit the slot (a gene symbol such as S100A9, a sample ID) would have to be broken
+        // inside the word; slant the labels instead. Long joined names (over 12 characters) may still be broken.
+        const splitsShort=plain.some(v=>v.split(/[\s_\-\/]+/).some(t=>t.length<=12&&textW(t,xs)>slot));
+        if(w&&!splitsShort&&widest(w)<=slot&&Math.max(...w.map(v=>v.split("<br>").length))<=3){ labs=w; ang=0; }
         else ang = uc.length*2*xs<=plotW? 45 : 90;
       }
       // Slanted labels run from their tick to the right (positive angle) or to the left (negative angle). When the
@@ -1469,6 +1475,7 @@ function plotToSheets(data, layout){
   const sheets=[];
   if(prism) sheets.push({name:"Prism", rows:prism});
   cols.forEach(c=>sheets.push(c));
+  if(L.meta&&Array.isArray(L.meta.statsRows)&&L.meta.statsRows.length>1) sheets.push({name:"Statistics", rows:L.meta.statsRows});
   sheets.push({name:"All values", rows:long});
   sheets.push({name:"Notes", rows:notes});
   return {sheets, kind};
@@ -1541,6 +1548,7 @@ function reguardPlots(force){
     try{ layoutGuard(d, r.traces, lay); plotAreaGuard(d, lay); }catch(e){}
     let tr=r.traces; if(TH_ON){ tr=thWalk(tr,""); lay=thWalk(lay,""); }
     r.w=w;
+    d._lastDraw=(typeof performance!=="undefined"&&performance.now)? performance.now() : Date.now();
     try{ _plreact(d, tr, lay, r.cfg); }catch(e){}
   }
 }
@@ -1570,6 +1578,7 @@ Plotly.react=function(div,traces,layout,cfg){
   if(layout&&layout.height&&d0&&d0.style&&d0.id!=="p_panel_tmp") d0.style.height=Math.ceil(layout.height)+"px";
   if(layout0) PLREG.set(d0.id, {traces, layout0, cfg, w:(d0.clientWidth||0)});
   if(TH_ON){ traces=thWalk(traces,""); layout=thWalk(layout,""); }
+  if(d0) d0._lastDraw=(typeof performance!=="undefined"&&performance.now)? performance.now() : Date.now();
   return _plreact(div,traces,layout,cfg);
 };
 /* ================= colour themes =================
@@ -3392,10 +3401,36 @@ el("genebq").addEventListener("keydown",e=>{ if(e.key==="Enter") drawGeneB(); })
 /* multi-gene comparison */
 el("addcompare").addEventListener("click",()=>{
   if(curGene===null) return;
-  if(!compareList.includes(curGene)){ compareList.push(curGene); if(compareList.length>10)compareList.shift(); }
+  if(!compareList.includes(curGene)){ compareList.push(curGene); if(compareList.length>CMPMAX)compareList.shift(); }
   drawCompare(); });
 el("clearcompare").addEventListener("click",()=>{ compareList=[]; drawCompare(); });
 el("comparez").addEventListener("change",drawCompare);
+["cmpstat","cmptest","cmpstatfmt"].forEach(id=>el(id).addEventListener("change",drawCompare));
+el("cmpfigexp").addEventListener("click",()=>{ if(compareList.length) figPreviewPlot(el("p_compare")); });
+const CMPSTATC=new Map(), CMPMAX=30;   // genes in the multi-gene comparison
+function cmpPairStats(pairs, genes, test){
+  // per gene and pair: log2FC (B - A), p, adjusted p (FDR across all genes for the DE model; Holm across the pairs shown
+  // for each gene with the Welch test)
+  const out={}; const gi=groupsIdx();
+  if(test==="de"){
+    const stKey=[deMethod, DEFIT, DECOVSEL.join("+"), included.join(""), JSON.stringify(COVTYPE), DETREAT? "t"+el("fcthr").value : ""].join("|");
+    for(const [A,B] of pairs){
+      const k=A+"\u0001"+B+"\u0001"+stKey;
+      let r=CMPSTATC.get(k);
+      if(!r){ const res=runContrast(A,B); r= res.err? {err:res.err} : {lfc:res.lfc, p:res.p, q:res.q, treat:!!res.treat, method:res.method};
+        if(CMPSTATC.size>40) CMPSTATC.clear(); CMPSTATC.set(k, r); }
+      genes.forEach(g=>{ (out[g]=out[g]||[]).push(r.err? {A,B,err:r.err} : {A,B, lfc:r.lfc[g], p:r.p[g], adj:r.q[g]}); });
+    }
+  } else {
+    genes.forEach(g=>{
+      const rows=pairs.map(([A,B])=>{ const a=gi[A].map(j=>L[g*nS+j]), b=gi[B].map(j=>L[g*nS+j]); const w=welch(a,b);
+        return (!w||!(w.se>0))? {A,B,err:"not testable (no within-group variance)"} : {A,B, lfc:w.d, p:w.p}; });
+      const ti=rows.map((r,i)=>i).filter(i=>!rows[i].err), adj=holm(ti.map(i=>rows[i].p)); ti.forEach((i,k)=>rows[i].adj=adj[k]);
+      out[g]=rows; });
+  }
+  return out;
+}
+function starOfQ(q){ return q<=0.0001? "****" : q<=0.001? "***" : q<=0.01? "**" : q<=0.05? "*" : "ns"; }
 function drawCompare(){
   const card=el("comparecard"), chips=el("comparechips");
   chips.innerHTML=compareList.map(g=>`<span class="chip">${GENES[g]}<b data-g="${g}">&times;</b></span>`).join("");
@@ -3415,6 +3450,7 @@ function drawCompare(){
     const o={}; gs.forEach(d=>{ o[d]=gi[d].map(j=>f(LM[g*nS+j])); }); return o; });
   const rgba=(h,a)=>{ const c=hexRGB(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
   const traces=[]; let layoutX, note="";
+  var statShapes=[], statAnn=[], statTop=null, statBottom=null;
   const zTxt=useZ?" of z-scored values":"";
   if(chart==="profile"){
     compareList.forEach((g,i)=>{ const ms=gs.map(d=>mean(vals[i][d])), c=PAL[i%PAL.length];
@@ -3460,11 +3496,60 @@ function drawCompare(){
       outer.map(o=>[o.lab].concat(...inner.map(s2=>{ const v=cell(o,s2).v; return Array.from({length:nRep},(_,r)=>v[r]!==undefined? v[r] : null); }))));
     var prismMeta={prismRows, prismKind:`Grouped (rows: ${byGene?"genes":"conditions"}; data sets: ${byGene?"conditions":"genes"}; ${nRep} replicate sub-columns)`,
       prismHow:`Create a Grouped table with ${nRep} replicates in side-by-side sub-columns; paste the sheet with the first column as row titles. Groups with fewer samples leave empty cells.`};
+    // ---- significance brackets (grouped by gene only)
+    var statShapes=[], statAnn=[], statTop=null, statBottom=null;
+    const stMode=el("cmpstat").value, stTest=el("cmptest").value, stFmt=el("cmpstatfmt").value;
+    if(stMode!=="none"){
+      if(!byGene) note+=" Statistics are drawn when the figure is grouped by gene.";
+      else {
+        const ok=gs.filter(d=>gi[d].length>=2);
+        let pairs=[];
+        if(stMode==="de"){ const A=el("selA").value, B=el("selB").value; if(ok.includes(A)&&ok.includes(B)&&A!==B) pairs=[[A,B]]; }
+        else if(stMode==="first"){ pairs=ok.slice(1).map(d=>[ok[0], d]); }
+        else { for(let a=0;a<ok.length;a++) for(let b=a+1;b<ok.length;b++) pairs.push([ok[a], ok[b]]); }
+        if(stMode==="all"&&pairs.length>15){ note+=` All pairs of ${ok.length} groups (${pairs.length} brackets per gene) would not be readable; choose "each group vs the first group" or the DE contrast.`; pairs=[]; }
+        if(!pairs.length&&stMode==="de") note+=" Statistics: the DE tab's two groups are not both shown with at least 2 samples.";
+        if(pairs.length){
+          const ST=cmpPairStats(pairs, compareList, stTest);
+          // data extent per gene (points and bar + error), and the bracket step
+          let lo=Infinity, hi=-Infinity; const topG=compareList.map((g,i)=>{ let t=-Infinity; gs.forEach(d=>{ const v=vals[i][d]; v.forEach(x=>{ if(x>t) t=x; if(x<lo) lo=x; if(x>hi) hi=x; });
+            if(chart==="bar"&&v.length){ const m=mean(v), sd=v.length>1?Math.sqrt(variance(v,m)):0, e=errType==="sd"? sd : (v.length>1? sd/Math.sqrt(v.length) : 0); if(m+e>t) t=m+e; } }); return t; });
+          const span=Math.max(1e-9, hi-Math.min(lo, useZ? lo : 0)), step=span*0.085, tick=span*0.018;
+          const idxOf=d=>inner.findIndex(s2=>s2.d===d);
+          const statRows=[["gene","group A","group B","log2FC (B - A)","p","adjusted p","adjustment","label"]];
+          compareList.forEach((g,k)=>{
+            const rows=(ST[g]||[]).map(r=>Object.assign({span:Math.abs(idxOf(r.B)-idxOf(r.A))}, r)).sort((x,y)=>x.span-y.span||idxOf(x.A)-idxOf(y.A));
+            let level=0; const used=[];   // stack brackets: a bracket goes on the lowest level whose intervals it does not overlap
+            rows.forEach(r=>{
+              const x1=pos(k, Math.min(idxOf(r.A), idxOf(r.B))), x2=pos(k, Math.max(idxOf(r.A), idxOf(r.B)));
+              let lv=0; while((used[lv]||[]).some(([u1,u2])=>!(x2<u1-1e-9||x1>u2+1e-9))) lv++;
+              (used[lv]=used[lv]||[]).push([x1,x2]); level=Math.max(level, lv);
+              const y=topG[k]+step*(0.7+lv);
+              const lab= r.err? "n.t." : stFmt==="stars"? starOfQ(r.adj) : (stTest==="de"? "q " : "p ")+fmtP(r.adj);
+              statShapes.push({type:"line", x0:x1, x1:x1, y0:y-tick, y1:y, line:{color:"#334155", width:1}},
+                              {type:"line", x0:x1, x1:x2, y0:y, y1:y, line:{color:"#334155", width:1}},
+                              {type:"line", x0:x2, x1:x2, y0:y-tick, y1:y, line:{color:"#334155", width:1}});
+              statAnn.push({x:(x1+x2)/2, y, text:lab, showarrow:false, yanchor:"bottom", font:{size:stFmt==="stars"?12:9.5, color:"#1e293b"}, yshift:-1});
+              statTop=Math.max(statTop??-Infinity, y+step*0.75);
+              statRows.push([GENES[g].split(" (")[0], r.A, r.B, r.err? null : r.lfc, r.err? null : r.p, r.err? null : r.adj,
+                stTest==="de"? "Benjamini-Hochberg across all "+nG+" genes" : "Holm across the "+rows.length+" pair(s) shown for this gene", r.err? r.err : lab]);
+            });
+          });
+          statBottom= useZ? lo-span*0.04 : Math.min(0, lo-span*0.04);
+          prismMeta.statsRows=statRows;
+          const tdesc= stTest==="de"? (()=>{ const pr=(deCache&&deCache.prior)||{}; return `${deMethodLabel()}${DETREAT&&deMethod!=="welch"? ", TREAT test of |log₂FC| > "+(Math.abs(parseFloat(el("fcthr").value))||0) : ""}${DEFIT==="all"&&deMethod!=="welch"? ", variance from all groups" : ""}${DECOVSEL.filter(v=>COVARS[v]).length? ", adjusted for "+DECOVSEL.filter(v=>COVARS[v]).join(", ") : ""}; FDR by Benjamini–Hochberg across all ${nG.toLocaleString()} genes`; })()
+            : `Welch t-test per gene on log₂ expression; p adjusted by Holm across the pairs shown for each gene`;
+          note+=` Brackets: ${stMode==="de"? "the DE contrast" : stMode==="first"? "each group against "+esc(ok[0]) : "all pairs of groups"}; ${tdesc}${stFmt==="stars"? "; * ≤ 0.05, ** ≤ 0.01, *** ≤ 0.001, **** ≤ 0.0001, ns > 0.05" : ""}${useZ? "; tests use log₂ expression, not the z-scores shown" : ""}.`;
+        }
+      }
+    }
   }
   const yTitle=useZ? "z-score (per gene, across samples)" : "log₂ expression";
   el("comparenote").innerHTML=note+(LM!==L?" Displayed values are batch-adjusted (display only).":"");
+  const hasStat= typeof statTop==="number" && isFinite(statTop);
   Plotly.react("p_compare",traces,{margin:{t:36,b:42,l:60,r:10},font:{size:11},
-    xaxis:layoutX, yaxis:{title:yTitle, rangemode:useZ?"normal":"tozero", zeroline:useZ},
+    xaxis:layoutX, yaxis: hasStat? {title:yTitle, range:[statBottom, statTop], zeroline:useZ} : {title:yTitle, rangemode:useZ?"normal":"tozero", zeroline:useZ},
+    shapes: hasStat? statShapes : [], annotations: hasStat? statAnn : [],
     legend:{orientation:"h",y:1.02,yanchor:"bottom",x:1,xanchor:"right"}, boxmode:"overlay", violinmode:"overlay", barmode:"overlay",
     meta: chart==="profile"? undefined : prismMeta},PL);
 }
@@ -3985,8 +4070,13 @@ let DESEL=null, DESELSORT={col:"p", dir:1};
 function onPlotSelect(div, fn){
   div._psHandler=fn;
   if(!div._psBound){ div._psBound=true;
-    div.on("plotly_selected", ev=>{ if(div._psHandler&&ev&&ev.points) div._psHandler(ev.points); });
-    div.on("plotly_deselect", ()=>{ if(div._psHandler) div._psHandler(null); }); }
+    // Plotly can report an empty selection or a deselect when the plot is redrawn (for example when its tab is shown
+    // again and the plot is refitted to the new width). Those events are not the user's and must not clear the
+    // selection; only events on a visible plot, not within 1 s of a redraw, are passed on.
+    const userEv=()=>{ const t=(typeof performance!=="undefined"&&performance.now)? performance.now() : Date.now();
+      return !(div._lastDraw&&t-div._lastDraw<1000) && (div.offsetParent!==null||div.clientWidth>0); };
+    div.on("plotly_selected", ev=>{ if(!div._psHandler||!ev||!ev.points) return; if(!ev.points.length&&!userEv()) return; div._psHandler(ev.points); });
+    div.on("plotly_deselect", ()=>{ if(div._psHandler&&userEv()) div._psHandler(null); }); }
 }
 function deSelRows(){
   const res=computeDE(); if(res.err||!DESEL) return null;
@@ -4025,7 +4115,7 @@ el("deselcsv").addEventListener("click",()=>{
 el("deselcopy").addEventListener("click",()=>{ const t=deSelSymbols().join("\n");
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>{ el("deselcopy").textContent="Copied"; setTimeout(()=>{ el("deselcopy").textContent="Copy genes"; },1500); }); });
 el("deselheat").addEventListener("click",()=>{ if(!DESEL||DESEL.size<2) return; el("heatsrc").value="sel"; switchTab("heat"); });
-el("deselcmp").addEventListener("click",()=>{ const rows=deSelRows()||[]; rows.sort((x,y)=>x.p-y.p); compareList=rows.slice(0,10).map(r=>r.g); if(!compareList.length) return;
+el("deselcmp").addEventListener("click",()=>{ const rows=deSelRows()||[]; rows.sort((x,y)=>x.p-y.p); compareList=rows.slice(0,CMPMAX).map(r=>r.g); if(!compareList.length) return;
   curGene=compareList[0]; switchTab("gene"); drawCompare(); });
 /* ================= co-expression ================= */
 makeAutocomplete(el("cosearch"),el("cosuggest"),i=>{ coGene=i; coPartner=null; drawCoexp(); });

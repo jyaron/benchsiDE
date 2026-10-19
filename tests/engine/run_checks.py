@@ -384,6 +384,44 @@ def relabel_reorder():
     return ok, r
 
 
+@check
+def compare_stats():
+    # multi-gene comparison: brackets from the DE model equal the DE table; Welch/Holm brackets; Statistics sheet;
+    # up to 30 genes; volcano selection survives redraws
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(des("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="CTRL_healthy"; el("selB").value="PSO_lesional"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey="";
+  const res=computeDE(); const out={};
+  const order=Array.from({length:nG},(_,g)=>g).sort((a,b)=>res.p[a]-res.p[b]); compareList=order.slice(0,25); CMPCHART="bar"; CMPARR="cond_in_gene";
+  el("cmpstat").value="de"; el("cmptest").value="de"; el("cmpstatfmt").value="p"; switchTab("gene"); __drain(); drawCompare();
+  let c=plotlyCalls.filter(x=>x.id==="p_compare").pop(), sr=c.layout.meta.statsRows;
+  out.n=compareList.length; out.br=c.layout.annotations.length; out.qOK=compareList.every((g,i)=>sr[i+1][5]===res.q[g]&&sr[i+1][3]===res.lfc[g]);
+  out.sheet=plotToSheets(c.traces, c.layout).sheets.some(x=>x.name==="Statistics");
+  el("cmpstat").value="all"; el("cmptest").value="welch"; drawCompare(); c=plotlyCalls.filter(x=>x.id==="p_compare").pop(); sr=c.layout.meta.statsRows;
+  const gi=groupsIdx(), g0=compareList[0];
+  const rows0=sr.slice(1).filter(x=>x[0]===GENES[g0].split(" (")[0]);
+  out.welch=rows0.map(x=>[x[1],x[2],x[4],x[5]]); out.vals=Object.fromEntries(Object.entries(gi).map(([k,ix])=>[k, ix.map(j=>L[g0*nS+j])]));
+  // selection persistence
+  el("dedrag").value="select"; switchTab("de"); __drain(); drawDE();
+  const v=plotlyCalls.filter(x=>x.id==="p_volcano").pop(), tr=v.traces[0], pts=[]; for(let k=0;k<tr.x.length;k++) if(tr.x[k]>=3&&tr.y[k]>=15) pts.push({curveNumber:0, pointIndex:k});
+  const V=el("p_volcano"); V._lastDraw=0; V._on["plotly_selected"]({points:pts}); const n0=DESEL?DESEL.size:0;
+  switchTab("gene"); __drain(); switchTab("de"); __drain(); V._on["plotly_deselect"](); V._on["plotly_selected"]({points:[]});
+  out.sel=[n0, DESEL?DESEL.size:0, el("deselbar").style.display];
+  print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=1800)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    from scipy import stats as SS
+    from statsmodels.stats.multitest import multipletests
+    ps = [SS.ttest_ind(r["vals"][b], r["vals"][a], equal_var=False).pvalue for a, b, _, _ in r["welch"]]
+    adj = multipletests(ps, method="holm")[1]
+    dp = max(abs(x - w[2]) / x for x, w in zip(ps, r["welch"])); da = max(abs(x - w[3]) for x, w in zip(adj, r["welch"]))
+    ok = r["n"] == 25 and r["br"] == 25 and r["qOK"] and r["sheet"] and dp < 1e-9 and da < 1e-9 and r["sel"][0] > 0 and r["sel"][1] == r["sel"][0] and r["sel"][2] == "flex"
+    return ok, {"n": r["n"], "brackets": r["br"], "de_q_identical": r["qOK"], "stats_sheet": r["sheet"], "welch_p_rel": dp, "holm_abs": da, "selection": r["sel"]}
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0
