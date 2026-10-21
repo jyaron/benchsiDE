@@ -2,6 +2,13 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Loading data
+- FIXED: ticking or unticking samples in the sample list at the top of the dashboard no longer recomputed the statistics (since the sample list could be hidden and groups renamed). The statistics again recompute when a sample or a whole group is ticked or unticked.
+- FIXED: repeated column names in the expression matrix (for example m5, m5, m5, m5+baf, m5+baf, m5+baf) gave several samples the same name. Plots that list samples drew them as one, and design values and session settings could not be told apart. Repeated names are now numbered in file order (m5_1, m5_2, …), and the review step says so. A design file may repeat the names in the same order.
+- CHANGED: without a design file, samples with identical column names form one group. Groups are otherwise guessed from whole name parts: sample-number and replicate parts (1, S3, rep1) are removed, a prefix or suffix shared by all names is removed only at a separator, and a number written directly after a name (WT1, WT2) is removed only when every resulting group has at least two samples. Previously m5 and m5+baf were split into the groups "m" and "+baf".
+- CHANGED: when a design file has a time factor (a column named as a time, such as Day, Time, Hours, Week or dpi, holding numbers with at least three distinct values), samples are grouped by it and analysed as a time course. Previously the first column was always used, so a design with a strain row above a day row was grouped by strain. The review step states the grouping factor, the factors available as covariates and the combined factor (for example Strain × Day).
+- CHANGED: group labels are ordered with numbers compared as numbers (C57 · 4 before C57 · 10).
+
 Multi-gene comparison (Gene Explorer)
 - NEW: significance brackets on the grouped bar, box and violin charts when grouped by gene: for the DE contrast, for each group against the first group, or for all pairs of groups. The test is either the DE tab's model (method, fit, covariates, TREAT; FDR by Benjamini-Hochberg across all genes, so the values equal the DE table) or a Welch t-test per gene with Holm correction across the pairs shown. Labels as stars or values; the caption states the test and correction. **Export this figure** saves the figure as shown, with its brackets, as SVG or PNG; the data export (Excel, Prism layout) has a Statistics sheet with log2FC, p and adjusted p for every bracket.
 - CHANGED: the comparison holds up to 30 genes (was 10), also when sent from a volcano or MA selection.

@@ -2063,7 +2063,8 @@ function parseMatrixText(text){
   let nameCol=annoCols.find(c=>/name|symbol/i.test(header[c])&&!/biotype/i.test(header[c]));
   if(nameCol===undefined) nameCol=annoCols.find(c=>c!==idCol&&c!==btCol) ?? idCol;
   if(sampleCols.length<3) throw "Fewer than 3 numeric sample columns detected. If the file uses a comma as the decimal separator (for example 12,5), re-save it with a point as the decimal separator.";
-  const sampleNames=sampleCols.map(c=>header[c]||("S"+c));
+  const origNames=sampleCols.map(c=>(header[c]||"").trim()||("S"+c));
+  const sampleNames=uniqueSampleNames(origNames);
   const ids=[], names=[], bts=[], vals=[]; let nBad=0;
   for(let i=1;i<lines.length;i++){
     const r=lines[i].split(delim);
@@ -2076,13 +2077,35 @@ function parseMatrixText(text){
     vals.push(row);
   }
   const seenId=new Set(); let nDupIds=0; for(const id of ids){ if(seenId.has(id)) nDupIds++; else seenId.add(id); }
-  return {sampleNames, ids, names, bts, vals, nBad, nDupIds};
+  return {sampleNames, origNames, dupLabels:dupLabelCounts(origNames), ids, names, bts, vals, nBad, nDupIds};
+}
+// Column names that occur more than once (for example m5, m5, m5, m5+baf, ...) are made unique by numbering
+// each occurrence in file order (m5_1, m5_2, m5_3); the same rule is applied to the sample names of a design
+// file, so a design file that repeats the names in the same order still matches.
+function uniqueSampleNames(names){
+  const cnt={}; names.forEach(n=>{ cnt[n]=(cnt[n]||0)+1; });
+  const taken=new Set(names.filter(n=>cnt[n]===1)), seen={}, out=[];
+  for(const n of names){
+    if(cnt[n]===1){ out.push(n); continue; }
+    let k=(seen[n]||0)+1, c=n+"_"+k;
+    while(taken.has(c)){ k++; c=n+"_"+k; }
+    seen[n]=k; taken.add(c); out.push(c);
+  }
+  return out;
+}
+function dupLabelCounts(names){
+  const cnt={}; names.forEach(n=>{ cnt[n]=(cnt[n]||0)+1; });
+  const d={}; for(const k of Object.keys(cnt)) if(cnt[k]>1) d[k]=cnt[k];
+  return Object.keys(d).length? d : null;
 }
 function parseDesignText(text, sampleNames){
   const lines=text.replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim().length);
   const delim=sniffDelim(lines[0]);
   const grid=lines.map(l=>l.split(delim).map(s=>s.trim().replace(/^"(.*)"$/,"$1").replace(/^'(.*)'$/,"$1").trim()));   // R write.csv quotes every field
   const sset=new Set(sampleNames);
+  // repeated sample names in the design file are numbered in the same way as repeated matrix columns
+  { const h=grid[0].slice(1); if(dupLabelCounts(h)){ const u=uniqueSampleNames(h); u.forEach((v,j)=>{ grid[0][j+1]=v; }); }
+    const r=grid.slice(1).map(x=>x[0]); if(dupLabelCounts(r)){ const u=uniqueSampleNames(r); u.forEach((v,i)=>{ grid[i+1][0]=v; }); } }
   const headMatch=grid[0].slice(1).filter(c=>sset.has(c)).length;
   let colMatch=0; for(let i=1;i<grid.length;i++) if(sset.has(grid[i][0])) colMatch++;
   const factors={};
@@ -2116,12 +2139,33 @@ function parseDesignText(text, sampleNames){
     throw "Design file: sample names matched, but no factor rows/columns were found. If the file has only one visible line, it may use bare carriage-return line endings (classic Mac/Excel export): re-save with standard line endings, or re-drop it (this version normalizes them automatically).";
   return factors;
 }
-function inferGroups(names){
+function inferGroups(names, orig){
+  // 1. identical column names (m5, m5, m5, m5+baf, ...) are replicates of one condition
+  if(orig&&dupLabelCounts(orig)) return orig.map(n=>String(n).trim());
+  const SEP=/[_\-.\s]/;
+  const okGrouping=g=>{ const c={}; g.forEach(x=>{ c[x]=(c[x]||0)+1; }); const k=Object.keys(c).length; return k>=2&&k<g.length&&Object.values(c).every(v=>v>=2); };
+  // 2. names made of tokens (S1_WT_rep1, WT_2): drop sample-number and replicate tokens (1, S1, rep1, r2)
+  { const tok=names.map(n=>n.split(/[_\-.\s]+/).filter(Boolean));
+    if(tok.every(t=>t.length>=2)){
+      const g=names.map(n=>n.replace(/(^|[_\-.\s]+)(s|sample|rep|r|replicate|n|no)?\d+(?=$|[_\-.\s])/gi,"").replace(/^[_\-.\s]+|[_\-.\s]+$/g,""));
+      if(g.every(x=>x!=="")&&okGrouping(g)) return g;
+    } }
+  // 3. remove a prefix and suffix shared by every name, but only whole tokens (cut at a separator), and only
+  //    when every name keeps something
   let pre=names[0], suf=names[0];
   for(const n of names){ while(pre&&!n.startsWith(pre)) pre=pre.slice(0,-1); while(suf&&!n.endsWith(suf)) suf=suf.slice(1); }
-  if(pre===suf&&pre===names[0]) suf=""; // all identical guard
-  return names.map(n=>{ let core=n.slice(pre.length, suf.length? n.length-suf.length : n.length) || n;
-    const g=core.replace(/[_\-\.\s]?\d+$/,""); return g!==""?g:core; });
+  const atSepPre=p=>{ if(!p) return ""; if(names.every(n=>n.length===p.length||SEP.test(n[p.length]))) return p; const m=p.match(/^(.*[_\-.\s])/); return m? m[1] : ""; };
+  const atSepSuf=q=>{ if(!q) return ""; if(names.every(n=>n.length===q.length||SEP.test(n[n.length-q.length-1]))) return q; const m=q.match(/([_\-.\s].*)$/); return m? m[1] : ""; };
+  pre=atSepPre(pre); suf=atSepSuf(suf);
+  let core=names.map(n=>n.slice(pre.length, suf.length? n.length-suf.length : n.length).replace(/^[_\-.\s]+|[_\-.\s]+$/g,""));
+  if(core.some(c=>c==="")) core=names.slice();
+  // 4. remove a trailing replicate number: after a separator (WT_1, KO-2) always; written directly after the
+  //    name (WT1, WT2, KO1, KO2) only when every resulting group has at least 2 samples
+  const g1=core.map(c=>{ const g=c.replace(/[_\-.\s]+\d+$/,""); return g!==""? g : c; });
+  if(g1.some((g,i)=>g!==core[i])) return g1;
+  const g2=core.map(c=>{ const g=c.replace(/\d+$/,""); return g!==""? g : c; });
+  if(okGrouping(g2)) return g2;
+  return core;
 }
 
 /* ================= setup UI ================= */
@@ -2153,7 +2197,7 @@ function readFileInput(file,dz,cb){
 function onMatrixLoaded(text,fname){
   const mx=parseMatrixText(text);
   pending={matrix:mx, factors:null, factorNames:[], matrixName:fname||"matrix"};
-  pending.groups=inferGroups(mx.sampleNames);
+  pending.groups=inferGroups(mx.sampleNames, mx.origNames);
   renderSetup();
 }
 const COMBO_SEP=" \u00d7 ";
@@ -2178,12 +2222,22 @@ function rebuildCombos(){
   }
   pending.factorNames=names;
 }
+// Default grouping factor: a design column that is named as a time (Day, Time, Hours, Week, dpi, ...) and holds
+// numbers with at least 3 distinct values; otherwise the first column.
+const TIME_NAME=/(^|[^a-z])(days?|time|timepoints?|time[ _]?points?|tp|hours?|hrs?|h|weeks?|wks?|minutes?|mins?|months?|dpi|hpi|dpf|hpf|dpw)([^a-z]|$)/i;
+function timeFactorOf(factors, names){
+  const c=(names||Object.keys(factors)).filter(f=>!isCombo(f)&&TIME_NAME.test(f)).filter(f=>{
+    const v=[...new Set(Object.values(factors[f]).filter(x=>x!=="NA"&&x!==""))];
+    return v.length>=3&&groupsAreNumeric(v); });
+  return c.length? c[0] : null;
+}
+function defaultGroupFactor(factors, names){ return timeFactorOf(factors, names) || names[0]; }
 function onDesignLoaded(text){
   if(!pending){ throw "Load the expression matrix first."; }
   pending.factors=parseDesignText(text,pending.matrix.sampleNames);
   pending.factorNames=Object.keys(pending.factors);
   rebuildCombos();
-  if(pending.factorNames.length){ applyFactor(pending.factorNames[0]); }
+  if(pending.factorNames.length){ applyFactor(defaultGroupFactor(pending.factors, pending.factorNames)); }
   renderSetup();
 }
 function applyFactor(fname){
@@ -2199,7 +2253,11 @@ function renderSetup(){
   if(maxv<=50) mode="log-scale values detected (max ≤ 50): used as-is";
   else { const dev=colsums.map(s=>Math.abs(s-1e6)/1e6); if(Math.max(...dev)<0.15) mode="column sums ≈ 10⁶: already CPM/TPM"; }
   el("parseinfo").innerHTML=`<b>${mx.ids.length.toLocaleString()}</b> genes × <b>${mx.sampleNames.length}</b> samples · normalization: <b>${mode}</b>`+
-    (pending.factors?` · design factors: <b>${pending.factorNames.join(", ")}</b>`:" · no design file; groups guessed from sample names (edit below)");
+    (pending.factors?` · design factors: <b>${pending.factorNames.join(", ")}</b>`:" · no design file; groups guessed from sample names (edit below)")+
+    (mx.dupLabels? `<div class="warn" style="margin:6px 0 0">Column names occur more than once: ${Object.entries(mx.dupLabels).map(([k,v])=>`<b>${esc(k)}</b> (${v})`).join(", ")}. Each sample needs its own name, so the repeated names were numbered in file order (${esc(mx.sampleNames[mx.origNames.indexOf(Object.keys(mx.dupLabels)[0])])}, …)${pending.factors? "" : ", and samples with the same name were put in one group"}. Check the groups below. A design file may repeat the names in the same order, or use the numbered names.</div>` : "")+
+    (pending.factors&&pending.factorNames.length>1? (()=>{ const tf=timeFactorOf(pending.factors, pending.factorNames), others=baseFactorNames().filter(f=>f!==FACTOR&&!(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(f)));
+      return `<div class="footer-note" style="margin-top:4px">Samples are grouped by <b>${esc(FACTOR)}</b>${FACTOR===tf? " (a time factor: groups are ordered by time and analysed as a time course)" : ""}. ${others.length? `The other design column${others.length>1?"s":""} (${others.map(esc).join(", ")}) can be adjusted for on the Differential Expression tab. ` : ""}${(()=>{ const cn=tf&&others.length? pending.factorNames.find(f=>isCombo(f)&&f.split(COMBO_SEP).includes(tf)&&f.split(COMBO_SEP).includes(others[0])) : null;
+        return tf&&FACTOR===tf&&cn? `To follow each ${esc(others[0])} over time, group by <b>${esc(cn)}</b> under "Group by factor".` : (tf&&FACTOR!==tf? `To analyse by time, choose <b>${esc(tf)}</b> under "Group by factor".` : ""); })()}</div>`; })() : "");
   if(pending.factorNames.length>1){
     el("factorwrap").style.display="inline";
     el("factorsel").innerHTML=pending.factorNames.map(f=>`<option>${esc(f)}</option>`).join("");
@@ -2395,7 +2453,7 @@ function wireGroupAssign(mx){
       const inp=inputs().find(x=>x.dataset.q===b.dataset.q); if(inp) inp.value=v; b.checked=false; } });
     el("geall").checked=false; upd(); updateGroupTypeNote(); });
   el("gereset").addEventListener("click",()=>{
-    const inf=inferGroups(mx.sampleNames);
+    const inf=inferGroups(mx.sampleNames, mx.origNames);
     inf.forEach((g,i)=>{ pending.groups[i]=g; });
     inputs().forEach(inp=>{ inp.value=pending.groups[+inp.dataset.q]; });
     updateGroupTypeNote(); });
@@ -2792,12 +2850,22 @@ function* analyzeGen(){
 let GROUPTYPE="auto"; // "auto" | "numeric" | "categorical"
 let GROUPORDER=null;  // user-defined categorical ordering (array of group labels)
 function groupsAreNumeric(uniq){ return uniq.every(g=>g!==""&&isFinite(Number(g))); }
+// character order, except that runs of digits compare as numbers ("C57 · 4" before "C57 · 10"; "Day 2" before "Day 14")
+function natCmp(a,b){
+  const ra=String(a).match(/\d+|\D+/g)||[], rb=String(b).match(/\d+|\D+/g)||[];
+  for(let i=0;i<Math.min(ra.length, rb.length);i++){
+    const x=ra[i], y=rb[i], dx=/^\d/.test(x), dy=/^\d/.test(y);
+    if(dx&&dy){ const d=Number(x)-Number(y); if(d) return d; if(x.length!==y.length) return x.length-y.length; }
+    else if(x!==y) return x<y? -1 : 1;
+  }
+  return ra.length-rb.length;
+}
 function deriveGroups(groups){
   const uniq=[...new Set(groups)];
   const canNum=groupsAreNumeric(uniq);
   NUMERIC = GROUPTYPE==="categorical"? false : canNum;  // numeric requires parseable labels even when forced
   // ordered-numeric labels still sort numerically in categorical mode (Day 2 before Day 14), else lexical
-  GROUPS = canNum? uniq.slice().sort((a,b)=>Number(a)-Number(b)) : uniq.slice().sort();
+  GROUPS = canNum? uniq.slice().sort((a,b)=>Number(a)-Number(b)) : uniq.slice().sort(natCmp);
   if(!NUMERIC && GROUPORDER && GROUPORDER.length===GROUPS.length && GROUPS.every(g=>GROUPORDER.includes(g)))
     GROUPS=GROUPORDER.slice();
   GX={}; GROUPS.forEach((g,i)=>GX[g]=NUMERIC?Number(g):i);
@@ -2860,6 +2928,23 @@ function buildSampleBar(){
   renderDashDesignCheck();
 }
 el("sbtoggle").addEventListener("click",()=>{ SBHIDE=!SBHIDE; buildSampleBar(); });
+el("samplebar").addEventListener("change",e=>{
+  if(e.target.classList&&e.target.classList.contains("grpall")){
+    const g=e.target.dataset.g, on=e.target.checked;
+    S.forEach((s,i)=>{ if(s.group===g) included[i]=on; });
+    buildSampleBar();  // sync the per-sample checkboxes
+    deKey=""; coKey=""; scorrKey=""; refreshTab(curTab);
+    return;
+  }
+  if(e.target.dataset.i===undefined)return;
+  included[+e.target.dataset.i]=e.target.checked;
+  // keep the group toggle consistent with its members
+  const grp=S[+e.target.dataset.i].group;
+  const boxes=el("samplebar").querySelectorAll(".grpall");
+  boxes.forEach(b=>{ if(b.dataset.g===grp) b.checked=S.every((s,i)=>s.group!==grp||included[i]); });
+  sampleBarSummary(); renderDashDesignCheck();
+  deKey=""; coKey=""; scorrKey=""; refreshTab(curTab);
+});
 function renameSessionGroup(oldG, newG){
   // renames a sample group everywhere it is used; the samples, their grouping and all statistics stay the same
   newG=String(newG).trim();
@@ -5547,9 +5632,9 @@ function analyzeDatasetB(matrixText, designText, label, groupFactor, speciesOver
   if(designText){
     factors=parseDesignText(designText, mx.sampleNames);
     factorNames=Object.keys(factors);
-    const gf=(groupFactor&&factors[groupFactor])? groupFactor : factorNames[0];
+    const gf=(groupFactor&&factors[groupFactor])? groupFactor : defaultGroupFactor(factors, factorNames);
     groups=mx.sampleNames.map(s=>factors[gf][s]||"NA");   // factor is a map keyed by sample name
-  } else groups=inferGroups(mx.sampleNames);
+  } else groups=inferGroups(mx.sampleNames, mx.origNames);
   // filter: edgeR filterByExpr on the grouping (raw counts), else CPM >= 1 in >= 2 samples
   const keep=[];
   if(!blog&&!bnorm){ const kv=filterByExprJS(mx.vals, groups, colsums); for(let i=0;i<ng0;i++) if(kv[i]) keep.push(i); }
@@ -5634,7 +5719,7 @@ const gi={};
       "A custom two-column ID map (Custom ID map button) overrides all of this.";
   }
   const gk0=Object.keys(gi).filter(g=>gi[g].length>=2);
-  return {L:Lb, factors, factorNames, libRaw:colsums.slice(), gfactor:(groupFactor&&factors&&factors[groupFactor])? groupFactor : factorNames[0]||null, covSel:[], nG:nGb, nS:ns, ids, genes, groups, sampleNames:mx.sampleNames, gi,
+  return {L:Lb, factors, factorNames, libRaw:colsums.slice(), gfactor:(groupFactor&&factors&&factors[groupFactor])? groupFactor : (factors? defaultGroupFactor(factors, factorNames) : null), covSel:[], nG:nGb, nS:ns, ids, genes, groups, sampleNames:mx.sampleNames, gi,
        matchAtoB, matched, nCust, custName:nCust?CUSTMAPNAME:"", matchWarn, hasCounts, species:slotSp, cross, label:label||"dataset",
        selA:gk0[0]||"", selB:gk0[1]||gk0[0]||"", res:null, resKey:""};
 }

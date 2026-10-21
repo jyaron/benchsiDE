@@ -88,10 +88,11 @@ batch       b1          b1          b2
 Rules:
 
 - Sample names must match the matrix column headers exactly.
-- The first factor is used for grouping by default; you can select a different one on the review step. Other factors become available as covariates.
+- The first factor is used for grouping by default, except that a time factor is used when there is one: a column named as a time (for example `Day`, `Time`, `Hours`, `Week`, `dpi`) whose values are numbers with at least three distinct values. The review step states which factor is used. Select a different one under **Group by factor**. Other factors become available as covariates; with two factors, the combined factor (for example `Strain × Day`) gives one group per combination, so each strain can be followed over time.
+- Each sample column should have its own name. If names repeat (for example `m5, m5, m5, m5+baf, m5+baf, m5+baf`), the repeats are numbered in file order (`m5_1`, `m5_2`, `m5_3`, `m5+baf_1`, …) and the review step says so. Without a design file, columns with the same name are put in one group. A design file may repeat the names in the same order, or use the numbered names.
 - Any line-ending convention (Windows, Unix, classic Mac) is accepted.
 
-If you have no design file, benchsiDE infers groups from sample names; you can correct them on the review step.
+If you have no design file, benchsiDE infers groups from sample names: identical names form a group; otherwise sample-number and replicate parts are removed (`WT_1`, `WT_2` → `WT`; `S3_KO_rep1` → `KO`). Check the groups on the review step and correct them there if needed.
 
 ### 2.3 Gene-set libraries (optional)
 

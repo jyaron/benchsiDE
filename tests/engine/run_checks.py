@@ -422,6 +422,57 @@ def compare_stats():
     return ok, {"n": r["n"], "brackets": r["br"], "de_q_identical": r["qOK"], "stats_sheet": r["sheet"], "welch_p_rel": dp, "holm_abs": da, "selection": r["sel"]}
 
 
+def _synth_counts(cols, n=2000, seed=1, eff=()):
+    import random
+    rnd = random.Random(seed); rows = ["Geneid\t" + "\t".join(cols)]
+    for i in range(n):
+        mu = rnd.gammavariate(0.6, 300)
+        vals = []
+        for j in range(len(cols)):
+            m = mu * (4 if (j in eff and i < 100) else 1)
+            vals.append(str(max(0, int(round(rnd.gauss(m, (m + m * m / 10) ** 0.5))))))
+        rows.append(f"g{i+1}\t" + "\t".join(vals))
+    return "\n".join(rows) + "\n"
+
+@check
+def sample_names_design():
+    # repeated column names, group guessing from names, time factor chosen as the grouping, sample toggles recompute
+    dup = ["m5", "m5", "m5", "m5+baf", "m5+baf", "m5+baf"]
+    M1 = _synth_counts(dup, eff=(3, 4, 5))
+    D1 = "sample\ttreatment\n" + "".join(f"{a}\t{b}\n" for a, b in zip(dup, ["ctrl"] * 3 + ["baf"] * 3))
+    tc = [f"S{i}" for i in range(1, 13)]
+    M2 = _synth_counts(tc, seed=2)
+    D2 = "\t" + "\t".join(tc) + "\nStrain\t" + "\t".join(["A"] * 6 + ["B"] * 6) + "\nDay\t" + "\t".join(["0", "0", "4", "4", "10", "10"] * 2) + "\n"
+    cases = ["WT_1,WT_2,KO_1,KO_2", "WT1,WT2,KO1,KO2", "S1_WT_rep1,S2_WT_rep2,S3_KO_rep1,S4_KO_rep2", "ctrl_rep1,ctrl_rep2,IMQ_rep1,IMQ_rep2", "GSM1,GSM2,GSM3,GSM4"]
+    body = r"""
+  el("species").value="mouse"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  const out={};
+  loadFromText(""" + J(M1) + r""", null); GROUPTYPE="auto"; analyzeNow(); __drain();
+  out.ids=S.map(x=>x.id); out.groups=GROUPS.slice(); out.warn=/occur more than once/.test(el("parseinfo").innerHTML);
+  const lib=plotlyCalls.filter(x=>x.id==="p_lib").pop(); out.libDistinct=lib? new Set(lib.traces.map(t=>t.x).flat()).size : 0;
+  loadFromText(""" + J(M1) + ", " + J(D1) + r"""); out.dGroups=pending.groups.slice();
+  loadFromText(""" + J(M2) + ", " + J(D2) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  out.factor=FACTOR; out.numeric=NUMERIC; out.tGroups=GROUPS.slice(); out.cov=Object.keys(COVARS);
+  el("selA").value="0"; el("selB").value="10"; deMethod="mod"; DEFIT="all"; DECOVSEL=[]; deKey=""; switchTab("de"); __drain();
+  const p0=deCache.p[0], nA0=S.filter((x,i)=>included[i]&&x.group==="0").length;
+  el("samplebar")._h["change"]({target:{dataset:{i:"0"}, checked:false, classList:{contains:()=>false}}}); __drain();
+  out.toggle={off:!included[0], recomputed:deCache.p[0]!==p0, nA:[nA0, S.filter((x,i)=>included[i]&&x.group==="0").length]};
+  applyFactor("Strain × Day"); out.combo=[...new Set(pending.groups)].sort(natCmp);
+  out.infer={}; for(const c of """ + J(cases) + r"""){ const nm=c.split(","); out.infer[c]=[...new Set(inferGroups(uniqueSampleNames(nm), nm))]; }
+  print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=900)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    exp_inf = {"WT_1,WT_2,KO_1,KO_2": ["WT", "KO"], "WT1,WT2,KO1,KO2": ["WT", "KO"], "S1_WT_rep1,S2_WT_rep2,S3_KO_rep1,S4_KO_rep2": ["WT", "KO"],
+               "ctrl_rep1,ctrl_rep2,IMQ_rep1,IMQ_rep2": ["ctrl", "IMQ"], "GSM1,GSM2,GSM3,GSM4": ["GSM1", "GSM2", "GSM3", "GSM4"]}
+    ok = (r["ids"] == ["m5_1", "m5_2", "m5_3", "m5+baf_1", "m5+baf_2", "m5+baf_3"] and r["groups"] == ["m5", "m5+baf"] and r["warn"] and r["libDistinct"] == 6
+          and r["dGroups"] == ["ctrl"] * 3 + ["baf"] * 3 and r["factor"] == "Day" and r["numeric"] and r["tGroups"] == ["0", "4", "10"] and r["cov"] == ["Strain"]
+          and r["toggle"]["off"] and r["toggle"]["recomputed"] and r["toggle"]["nA"] == [4, 3]
+          and r["combo"] == ["A · 0", "A · 4", "A · 10", "B · 0", "B · 4", "B · 10"] and all(sorted(r["infer"][k]) == sorted(v) for k, v in exp_inf.items()))
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0
