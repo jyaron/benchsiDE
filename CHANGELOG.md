@@ -2,6 +2,16 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Data export of figures
+- FIXED: the data export of the ridgeline plot (Enrichment tab) held only the 12 medians, with blank row labels and columns named "series 1" to "series 12", and the "All values" sheet had no gene-set names. The Prism sheet is now a Column table with one column per gene set (full name) holding the log2 fold change of every gene in the set; a Genes sheet gives the gene behind each value, and a Statistics sheet gives each set's number of genes, median log2 fold change and enrichment FDR. Horizontal box and violin plots are exported by category in general.
+- FIXED: other figures whose export had unnamed series: the PCA score panels (now one row per sample with group and PC1 to PC3, and variance explained per component), the p-value Q-Q plot (the points were omitted from the Prism sheet), and single-series figures such as the volcano plot, library sizes and the p-value histogram (the series is now named after the axis). Engine check export_series_names covers the data export of every figure drawn in a sweep of the tabs.
+
+Two-factor designs
+- NEW: with samples grouped by a combination of two factors (for example Strain × Day), the Gene Explorer draws the second factor (a time factor when there is one) on the x axis with one line per level of the first, and labels the comparison of the levels at each x level: the DE model (the Differential Expression tab's test, model and covariates, FDR across all genes) or a Welch t-test with Holm correction across levels. A table gives log2FC, p and adjusted p at each level; the data export has a Prism Grouped sheet and a Statistics sheet. "one bar per group" keeps the previous chart.
+- NEW: Differential Expression tab, card "Two-factor design": one level compared with another at each level of the second factor (genes up and down at each level, bar chart, gene table, CSV of all genes), and the interaction test: moderated F (limma-trend) of the difference at each level minus the difference at the first level, model ~ 0 + group + covariates. Per-level results and the interaction F agree with limma (lmFit, contrasts.fit, eBayes(trend = TRUE), topTable) to within 1e-10 in p, with and without a covariate. The card recomputes when samples or test settings change. Engine check two_factor.
+- NEW: buttons on the review step and the Differential Expression tab switch the grouping between the combined factor and either factor alone; sample inclusion is kept.
+- CHANGED: when a design file has a time factor crossed with exactly one other factor (every combination present, 2 to 6 levels), samples are grouped by the combination by default.
+
 Loading data
 - FIXED: ticking or unticking samples in the sample list at the top of the dashboard no longer recomputed the statistics (since the sample list could be hidden and groups renamed). The statistics again recompute when a sample or a whole group is ticked or unticked.
 - FIXED: repeated column names in the expression matrix (for example m5, m5, m5, m5+baf, m5+baf, m5+baf) gave several samples the same name. Plots that list samples drew them as one, and design values and session settings could not be told apart. Repeated names are now numbered in file order (m5_1, m5_2, …), and the review step says so. A design file may repeat the names in the same order.

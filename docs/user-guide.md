@@ -88,7 +88,7 @@ batch       b1          b1          b2
 Rules:
 
 - Sample names must match the matrix column headers exactly.
-- The first factor is used for grouping by default, except that a time factor is used when there is one: a column named as a time (for example `Day`, `Time`, `Hours`, `Week`, `dpi`) whose values are numbers with at least three distinct values. The review step states which factor is used. Select a different one under **Group by factor**. Other factors become available as covariates; with two factors, the combined factor (for example `Strain × Day`) gives one group per combination, so each strain can be followed over time.
+- The first factor is used for grouping by default, except that a time factor is used when there is one: a column named as a time (for example `Day`, `Time`, `Hours`, `Week`, `dpi`) whose values are numbers with at least three distinct values. The review step states which factor is used. Select a different one under **Group by factor**. Other factors become available as covariates; with two factors, the combined factor (for example `Strain × Day`) gives one group per combination. When a time factor is crossed with one other factor (every combination present), the combined factor is the default.
 - Each sample column should have its own name. If names repeat (for example `m5, m5, m5, m5+baf, m5+baf, m5+baf`), the repeats are numbered in file order (`m5_1`, `m5_2`, `m5_3`, `m5+baf_1`, …) and the review step says so. Without a design file, columns with the same name are put in one group. A design file may repeat the names in the same order, or use the numbered names.
 - Any line-ending convention (Windows, Unix, classic Mac) is accepted.
 
@@ -273,6 +273,14 @@ Click **Compute** under **Genome-wide moderated F (any group differs)**. This si
 In the Differential Expression tab, compare each time point with baseline, then use **Run all pairs (current method)** and **Compare two contrasts** to see which responses persist and which resolve.
 
 With few replicates at baseline, genome-wide FDR can be unattainable even for large effects. See [Statistical power](../wiki/Statistical-Power.md) in the Knowledgebase.
+
+
+### Step 3. Two strains (or genotypes, treatments) over time
+
+With a design file that has a strain column and a day column, samples are grouped by the combination (`Strain × Day`), one group per strain and day. The review step and the Differential Expression tab have buttons to switch between the combination and either factor alone; switching recomputes filtering, normalization and every statistic and keeps sample inclusion.
+
+- **Gene Explorer:** the gene is drawn with day on the x axis and one line per strain (means ± SEM or SD, with the samples). The labels compare the strains at each day: with the DE model, the Differential Expression tab's test, model and covariates with FDR across all genes, equal to that day's contrast in the DE table; or a Welch t-test at each day, Holm-corrected across the days. The table under the plot lists log₂FC, p and adjusted p at each day, and the data export has a Prism Grouped sheet (rows: days; data sets: strains) and a Statistics sheet. **one bar per group** returns to the bar chart of the eight groups.
+- **Differential Expression tab, card "Two-factor design":** choose the two strains and click **Run**. For each day it gives the numbers of genes up and down in one strain compared with the other, with the test, FDR and |log₂FC| set above, and a bar chart of those numbers. It also tests the interaction: the genes in which the strain difference changes across days, by a moderated F test (limma-trend) of the strain difference at each day minus the strain difference at the first day. The gene table shows log₂FC at each day and the interaction FDR; **Export full table (CSV)** saves all genes, and **Send genes to multi-gene comparison** opens them in the Gene Explorer. The card recomputes when samples are ticked or unticked or the test settings change.
 
 ---
 

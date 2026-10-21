@@ -451,7 +451,7 @@ def sample_names_design():
   out.ids=S.map(x=>x.id); out.groups=GROUPS.slice(); out.warn=/occur more than once/.test(el("parseinfo").innerHTML);
   const lib=plotlyCalls.filter(x=>x.id==="p_lib").pop(); out.libDistinct=lib? new Set(lib.traces.map(t=>t.x).flat()).size : 0;
   loadFromText(""" + J(M1) + ", " + J(D1) + r"""); out.dGroups=pending.groups.slice();
-  loadFromText(""" + J(M2) + ", " + J(D2) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  loadFromText(""" + J(M2) + ", " + J(D2) + r"""); out.dflt=FACTOR; applyFactor("Day"); GROUPTYPE="auto"; analyzeNow(); __drain();
   out.factor=FACTOR; out.numeric=NUMERIC; out.tGroups=GROUPS.slice(); out.cov=Object.keys(COVARS);
   el("selA").value="0"; el("selB").value="10"; deMethod="mod"; DEFIT="all"; DECOVSEL=[]; deKey=""; switchTab("de"); __drain();
   const p0=deCache.p[0], nA0=S.filter((x,i)=>included[i]&&x.group==="0").length;
@@ -467,10 +467,75 @@ def sample_names_design():
     exp_inf = {"WT_1,WT_2,KO_1,KO_2": ["WT", "KO"], "WT1,WT2,KO1,KO2": ["WT", "KO"], "S1_WT_rep1,S2_WT_rep2,S3_KO_rep1,S4_KO_rep2": ["WT", "KO"],
                "ctrl_rep1,ctrl_rep2,IMQ_rep1,IMQ_rep2": ["ctrl", "IMQ"], "GSM1,GSM2,GSM3,GSM4": ["GSM1", "GSM2", "GSM3", "GSM4"]}
     ok = (r["ids"] == ["m5_1", "m5_2", "m5_3", "m5+baf_1", "m5+baf_2", "m5+baf_3"] and r["groups"] == ["m5", "m5+baf"] and r["warn"] and r["libDistinct"] == 6
-          and r["dGroups"] == ["ctrl"] * 3 + ["baf"] * 3 and r["factor"] == "Day" and r["numeric"] and r["tGroups"] == ["0", "4", "10"] and r["cov"] == ["Strain"]
+          and r["dGroups"] == ["ctrl"] * 3 + ["baf"] * 3 and r["dflt"] == "Strain × Day" and r["factor"] == "Day" and r["numeric"] and r["tGroups"] == ["0", "4", "10"] and r["cov"] == ["Strain"]
           and r["toggle"]["off"] and r["toggle"]["recomputed"] and r["toggle"]["nA"] == [4, 3]
           and r["combo"] == ["A · 0", "A · 4", "A · 10", "B · 0", "B · 4", "B · 10"] and all(sorted(r["infer"][k]) == sorted(v) for k, v in exp_inf.items()))
     return ok, r
+
+
+@check
+def two_factor():
+    # combined grouping (Treatment x Day): per-level contrasts equal the DE tab's contrast; the interaction F with one
+    # contrast equals t^2 of the Interaction card (checked against limma); a crossed time design defaults to the combination
+    tc = [f"S{i}" for i in range(1, 13)]
+    M2 = _synth_counts(tc, seed=3)
+    D2 = "\t" + "\t".join(tc) + "\nStrain\t" + "\t".join(["A"] * 6 + ["B"] * 6) + "\nDay\t" + "\t".join(["0", "0", "4", "4", "10", "10"] * 2) + "\n"
+    body = r"""
+  el("species").value="mouse"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe"; const out={};
+  loadFromText(""" + J(M2) + ", " + J(D2) + r"""); out.defaultFactor=FACTOR;
+  loadFromText(""" + J(mat("GSE143688")) + ", " + J(des("GSE143688")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  regroupBy("Treatment × Day"); __drain(); const T2=twoFactor(); out.T=[T2.xName, T2.sName, T2.xLv, T2.sLv];
+  el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey="";
+  switchTab("de"); __drain(); el("tfref").value="Control"; el("tfcmp").value="Aldara"; runTwoFactor(); __drain();
+  el("selA").value="Control · d7"; el("selB").value="Aldara · d7"; deKey=""; const de=computeDE(); const r7=TFRES.per[1];
+  let dq=0; for(let g=0;g<nG;g++) dq=Math.max(dq, Math.abs(de.q[g]-r7.q[g]), Math.abs(de.lfc[g]-r7.lfc[g])); out.perLevelMaxDiff=dq;
+  ixRefreshUI(); el("ixA1").value="Control · d3"; el("ixB1").value="Aldara · d3"; el("ixA2").value="Control · d7"; el("ixB2").value="Aldara · d7"; el("ixmeth").value="mod"; el("ixfit").value="all"; el("ixfdr").value="0.05"; el("ixlfc").value="0"; runInteraction();
+  let mt=0; for(let g=0;g<nG;g++){ const t=(IXRES.t||IXRES.tv)[g]; mt=Math.max(mt, Math.abs(t*t-TFRES.IX.F[g])/Math.max(TFRES.IX.F[g],1e-12)); } out.tF=mt;
+  curGene=0; switchTab("gene"); __drain(); drawGene(); const c=plotlyCalls.filter(x=>x.id==="p_gene").pop();
+  out.lines=c.traces.filter(t=>t.meta==="summary").map(t=>t.name); out.sheets=plotToSheets(c.traces,c.layout).sheets.map(s2=>s2.name); out.labels=c.layout.annotations.length;
+  print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=900)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = (r["defaultFactor"] == "Strain × Day" and r["T"] == ["Day", "Treatment", ["d3", "d7"], ["Aldara", "Control"]] and r["perLevelMaxDiff"] < 1e-12
+          and r["tF"] < 1e-9 and r["lines"] == ["Aldara", "Control"] and "Statistics" in r["sheets"] and "Prism" in r["sheets"] and r["labels"] == 2)
+    return ok, r
+
+
+@check
+def export_series_names():
+    # every drawn figure's data export names its series; ridgeline Prism sheet = one column per gene set with all its genes
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(des("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="CTRL_healthy"; el("selB").value="PSO_lesional"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  for(const t of ["overview","gene","de","coexp","heat","patterns","disco","traits"]){ try{ switchTab(t); __drain(); }catch(e){} }
+  try{ curGene=nameToIdx["pi3"]; switchTab("gene"); __drain(); drawGene(); for(const gp of ["box","violin","bar"]){ GPLOT=gp; drawGene(); } }catch(e){ print("ERR gene "+e); }
+  try{ compareList=["pi3","s100a9","defb4a"].map(n=>nameToIdx[n]); for(const ch of ["bar","box","violin"]){ CMPCHART=ch; drawCompare(); } }catch(e){ print("ERR cmp "+e); }
+  try{ useBuiltin("hallmark_hs"); el("enrsrc").value="de_up"; el("enrmin").value="5"; el("enrmax").value="2000"; switchTab("enrich"); __drain(); runEnrichment(); __drain(); drawSetJaccard(); drawRidgeline(); }catch(e){ print("ERR enr "+e); }
+  try{ runAllPairs&&runAllPairs(); __drain(); }catch(e){ print("ERR pairs "+e); }
+  try{ computeModF(); drawModF&&drawModF(); }catch(e){ print("ERR modf "+e); }
+  const ids=[...new Set(plotlyCalls.map(x=>x.id))]; const rep=[];
+  for(const id of ids){ const c=plotlyCalls.filter(x=>x.id===id).pop(); if(!c.traces||!c.traces.length) continue;
+    let r; try{ r=plotToSheets(c.traces,c.layout); }catch(e){ rep.push([id,"THROW "+e]); continue; }
+    const P=r.sheets.find(x=>x.name==="Prism"), A=r.sheets.find(x=>x.name==="All values");
+    const hdr=P? P.rows[0] : []; const generic=(c.layout.meta&&c.layout.meta.prismRows)? 0 : hdr.filter((h,j)=>/^series \d+$/.test(String(h))||(j>0&&(h===""||h===null))).length;
+    const blankSeries=A.rows.slice(1).filter(x=>x[0]===""||x[0]===null||/^series \d+$/.test(x[0])).length, nLong=A.rows.length-1;
+    const types=[...new Set(c.traces.map(t=>t.type||"scatter"))];
+    rep.push([id, r.kind||"none", generic, hdr.length, blankSeries, nLong, types.join("/")]); }
+  
+  const c=plotlyCalls.filter(x=>x.id==="p_ridge").pop(), P=plotToSheets(c.traces,c.layout).sheets[0];
+  const ridge={hdr:P.rows[0], sets:RIDGEROWS.map(r=>r.name), counts:P.rows[0].map((_,j)=>P.rows.slice(1).filter(r=>r[j]!==null).length), nGenes:RIDGEROWS.map(r=>(r.allIdx||r.rows||r.ovIdx).length)};
+  print("RES " + JSON.stringify({rep, ridge}));
+"""
+    o = run(APP, body, timeout=1200)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]; bad = [x for x in r["rep"] if isinstance(x[1], str) and x[1].startswith("THROW") or (len(x) > 4 and (x[2] > 0 or x[4] > 0))]
+    rd = r["ridge"]
+    ok = len(r["rep"]) >= 20 and not bad and rd["hdr"] == rd["sets"] and rd["counts"] == rd["nGenes"]
+    return ok, {"figures": len(r["rep"]), "bad": bad, "ridge_sets": len(rd["sets"]), "ridge_counts_match": rd["counts"] == rd["nGenes"]}
 
 
 if __name__ == "__main__":

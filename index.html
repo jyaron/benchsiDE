@@ -396,7 +396,10 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
           <option value="all">all pairs (sig. only)</option>
         </select>
         <button class="act ghost" id="addcompare">+ Add to comparison</button>
+        <span id="g2fwrap" style="display:none"><select id="g2flay" title="With samples grouped by a combination of two factors: draw the second factor on the x axis with one line per level of the first, or one bar per group"><option value="lines">x axis and lines</option><option value="groups">one bar per group</option></select>
+          <select id="g2fstat" title="Compare the levels of the line factor at each x level. DE model: the Differential Expression tab's test, model and covariates, FDR across all genes (equal to that contrast's DE table). Welch: Welch t-test per level, Holm-corrected across the levels."><option value="none">no comparison</option><option value="de" selected>DE model, FDR</option><option value="welch">Welch t, Holm</option></select></span>
       </div>
+      <div id="g2fnote"></div>
       <div id="geneinfo" class="footer-note" style="margin:2px 0 4px"></div>
       <div class="statrow" id="genestats"></div>
       <div id="pwtable" style="margin:4px 0"></div>
@@ -476,6 +479,16 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
         </div>
       </div>
       <div class="footer-note" id="denote">Moderated t: pooled gene-wise variance shrunk by empirical Bayes toward a global prior (limma-style eBayes, Smyth 2004); recommended for small groups. voom: per-observation precision weights from the count-level mean&ndash;variance trend (Law et al. 2014), then weighted moderated t. Best when counts are low or library sizes vary widely; needs raw counts. Welch t: unequal-variance t-test, no moderation. Both on log&#8322; values, Benjamini&ndash;Hochberg FDR over all kept genes. log&#8322;FC = mean(B) &minus; mean(A). Recomputed live on any change. <span id="deprior"></span></div>
+    </div>
+    <div class="card" id="tfcard" style="display:none">
+      <h3>Two-factor design: one factor compared at each level of the other</h3>
+      <div id="tfhead"></div>
+      <div class="controls" id="tfctl">compare <select id="tfcmp"></select> vs <select id="tfref"></select>
+        <button class="act" id="tfrun">Run</button> <button class="act ghost" id="tfexp" style="display:none">Export full table (CSV)</button>
+        <button class="act ghost" id="tfcmpbtn" style="display:none" title="Send the first genes of the table to the multi-gene comparison in the Gene Explorer">Send genes to multi-gene comparison</button></div>
+      <div id="tfout"></div>
+      <div id="p_tfcounts" style="height:300px;display:none"></div>
+      <div id="tftable"></div>
     </div>
     <div class="card">
       <h3>All pairwise contrasts</h3>
@@ -1376,7 +1389,8 @@ function plotToSheets(data, layout){
   // shortened or wrapped labels are exported under their full names
   const FULLMAP=(L.meta&&L.meta.fullLabels)||null, PT=v=>fullLabelOf(FULLMAP, v);
   // helper traces: CI bands, fitted/reference lines, hidden traces (all still listed under 'All values')
-  const isHelper=t=>t.hoverinfo==="skip"||t.fill==="toself"||(t.marker&&t.marker.opacity===0)||t.visible===false||t.visible==="legendonly"||(t.mode==="lines"&&t.showlegend===false);
+  // (box and violin traces are data even when their hover is switched off)
+  const isHelper=t=>(t.hoverinfo==="skip"&&t.type!=="box"&&t.type!=="violin")||t.fill==="toself"||(t.marker&&t.marker.opacity===0)||t.visible===false||t.visible==="legendonly"||(t.mode==="lines"&&t.showlegend===false);
   const tr=(data||[]).filter(t=>t&&!isHelper(t));
   const title=PT(L.title&&(L.title.text||L.title)), xt=axisTitle(xa), yt=axisTitle(ya);
   const catMap=ax=>{ if(!Array.isArray(ax.tickvals)||!Array.isArray(ax.ticktext)||!ax.tickvals.every(v=>typeof v==="number")) return null;
@@ -1389,10 +1403,13 @@ function plotToSheets(data, layout){
   // long format: every value in the figure
   const long=[["series","type","label","x","x category","y","y category","x error -","x error +","y error -","y error +"]];
   const heat=tr.filter(t=>t.type==="heatmap");
-  (data||[]).filter(t=>t&&t.type!=="heatmap"&&t.visible!==false&&t.fill!=="toself").forEach(t=>{
-    const nm=PT(t.name||""), n=Math.max(Array.isArray(t.x)?t.x.length:0, Array.isArray(t.y)?t.y.length:0);
+  const dataTr=(data||[]).filter(t=>t&&t.type!=="heatmap"&&t.visible!==false&&t.fill!=="toself");
+  const onlyOne=tr.filter(t=>t.type!=="heatmap").length===1;
+  dataTr.forEach((t,k)=>{
+    const nm=PT(t.name||(t.type==="box"||t.type==="violin"? (t.orientation==="h"? t.y0 : t.x0) : "")||(onlyOne&&tr.includes(t)? (yt||title||"values") : (isHelper(t)? "reference line or guide "+(k+1) : "series "+(k+1)))), n=Math.max(Array.isArray(t.x)?t.x.length:0, Array.isArray(t.y)?t.y.length:0);
     for(let i=0;i<n;i++){
-      const x=Array.isArray(t.x)? t.x[i] : (t.type==="box"||t.type==="violin"? nm : null), y=Array.isArray(t.y)? t.y[i] : null;
+      const bv=t.type==="box"||t.type==="violin", hz=bv&&t.orientation==="h";
+      const x=Array.isArray(t.x)? t.x[i] : (bv&&!hz? (nm||PT(t.x0||"")) : null), y=Array.isArray(t.y)? t.y[i] : (hz? (nm||PT(t.y0||"")) : null);
       long.push([nm, t.type||"scatter", lab(t,i), typeof x==="number"?x:null, typeof x==="number"? (cx?cx(x):"") : PT(x), typeof y==="number"?y:null,
         typeof y==="number"? (cy?cy(y):"") : PT(y), errOf(t.error_x,i,true)??(errOf(t.error_x,i,false)), errOf(t.error_x,i,false), errOf(t.error_y,i,true)??(errOf(t.error_y,i,false)), errOf(t.error_y,i,false)]);
     }
@@ -1408,7 +1425,7 @@ function plotToSheets(data, layout){
     kind="Grouped (row titles = first column, one column per sample or group)"; howto="Create a Grouped table with one replicate per cell, then import or paste the sheet with row titles.";
   }
   // (b) one column per group: box/violin traces, or point clouds that sit on a single category
-  const pointCol=t=>{ if(t.type==="box"||t.type==="violin") return PT(t.name||t.x0||"");
+  const pointCol=t=>{ if(t.type==="box"||t.type==="violin") return PT(t.name||(t.orientation==="h"? t.y0 : t.x0)||"");
     if(t.type==="bar"||!Array.isArray(t.x)||!Array.isArray(t.y)||t.error_y&&t.error_y.visible!==false&&t.y.length===1) return null;
     if(typeof t.x[0]==="string"){ return t.x.every(v=>v===t.x[0])? PT(t.x[0]) : null; }
     if(!cx) return null; const c0=cx(t.x[0]); return c0&&t.x.every(v=>cx(v)===c0)? c0 : null; };
@@ -1420,10 +1437,10 @@ function plotToSheets(data, layout){
     if(pc.length&&pc.every(o=>o.c)){
       const order=[]; const byC={}, labC={};
       pc.forEach(o=>{ if(!byC[o.c]){ byC[o.c]=[]; labC[o.c]=[]; order.push(o.c); }
-        (Array.isArray(o.t.y)? o.t.y : ["lowerfence","q1","median","q3","upperfence"].map(k=>Array.isArray(o.t[k])?o.t[k][0]:o.t[k]).filter(v=>typeof v==="number")).forEach((v,i)=>{ if(typeof v==="number"){ byC[o.c].push(v); labC[o.c].push(lab(o.t,i)); } }); });
+        ((o.t.type==="box"||o.t.type==="violin")&&o.t.orientation==="h"&&Array.isArray(o.t.x)? o.t.x : Array.isArray(o.t.y)? o.t.y : ["lowerfence","q1","median","q3","upperfence"].map(k=>Array.isArray(o.t[k])?o.t[k][0]:o.t[k]).filter(v=>typeof v==="number")).forEach((v,i)=>{ if(typeof v==="number"){ byC[o.c].push(v); labC[o.c].push(lab(o.t,i)); } }); });
       const nMax=Math.max(...order.map(c=>byC[c].length));
       prism=[order].concat(Array.from({length:nMax},(_,r)=>order.map(c=>byC[c][r]!==undefined?byC[c][r]:null)));
-      cols.push({name:"Sample IDs", rows:[order].concat(Array.from({length:nMax},(_,r)=>order.map(c=>labC[c][r]||null)))});
+      cols.push({name:(L.meta&&L.meta.labelSheet)||"Sample IDs", rows:[order].concat(Array.from({length:nMax},(_,r)=>order.map(c=>labC[c][r]||null)))});
       kind="Column"; howto="Create a Column table (enter replicate values stacked into columns), then import or paste the sheet with the first row as column titles.";
     }
   }
@@ -2231,7 +2248,21 @@ function timeFactorOf(factors, names){
     return v.length>=3&&groupsAreNumeric(v); });
   return c.length? c[0] : null;
 }
-function defaultGroupFactor(factors, names){ return timeFactorOf(factors, names) || names[0]; }
+// With a time factor and exactly one other factor that is crossed with it (every combination present, 2 to 6
+// levels), the default is the combination (for example Strain × Day): each level is followed over time and the
+// levels can be compared at each time point. With a time factor alone, the time factor.
+function defaultGroupFactor(factors, names){
+  const tf=timeFactorOf(factors, names); if(!tf) return names[0];
+  const samp=Object.keys(factors[tf]).filter(k=>factors[tf][k]!=="NA"&&factors[tf][k]!=="");
+  const crossed=names.filter(f=>!isCombo(f)&&f!==tf).filter(f=>{
+    const lv=[...new Set(samp.map(k=>factors[f][k]).filter(v=>v!==undefined&&v!=="NA"&&v!==""))];
+    if(lv.length<2||lv.length>6) return false;
+    const tl=[...new Set(samp.map(k=>factors[tf][k]))], seen=new Set(samp.map(k=>factors[f][k]+"\u0001"+factors[tf][k]));
+    return lv.every(a=>tl.every(t=>seen.has(a+"\u0001"+t)));
+  });
+  if(crossed.length===1){ const cn=names.find(n=>isCombo(n)&&n.split(COMBO_SEP).includes(tf)&&n.split(COMBO_SEP).includes(crossed[0])); if(cn) return cn; }
+  return tf;
+}
 function onDesignLoaded(text){
   if(!pending){ throw "Load the expression matrix first."; }
   pending.factors=parseDesignText(text,pending.matrix.sampleNames);
@@ -2256,7 +2287,7 @@ function renderSetup(){
     (pending.factors?` · design factors: <b>${pending.factorNames.join(", ")}</b>`:" · no design file; groups guessed from sample names (edit below)")+
     (mx.dupLabels? `<div class="warn" style="margin:6px 0 0">Column names occur more than once: ${Object.entries(mx.dupLabels).map(([k,v])=>`<b>${esc(k)}</b> (${v})`).join(", ")}. Each sample needs its own name, so the repeated names were numbered in file order (${esc(mx.sampleNames[mx.origNames.indexOf(Object.keys(mx.dupLabels)[0])])}, …)${pending.factors? "" : ", and samples with the same name were put in one group"}. Check the groups below. A design file may repeat the names in the same order, or use the numbered names.</div>` : "")+
     (pending.factors&&pending.factorNames.length>1? (()=>{ const tf=timeFactorOf(pending.factors, pending.factorNames), others=baseFactorNames().filter(f=>f!==FACTOR&&!(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(f)));
-      return `<div class="footer-note" style="margin-top:4px">Samples are grouped by <b>${esc(FACTOR)}</b>${FACTOR===tf? " (a time factor: groups are ordered by time and analysed as a time course)" : ""}. ${others.length? `The other design column${others.length>1?"s":""} (${others.map(esc).join(", ")}) can be adjusted for on the Differential Expression tab. ` : ""}${(()=>{ const cn=tf&&others.length? pending.factorNames.find(f=>isCombo(f)&&f.split(COMBO_SEP).includes(tf)&&f.split(COMBO_SEP).includes(others[0])) : null;
+      return `<div class="footer-note" style="margin-top:4px">Samples are grouped by <b>${esc(FACTOR)}</b>${FACTOR===tf? " (a time factor: groups are ordered by time and analysed as a time course)" : (isCombo(FACTOR)&&tf&&FACTOR.split(COMBO_SEP).includes(tf)? ` (each combination is one group; plots show ${esc(tf)} on the x axis with one line per ${esc(FACTOR.split(COMBO_SEP).find(f=>f!==tf))}, and the Differential Expression tab compares them at each ${esc(tf)})` : "")}. ${others.length? `The other design column${others.length>1?"s":""} (${others.map(esc).join(", ")}) can be adjusted for on the Differential Expression tab. ` : ""}${(()=>{ const cn=tf&&others.length? pending.factorNames.find(f=>isCombo(f)&&f.split(COMBO_SEP).includes(tf)&&f.split(COMBO_SEP).includes(others[0])) : null;
         return tf&&FACTOR===tf&&cn? `To follow each ${esc(others[0])} over time, group by <b>${esc(cn)}</b> under "Group by factor".` : (tf&&FACTOR!==tf? `To analyse by time, choose <b>${esc(tf)}</b> under "Group by factor".` : ""); })()}</div>`; })() : "");
   if(pending.factorNames.length>1){
     el("factorwrap").style.display="inline";
@@ -3122,6 +3153,11 @@ el("scaletoggle").querySelectorAll("button").forEach(b=>b.addEventListener("clic
 el("errtoggle").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
   errType=b.dataset.e; document.querySelectorAll("#errtoggle button").forEach(x=>x.classList.toggle("on",x===b)); drawGene(); if(compareList.length) drawCompare(); }));
 el("pwsel").addEventListener("change",drawGene);
+el("g2flay").addEventListener("change",()=>{ G2FLAY=el("g2flay").value; drawGene(); });
+el("g2fstat").addEventListener("change",()=>{ G2FSTAT=el("g2fstat").value; drawGene(); });
+el("tfrun").addEventListener("click",runTwoFactor);
+el("tfexp").addEventListener("click",exportTwoFactor);
+el("tfcmpbtn").addEventListener("click",()=>{ if(!TFRES||!TFRES.rows||!TFRES.rows.length) return; compareList=TFRES.rows.slice(0,CMPMAX).map(r=>r.g); curGene=compareList[0]; switchTab("gene"); drawCompare(); });
 el("gplottoggle").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ GPLOT=b.dataset.g; document.querySelectorAll("#gplottoggle button").forEach(x=>x.classList.toggle("on",x===b)); drawGene(); if(compareList.length) drawCompare(); }));
 ["cmpchart","cmppts","cmparr"].forEach(id=>el(id).addEventListener("change",()=>{ if(id==="cmpchart") CMPCHART=el("cmpchart").value; if(id==="cmparr") CMPARR=el("cmparr").value; drawCompare(); }));
 el("panelfig").addEventListener("click",exportPanelFigure);
@@ -3366,7 +3402,252 @@ function genePlotNote(){
     (nMin<8? ` With ${nMin} sample${nMin===1?"":"s"} in the smallest group the shape reflects the kernel bandwidth more than the data; a bar or box plot is more faithful at this size.` : "");
   return NUMERIC? `Line: group means ± ${errType.toUpperCase()}; ${pts}.` : `Bars: group means ± ${errType.toUpperCase()}; ${pts}.`;
 }
+/* ================= two-factor designs (for example strain × day) =================
+   When samples are grouped by a combined factor (Review → group by "Ms × Day"), each group is one combination.
+   The second factor (a time factor when there is one) is drawn on the x axis and the first as one line per level;
+   the first factor's levels are compared at each level of the second. */
+let G2FLAY="lines", G2FSTAT="de", TFRES=null;
+function twoFactor(){
+  if(!pending||!pending.factors||!isCombo(FACTOR)) return null;
+  const parts=FACTOR.split(COMBO_SEP); if(parts.length!==2) return null;
+  const cellOf={};
+  for(const g of GROUPS){ const p=String(g).split(" \u00b7 "); if(p.length!==2) return null; cellOf[g]=p; }
+  const tf=timeFactorOf(pending.factors, parts);
+  const xi= tf? parts.indexOf(tf) : 1, si=1-xi;
+  const uniq=a=>[...new Set(a)];
+  const xRaw=uniq(GROUPS.map(g=>cellOf[g][xi])), sLv=uniq(GROUPS.map(g=>cellOf[g][si]));
+  const numericX=groupsAreNumeric(xRaw);
+  const xLv= numericX? xRaw.slice().sort((a,b)=>Number(a)-Number(b)) : xRaw.slice().sort(natCmp);
+  if(xLv.length<2||sLv.length<2) return null;
+  const cell=(sv,xv)=>GROUPS.find(g=>cellOf[g][si]===sv&&cellOf[g][xi]===xv);
+  return {xName:parts[xi], sName:parts[si], xLv, sLv, cell, numericX, cellOf, xi, si};
+}
+function comboFor(f){
+  // the combined factor that contains f, when the current grouping is a single factor
+  if(!pending||!pending.factorNames||isCombo(FACTOR)) return null;
+  return pending.factorNames.find(n=>isCombo(n)&&n.split(COMBO_SEP).includes(f))||null;
+}
+function regroupHTML(){
+  if(!pending||!pending.factors) return "";
+  if(isCombo(FACTOR)){
+    const parts=FACTOR.split(COMBO_SEP);
+    return `<div class="footer-note" style="margin:4px 0">Group by one factor instead: ${parts.map(f=>`<button class="act ghost regroup" data-f="${esc(f)}" title="Groups the samples by ${esc(f)} only; filtering, normalization and every statistic are recomputed. Sample inclusion is kept.">${esc(f)}</button>`).join(" ")}</div>`;
+  }
+  const cn=comboFor(FACTOR); if(!cn) return "";
+  const other=cn.split(COMBO_SEP).find(f=>f!==FACTOR);
+  return `<div class="footer-note" style="margin:4px 0">Samples are grouped by <b>${esc(FACTOR)}</b>. To compare ${esc(other)} at each ${esc(FACTOR)}, group by the combination: <button class="act ghost regroup" data-f="${esc(cn)}" title="Groups the samples by each combination of ${esc(cn)}; filtering, normalization and every statistic are recomputed for the new groups. Sample inclusion is kept.">Group by ${esc(cn)}</button></div>`;
+}
+function regroupBy(fname){
+  if(!pending||!pending.factors||!pending.factors[fname]) return;
+  const keepInc={}; S.forEach((s0,i)=>{ keepInc[s0.id]=included[i]; });
+  applyFactor(fname); GROUPORDER=null; GROUPTYPE="auto"; el("grouptype").value="auto";
+  analyzeNow();
+  S.forEach((s0,i)=>{ if(keepInc[s0.id]===false) included[i]=false; });
+  buildSampleBar(); deKey=""; coKey=""; scorrKey=""; patState=null; TFRES=null;
+  refreshTab(curTab);
+}
+document.addEventListener("click", e=>{ const b=e.target&&e.target.closest? e.target.closest(".regroup") : null; if(b) regroupBy(b.dataset.f); });
+
+// statistics for one gene: the levels of the line factor compared at each x level (each level against the first)
+function g2fStats(g, T, test){
+  const gi=groupsIdx(), out=[], ref=T.sLv[0];
+  for(const sv of T.sLv.slice(1)){
+    const rows=[];
+    for(const xv of T.xLv){
+      const A=T.cell(ref,xv), B=T.cell(sv,xv);
+      if(!A||!B||(gi[A]||[]).length<2||(gi[B]||[]).length<2){ rows.push({x:xv, A, B, ref, cmp:sv, err:"fewer than 2 samples"}); continue; }
+      if(test==="de"){ const r=cmpPairStats([[A,B]], [g], "de")[g][0]; rows.push(Object.assign({x:xv, ref, cmp:sv}, r)); }
+      else { const a=gi[A].map(j=>L[g*nS+j]), b=gi[B].map(j=>L[g*nS+j]), w=welch(a,b);
+        rows.push((!w||!(w.se>0))? {x:xv, A, B, ref, cmp:sv, err:"not testable (no within-group variance)"} : {x:xv, A, B, ref, cmp:sv, lfc:w.d, p:w.p}); }
+    }
+    if(test!=="de"){ const ti=rows.map((r,i)=>i).filter(i=>!rows[i].err), adj=holm(ti.map(i=>rows[i].p)); ti.forEach((i,k)=>rows[i].adj=adj[k]); }
+    out.push(...rows);
+  }
+  return out;
+}
+function g2fTestText(test){
+  if(test==="de") return `${deMethodLabel()}${DETREAT&&deMethod!=="welch"? ", TREAT test of |log₂FC| > "+(Math.abs(parseFloat(el("fcthr").value))||0) : ""}${DEFIT==="all"&&deMethod!=="welch"? ", variance from all groups" : ""}${DECOVSEL.filter(v=>COVARS[v]).length? ", adjusted for "+DECOVSEL.filter(v=>COVARS[v]).join(", ") : ""}; FDR by Benjamini–Hochberg across all ${nG.toLocaleString()} genes, separately at each level`;
+  return "Welch t-test on log₂ expression at each level; p adjusted by Holm across the levels";
+}
+function buildTwoFactorPlot(g, T){
+  const LM=dispM(), gi=groupsIdx();
+  const val= scale==="log"? (j=>LM[g*nS+j]) : (j=>VALS[g][j]);
+  const xPos=xv=> T.numericX? Number(xv) : T.xLv.indexOf(xv);
+  const span= T.numericX? (Number(T.xLv[T.xLv.length-1])-Number(T.xLv[0]))||1 : T.xLv.length;
+  const dodge= T.numericX? span*0.018 : 0.14, nSer=T.sLv.length;
+  const traces=[]; let ymax=-Infinity, ymin=0; const topAt={};
+  T.sLv.forEach((sv,k)=>{
+    const c=PAL[k%PAL.length], off=(k-(nSer-1)/2)*dodge;
+    const mx=[], my=[], me=[], px=[], py=[], pt=[];
+    T.xLv.forEach(xv=>{
+      const cg=T.cell(sv,xv), idx=cg? (gi[cg]||[]) : [];
+      if(!idx.length) return;
+      const ys=idx.map(val), m=mean(ys), sd=ys.length>1? Math.sqrt(variance(ys,m)) : 0, e=errType==="sd"? sd : (ys.length>1? sd/Math.sqrt(ys.length) : 0);
+      mx.push(xPos(xv)+off); my.push(m); me.push(e);
+      ys.forEach((y,q)=>{ px.push(xPos(xv)+off+(q-(ys.length-1)/2)*dodge*0.5/Math.max(ys.length-1,1)); py.push(y); pt.push(S[idx[q]].id); });
+      const t=Math.max(m+e, ...ys); topAt[xv]=Math.max(topAt[xv]??-Infinity, t); ymax=Math.max(ymax, t); ymin=Math.min(ymin, ...ys);
+    });
+    traces.push({x:px, y:py, text:pt, mode:"markers", type:"scatter", name:sv, legendgroup:sv, showlegend:false, marker:{size:7, color:c, opacity:0.75, line:{width:0.6, color:"#fff"}}, hovertemplate:"%{text}: %{y:.3g}<extra>"+esc(sv)+"</extra>"});
+    traces.push({x:mx, y:my, mode:"lines+markers", type:"scatter", name:sv, legendgroup:sv, line:{color:c, width:2}, marker:{size:9, color:c, symbol:"diamond"}, meta:"summary",
+      error_y:{type:"data", array:me, visible:true, color:c, thickness:1.4, width:5}, hovertemplate:`mean %{y:.3g}<extra>${esc(sv)}</extra>`});
+  });
+  // significance labels: drawn when exactly two levels are compared
+  const ann=[], statRows=[["gene", T.xName, T.sName+" (reference)", T.sName, "log2FC", "p", "adjusted p", "adjustment", "label"]];
+  let st=null;
+  if(G2FSTAT!=="none"){
+    st=g2fStats(g, T, G2FSTAT);
+    const step=(ymax-ymin||1)*0.07;
+    st.forEach(r=>{
+      const lab= r.err? "n.t." : starOfQ(r.adj);
+      statRows.push([geneTitle(g), r.x, r.ref, r.cmp, r.err? null : r.lfc, r.err? null : r.p, r.err? null : r.adj, G2FSTAT==="de"? "Benjamini-Hochberg across all genes" : "Holm across the "+T.xName+" levels", r.err||lab]);
+      if(nSer===2&&topAt[r.x]!==undefined) ann.push({x:xPos(r.x), y:topAt[r.x]+step, text:lab, showarrow:false, yanchor:"bottom", font:{size:12, color:"#1e293b"}});
+    });
+    if(nSer===2) ymax+=step*2.2;
+  }
+  const xaxis= T.numericX? {title:T.xName, tickvals:T.xLv.map(Number), ticktext:T.xLv.map(String), zeroline:false, rangemode: T.xLv.every(v=>Number(v)>=0)? "tozero" : "normal"}
+                         : {title:T.xName, tickvals:T.xLv.map((_,i)=>i), ticktext:T.xLv.map(String), range:[-0.5, T.xLv.length-0.5], zeroline:false};
+  if(T.numericX){ const lo=Math.min(0, Number(T.xLv[0])), hi=Number(T.xLv[T.xLv.length-1]); xaxis.range=[lo-span*0.06, hi+span*0.06]; }
+  // Prism Grouped table: rows = x levels, data sets = line levels, samples as replicate sub-columns
+  const nRep=Math.max(...GROUPS.map(d=>(gi[d]||[]).length), 1);
+  const prismRows=[[T.xName].concat(...T.sLv.map(sv=>Array.from({length:nRep},(_,r)=>r===0? sv : "")))].concat(
+    T.xLv.map(xv=>[xv].concat(...T.sLv.map(sv=>{ const cg=T.cell(sv,xv), idx=cg? (gi[cg]||[]) : []; return Array.from({length:nRep},(_,r)=>idx[r]!==undefined? val(idx[r]) : null); }))));
+  const meta={prismRows, prismKind:`Grouped (rows: ${T.xName}; data sets: ${T.sName}; ${nRep} replicate sub-columns)`,
+    prismHow:`Create a Grouped table with ${nRep} replicates in side-by-side sub-columns; paste the sheet with the first column as row titles.`};
+  if(st) meta.statsRows=statRows;
+  const layout={margin:{t:30, b:50, l:60, r:10}, font:{size:11}, title:{text:geneTitle(g), font:{size:13}, x:0.02, xanchor:"left"},
+    xaxis, yaxis:{title: scale==="log"? (BATCHDISP? "log₂ expression (batch-adjusted)" : "log₂ expression") : "expression (linear)", range:[Math.min(0, ymin-(ymax-ymin)*0.04), ymax+(ymax-ymin)*0.06], zeroline:true},
+    annotations:ann, legend:{orientation:"h", y:1.02, yanchor:"bottom", x:1, xanchor:"right", title:{text:T.sName+" "}}, meta};
+  return {data:traces, layout, st};
+}
+function g2fNote(T, st){
+  const nMin=Math.min(...GROUPS.map(d=>(groupsIdx()[d]||[]).length).filter(n=>n>0));
+  let t=`Lines: means of each ${esc(T.sName)} at each ${esc(T.xName)} ± ${errType.toUpperCase()}; points: individual samples (smallest group n = ${nMin}).`;
+  if(st){ t+= T.sLv.length===2? ` Labels: ${esc(T.sLv[1])} vs ${esc(T.sLv[0])} at each ${esc(T.xName)}; ${g2fTestText(G2FSTAT)}; * ≤ 0.05, ** ≤ 0.01, *** ≤ 0.001, **** ≤ 0.0001, ns > 0.05.`
+                                 : ` Each ${esc(T.sName)} vs ${esc(T.sLv[0])} at each ${esc(T.xName)} is in the table below (labels are drawn for two levels only); ${g2fTestText(G2FSTAT)}.`; }
+  return t;
+}
+function g2fTable(T, st){
+  if(!st) return "";
+  const lbl=G2FSTAT==="de"? "FDR" : "Holm p";
+  return `<table class="tbl"><tr><th>${esc(T.xName)}</th><th>comparison</th><th>log₂FC</th><th>p</th><th>${lbl}</th><th></th></tr>`+
+    st.map(r=>r.err? `<tr><td>${esc(r.x)}</td><td>${esc(r.cmp)} vs ${esc(r.ref)}</td><td colspan="4">${esc(r.err)}</td></tr>`
+                    : `<tr${r.adj<=0.05?' style="background:#f0fdf4"':''}><td>${esc(r.x)}</td><td>${esc(r.cmp)} vs ${esc(r.ref)}</td><td>${r.lfc>=0?"+":""}${r.lfc.toFixed(2)}</td><td>${fmtP(r.p)}</td><td>${fmtP(r.adj)}</td><td>${starOfQ(r.adj)}</td></tr>`).join("")+`</table>`;
+}
+
+/* ---- DE tab: the line factor compared at each x level, and the interaction test ---- */
+// Moderated F test of several contrasts of the cell means (limma-trend: lmFit, contrasts.fit, eBayes(trend = TRUE),
+// F statistic as topTable with several coefficients). Model ~ 0 + group (+ covariates) on all included samples.
+function lmFContrasts(cells, gi, Cm, covNames){
+  const okS=j=>covNames.every(cn=>{ const v=COVARS[cn]&&COVARS[cn][j]; return v!==undefined&&v!==null&&String(v).trim()!==""&&String(v).trim().toUpperCase()!=="NA"; });
+  const samp=[], cellOf=[]; cells.forEach((c,k)=>{ for(const j of (gi[c]||[])) if(okS(j)){ samp.push(j); cellOf.push(k); } });
+  const nT=samp.length, nC=cells.length;
+  const D=ixDesign(cells, samp, Int32Array.from(cellOf), covNames), X=D.X, p0=X[0].length, dfr=nT-p0;
+  if(D.kept.filter(n=>n.startsWith("cell:")).length<nC) return {err:"The groups are not separable in this design."};
+  if(dfr<1) return {err:`No residual degrees of freedom (n = ${nT}, parameters = ${p0}).`};
+  const A=Array.from({length:p0},(_,r)=>Array.from({length:p0},(_,c)=>{ let s=0; for(let q=0;q<nT;q++) s+=X[q][r]*X[q][c]; return s; }));
+  const V=invMat(A); if(!V) return {err:"Design matrix is singular."};
+  const H=Array.from({length:p0},(_,r)=>Float64Array.from({length:nT},(_,q)=>{ let s=0; for(let c=0;c<p0;c++) s+=V[r][c]*X[q][c]; return s; }));
+  const C=Cm.map(c=>{ const v=new Float64Array(p0); for(let k=0;k<nC;k++) v[k]=c[k]; return v; }), r0=C.length;
+  const CVC=C.map(a=>C.map(b=>{ let s=0; for(let i=0;i<p0;i++) for(let k=0;k<p0;k++) s+=a[i]*V[i][k]*b[k]; return s; }));
+  const M=invMat(CVC); if(!M) return {err:"The contrasts are not independent."};
+  const s2=new Float64Array(nG), num=new Float64Array(nG), Am=new Float64Array(nG), y=new Float64Array(nT), b=new Float64Array(p0), cb=new Float64Array(r0);
+  for(let g=0;g<nG;g++){
+    let sy=0; for(let q=0;q<nT;q++){ y[q]=L[g*nS+samp[q]]; sy+=y[q]; } Am[g]=sy/nT;
+    for(let r=0;r<p0;r++){ let s=0; const h=H[r]; for(let q=0;q<nT;q++) s+=h[q]*y[q]; b[r]=s; }
+    let rss=0; for(let q=0;q<nT;q++){ let f=0; for(let c=0;c<p0;c++) f+=X[q][c]*b[c]; const d=y[q]-f; rss+=d*d; }
+    s2[g]=rss/dfr;
+    for(let i=0;i<r0;i++){ let s=0; for(let k=0;k<p0;k++) s+=C[i][k]*b[k]; cb[i]=s; }
+    let qf=0; for(let i=0;i<r0;i++) for(let k=0;k<r0;k++) qf+=cb[i]*M[i][k]*cb[k];
+    num[g]=qf/r0;
+  }
+  const pr=fitFDistTrendJS(s2, dfr, Am);
+  const dfT=Math.min(isFinite(pr.df0)? dfr+pr.df0 : Infinity, nG*dfr);
+  const F=new Float64Array(nG), P=new Float64Array(nG);
+  for(let g=0;g<nG;g++){ const sp=isFinite(pr.df0)? (pr.df0*pr.s20[g]+dfr*s2[g])/(pr.df0+dfr) : pr.s20[g]; F[g]=num[g]/Math.max(sp,1e-300); P[g]=fPval(F[g], r0, dfT); }
+  return {F, P, q:bh(Array.from(P)), df1:r0, df2:dfT, df0:pr.df0, nT, dropped:D.dropped};
+}
+function renderTFCard(){
+  const card=el("tfcard"); if(!card) return;
+  const T=twoFactor(), rg=regroupHTML();
+  if(!T&&!rg){ card.style.display="none"; return; }
+  card.style.display="block";
+  if(!T){ el("tfhead").innerHTML=rg; el("tfctl").style.display="none"; el("tfout").innerHTML=""; return; }
+  el("tfctl").style.display="";
+  el("tfhead").innerHTML=regroupHTML()+`<div class="footer-note">Samples are grouped by each combination of <b>${esc(FACTOR)}</b>. Compares ${esc(T.sName)} at each ${esc(T.xName)} (${T.xLv.map(esc).join(", ")}) with the test, FDR and |log₂FC| settings above, and tests whether the ${esc(T.sName)} difference changes across ${esc(T.xName)} (interaction).</div>`;
+  const fill=(id, v)=>{ const e2=el(id), cur=e2.value; e2.innerHTML=T.sLv.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(""); e2.value=T.sLv.includes(cur)? cur : v; };
+  fill("tfref", T.sLv[0]); fill("tfcmp", T.sLv[1]);
+  if(el("tfcmp").value===el("tfref").value) el("tfcmp").value=T.sLv.find(x=>x!==el("tfref").value);
+}
+function runTwoFactor(){
+  const T=twoFactor(); if(!T) return;
+  const ref=el("tfref").value, cmp=el("tfcmp").value; if(ref===cmp){ el("tfout").innerHTML='<span class="warnchip">Choose two different levels.</span>'; return; }
+  const fdr=parseFloat(el("selFDR").value)||0.05, thr=Math.abs(parseFloat(el("fcthr").value))||0, gi=groupsIdx();
+  const per=T.xLv.map(xv=>{ const A=T.cell(ref,xv), B=T.cell(cmp,xv);
+    if(!A||!B||(gi[A]||[]).length<2||(gi[B]||[]).length<2) return {x:xv, A, B, nA:A?(gi[A]||[]).length:0, nB:B?(gi[B]||[]).length:0, err:"fewer than 2 included samples in a group"};
+    const r=runContrast(A,B); if(r.err) return {x:xv, A, B, nA:gi[A].length, nB:gi[B].length, err:r.err};
+    let up=0, dn=0; for(let g=0;g<nG;g++) if(r.q[g]<=fdr&&Math.abs(r.lfc[g])>=thr){ if(r.lfc[g]>0) up++; else dn++; }
+    return {x:xv, A, B, nA:gi[A].length, nB:gi[B].length, lfc:r.lfc, p:r.p, q:r.q, up, dn}; });
+  // interaction: (cmp - ref) at each x level minus (cmp - ref) at the first x level; moderated F, limma-trend
+  const okX=T.xLv.filter(xv=>{ const A=T.cell(ref,xv), B=T.cell(cmp,xv); return A&&B&&(gi[A]||[]).length>=1&&(gi[B]||[]).length>=1; });
+  const cells=GROUPS.filter(d=>(gi[d]||[]).length>0);
+  let IX=null;
+  if(okX.length>=2){
+    const ci=d=>cells.indexOf(d), x0=okX[0];
+    const Cm=okX.slice(1).map(xv=>{ const c=new Array(cells.length).fill(0); c[ci(T.cell(cmp,xv))]+=1; c[ci(T.cell(ref,xv))]-=1; c[ci(T.cell(cmp,x0))]-=1; c[ci(T.cell(ref,x0))]+=1; return c; });
+    const covs=DECOVSEL.filter(v=>COVARS[v]);
+    IX=lmFContrasts(cells, gi, Cm, covs); IX.x0=x0; IX.covs=covs;
+  }
+  TFRES={T, ref, cmp, per, IX, fdr, thr, method:deMethodLabel()};
+  drawTwoFactor();
+}
+function drawTwoFactor(){
+  const R=TFRES; if(!R) return; const {T, ref, cmp, per, IX, fdr, thr}=R;
+  let h=`<div class="footer-note" style="margin:6px 0">${esc(cmp)} vs ${esc(ref)} at each ${esc(T.xName)}: ${deRuleText(fdr, thr)}${deMethod!=="welch"? (DEFIT==="all"? ", variance from all groups" : ", variance from the two groups compared") : ""}${DECOVSEL.filter(v=>COVARS[v]).length? ", adjusted for "+DECOVSEL.filter(v=>COVARS[v]).map(esc).join(", ") : ""}; FDR within each ${esc(T.xName)}.</div>`;
+  h+=`<table class="tbl"><tr><th>${esc(T.xName)}</th><th>n (${esc(ref)})</th><th>n (${esc(cmp)})</th><th>up in ${esc(cmp)}</th><th>down in ${esc(cmp)}</th></tr>`+
+    per.map(r=>r.err? `<tr><td>${esc(r.x)}</td><td>${r.nA}</td><td>${r.nB}</td><td colspan="2">${esc(r.err)}</td></tr>` : `<tr><td>${esc(r.x)}</td><td>${r.nA}</td><td>${r.nB}</td><td style="color:#dc2626">${r.up.toLocaleString()}</td><td style="color:#2563eb">${r.dn.toLocaleString()}</td></tr>`).join("")+`</table>`;
+  if(IX){
+    if(IX.err) h+=`<div class="footer-note" style="margin-top:6px">Interaction test: ${esc(IX.err)}</div>`;
+    else { let nI=0; for(let g=0;g<nG;g++) if(IX.q[g]<=fdr) nI++;
+      h+=`<div class="footer-note" style="margin-top:6px"><b>Interaction:</b> ${nI.toLocaleString()} gene${nI===1?"":"s"} at FDR ≤ ${fdr} in which the ${esc(cmp)} − ${esc(ref)} difference changes across ${esc(T.xName)}: moderated F test (limma-trend) of the ${IX.df1} contrasts [(${esc(cmp)} − ${esc(ref)}) at each ${esc(T.xName)}] − [(${esc(cmp)} − ${esc(ref)}) at ${esc(IX.x0)}], model ~ 0 + group${IX.covs.length? " + "+IX.covs.map(esc).join(" + ") : ""} on all ${IX.nT} included samples; F on ${IX.df1} and ${fmtN(IX.df2)} df; FDR by Benjamini–Hochberg across all genes. The interaction test uses limma-trend whatever test is chosen above, and no |log₂FC| threshold.</div>`; }
+  }
+  el("tfout").innerHTML=h;
+  // up/down counts at each x level
+  const ok=per.filter(r=>!r.err), xs=ok.map(r=>T.numericX? Number(r.x) : String(r.x));
+  Plotly.react("p_tfcounts", [
+    {x:xs, y:ok.map(r=>r.up), type:"bar", name:`up in ${cmp}`, marker:{color:"#dc2626", opacity:0.8}},
+    {x:xs, y:ok.map(r=>-r.dn), type:"bar", name:`down in ${cmp}`, marker:{color:"#2563eb", opacity:0.8}, customdata:ok.map(r=>r.dn), hovertemplate:"%{customdata} down<extra></extra>"}],
+    {margin:{t:30,b:50,l:60,r:10}, font:{size:11}, barmode:"relative", xaxis: T.numericX? {title:T.xName, tickvals:xs, ticktext:ok.map(r=>String(r.x)), rangemode:"tozero"} : {title:T.xName, type:"category"},
+     yaxis:{title:`genes (${cmp} vs ${ref})`, zeroline:true}, legend:{orientation:"h", y:1.02, yanchor:"bottom", x:1, xanchor:"right"}}, PL);
+  el("p_tfcounts").style.display="block";
+  // genes significant at one or more levels, or in the interaction test
+  const rows=[]; for(let g=0;g<nG;g++){
+    const sig=ok.map(r=>r.q[g]<=fdr&&Math.abs(r.lfc[g])>=thr), ixq=IX&&!IX.err? IX.q[g] : null;
+    if(sig.some(Boolean)||(ixq!==null&&ixq<=fdr)) rows.push({g, sig, nSig:sig.filter(Boolean).length, ixq, minq:Math.min(...ok.map(r=>r.q[g]))}); }
+  rows.sort((a,b)=>(a.ixq??1)-(b.ixq??1)||a.minq-b.minq);
+  const head=`<tr><th>gene</th>${ok.map(r=>`<th>log₂FC ${esc(T.xName)} ${esc(r.x)}</th>`).join("")}${IX&&!IX.err?"<th>interaction FDR</th>":""}</tr>`;
+  const cellH=(r,g)=>{ const v=r.lfc[g], s=r.q[g]<=fdr&&Math.abs(v)>=thr; return `<td style="${s? (v>0?"color:#dc2626;font-weight:600":"color:#2563eb;font-weight:600") : "color:#64748b"}" title="FDR ${fmtP(r.q[g])}">${v>=0?"+":""}${v.toFixed(2)}</td>`; };
+  el("tftable").innerHTML= rows.length? `<div class="footer-note" style="margin:6px 0">${rows.length.toLocaleString()} genes significant at one or more ${esc(T.xName)} levels or in the interaction test (first 50, ordered by interaction FDR; bold: significant at that level).</div><table class="tbl">${head}`+
+    rows.slice(0,50).map(r=>`<tr><td><span class="glink2" data-g="${r.g}" style="cursor:pointer;color:var(--accent)">${esc(geneTitle(r.g))}</span></td>${ok.map(o=>cellH(o,r.g)).join("")}${IX&&!IX.err?`<td>${fmtP(r.ixq)}</td>`:""}</tr>`).join("")+`</table>` : `<div class="footer-note">No gene is significant at any ${esc(T.xName)} level.</div>`;
+  el("tftable").querySelectorAll(".glink2").forEach(sp=>sp.addEventListener("click",()=>jumpToGene(+sp.dataset.g)));
+  el("tfexp").style.display="inline-block"; el("tfcmpbtn").style.display=rows.length? "inline-block" : "none";
+  TFRES.rows=rows;
+}
+function exportTwoFactor(){
+  const R=TFRES; if(!R) return; const {T, ref, cmp, per, IX}=R, ok=per.filter(r=>!r.err);
+  const q=v=>{ const t=String(v); return /[",\n]/.test(t)? '"'+t.replace(/"/g,'""')+'"' : t; };
+  const lines=[`# ${cmp} vs ${ref} at each ${T.xName}; ${R.method}; FDR within each ${T.xName}` + (IX&&!IX.err? `; interaction: moderated F (limma-trend) on ${IX.df1} and ${IX.df2.toFixed(1)} df, FDR across genes` : "")];
+  lines.push(["gene","gene_id"].concat(...ok.map(r=>[`log2FC_${T.xName}_${r.x}`,`p_${T.xName}_${r.x}`,`FDR_${T.xName}_${r.x}`]), IX&&!IX.err? ["interaction_F","interaction_p","interaction_FDR"] : []).map(q).join(","));
+  for(let g=0;g<nG;g++) lines.push([geneTitle(g), IDS[g]].concat(...ok.map(r=>[r.lfc[g], r.p[g], r.q[g]]), IX&&!IX.err? [IX.F[g], IX.P[g], IX.q[g]] : []).map(q).join(","));
+  downloadCSV(lines.join("\n")+"\n", `${T.sName}_by_${T.xName}_${cmp}_vs_${ref}.csv`.replace(/[^\w.+-]+/g,"_"));
+}
+
 function drawGene(){
+  const T2=twoFactor(); el("g2fwrap").style.display=T2? "" : "none"; el("g2fnote").innerHTML=T2? "" : regroupHTML();
+  if(T2){ const lk=T2.xName+"|"+T2.sName;
+    if(el("g2fwrap")._lk!==lk){ el("g2fwrap")._lk=lk;
+      el("g2flay").innerHTML=`<option value="lines">${esc(T2.xName)} on the axis, one line per ${esc(T2.sName)}</option><option value="groups">one bar per group</option>`;
+      el("g2fstat").innerHTML=`<option value="none">no ${esc(T2.sName)} comparison</option><option value="de">${esc(T2.sName)} at each ${esc(T2.xName)}: DE model, FDR</option><option value="welch">${esc(T2.sName)} at each ${esc(T2.xName)}: Welch t, Holm</option>`; }
+    el("g2flay").value=G2FLAY; el("g2fstat").value=G2FSTAT; }
   if(curGene===null){
     Plotly.react("p_gene",[],{xaxis:{visible:false},yaxis:{visible:false},
       annotations:[{text:"Search for a gene above to view its expression",showarrow:false,font:{size:14,color:"#94a3b8"}}]},PL);
@@ -3376,10 +3657,12 @@ function drawGene(){
   const g=curGene;
   const bp=buildGenePlot(g);
   el("geneinfo").innerHTML=`${IDS[g]}${BIOTYPES[BT[g]]!=="unknown"?" &middot; "+BIOTYPES[BT[g]]:""}${GENES[g]!==geneTitle(g)?" &middot; shown as "+geneTitle(g):""}${geneLinks(g)}`+batchDispNote();
-  Plotly.react("p_gene",bp.data,bp.layout,PL);
-  el("gplotnote").innerHTML=genePlotNote();
+  const tfp= (T2&&G2FLAY==="lines")? buildTwoFactorPlot(g, T2) : null;
+  if(tfp){ Plotly.react("p_gene",tfp.data,tfp.layout,PL); el("gplotnote").innerHTML=g2fNote(T2, tfp.st); }
+  else { Plotly.react("p_gene",bp.data,bp.layout,PL); el("gplotnote").innerHTML=genePlotNote(); }
   const {testGroups,testNames,gi,raw,lg}=bp;
-  if(bp.pw){
+  if(tfp){ el("pwtable").innerHTML=g2fTable(T2, tfp.st); }
+  else if(bp.pw){
     const mode=el("pwsel").value;
     el("pwtable").innerHTML=`<table class="tbl"><tr><th>Comparison</th><th>Welch p</th><th>Holm-adj p</th><th></th></tr>`+
       bp.pw.map(r=>r.untestable? `<tr><td>${r.a} vs ${r.b}</td><td colspan="3" title="Both groups have identical values within the group; a t-test is not defined">not testable (no within-group variance)</td></tr>` : `<tr${r.padj<0.05?' style="background:#f0fdf4"':''}><td>${r.a} vs ${r.b}</td><td>${fmtP(r.p)}</td><td>${fmtP(r.padj)}</td><td>${starOf(r.padj)}</td></tr>`).join("")+
@@ -4065,6 +4348,9 @@ function tUpperJS(x,df){
   return x>=0? two/2 : 1-two/2;
 }
 function drawDE(){
+  renderTFCard();
+  if(TFRES){ const k=[included.join(""), deMethod, DEFIT, DECOVSEL.join("+"), DETREAT, el("selFDR").value, el("fcthr").value, el("tfref").value, el("tfcmp").value, GROUPS.join("|")].join("/");
+    if(TFRES.key!==k){ runTwoFactor(); if(TFRES) TFRES.key=k; } }
   const res=computeDE();
   if(res.err){ Plotly.react("p_volcano",[],{annotations:[{text:res.err,showarrow:false}]},PL);
     el("detable").innerHTML=""; el("decounts").innerHTML=""; return; }
@@ -7468,7 +7754,7 @@ function drawRidgeline(){
   const traces=withMed.map((o,k2)=>{
     const r=o.r;
     const pStat=r.q!==undefined? " (FDR "+fmtP(r.q)+")" : "";
-    return {x:o.gs.map(g=>res.lfc[g]), type:"violin", side:"positive", orientation:"h",
+    return {x:o.gs.map(g=>res.lfc[g]), text:o.gs.map(g=>geneTitle(g)), name:r.name, type:"violin", side:"positive", orientation:"h",
       y0:(()=>{ const tl="  med "+o.med.toFixed(2)+pStat, sh=shortName(r.name, 30)+tl; noteFull(sh, r.name+tl); return sh; })(), width:1.7,
       line:{color:"#334155",width:1}, fillcolor:hexA(PAL[k2%PAL.length],0.45),
       points:false, meanline:{visible:true}, showlegend:false,
@@ -7477,7 +7763,7 @@ function drawRidgeline(){
   const nRidge=traces.length;
   withMed.forEach((o,k2)=>{
     const r=o.r;
-    traces.push({x:[o.med], y:[traces[k2].y0], mode:"markers", type:"scatter",
+    traces.push({x:[o.med], y:[traces[k2].y0], mode:"markers", type:"scatter", name:"median: "+r.name, meta:"summary",
       marker:{size:9, color:"#334155", symbol:"line-ns-open"},
       hovertemplate:`<b>${r.name}</b><br>${o.gs.length} genes · median log₂FC ${o.med.toFixed(2)}`+
         (r.q!==undefined?`<br>FDR ${fmtP(r.q)}`:``)+`<br><i>click for barcode + ECDF</i><extra></extra>`,
@@ -7486,7 +7772,8 @@ function drawRidgeline(){
   Plotly.react(el("p_ridge"), traces,
     {margin:{t:30,b:44,l:250,r:10}, height:110+34*rows.length, font:{size:9},
      title:{text:"log₂FC distributions of the top sets, sorted by median", font:{size:12}},
-     xaxis:{title:"log₂ fold change", zeroline:true, zerolinecolor:"#94a3b8"}, yaxis:{autorange:"reversed"}}, PL);
+     xaxis:{title:"log₂ fold change", zeroline:true, zerolinecolor:"#94a3b8"}, yaxis:{autorange:"reversed"},
+     meta:{labelSheet:"Genes", statsRows:[["gene set","genes","median log2FC","FDR (enrichment test)"]].concat(withMed.map(o=>[o.r.name, o.gs.length, o.med, o.r.q!==undefined? o.r.q : null]))}}, PL);
   el("ridgehint").style.display="block";
   onPlotClick(el("p_ridge"), ev=>{
     const r=RIDGEROWS[ev.points[0].curveNumber % nRidge];   // violins 0..n-1, median markers n..2n-1
@@ -7724,7 +8011,7 @@ function drawScree(){
   // PC coordinates already available: pcs = vecs[c]*sqrt(vals[c])
   const pc=(c)=>PCASTATE.vecs[c].map(v=>v*Math.sqrt(Math.max(PCASTATE.vals[c],0)));
   const p1=pc(0), p2=pc(1), p3=n>3?pc(2):null;
-  const traces=[{x:ve.map((_,c)=>"PC"+(c+1)), y:ve, type:"bar", marker:{color:"#334155"},
+  const traces=[{x:ve.map((_,c)=>"PC"+(c+1)), y:ve, type:"bar", name:"variance explained (%)", marker:{color:"#334155"},
     xaxis:"x", yaxis:"y", showlegend:false, hovertemplate:"%{y:.1f}%<extra></extra>"}];
   const panels=[["x2","y2",p1,p2,"PC1","PC2"]];
   if(p3){ panels.push(["x3","y3",p1,p3,"PC1","PC3"], ["x4","y4",p2,p3,"PC2","PC3"]); }
@@ -7733,7 +8020,7 @@ function drawScree(){
     GROUPS.forEach(g=>{
       const ii=idx.map((j,q)=>({j,q})).filter(o=>S[o.j].group===g);
       if(!ii.length) return;
-      traces.push({x:ii.map(o=>px[o.q]), y:ii.map(o=>py[o.q]), text:ii.map(o=>S[o.j].id),
+      traces.push({x:ii.map(o=>px[o.q]), y:ii.map(o=>py[o.q]), text:ii.map(o=>S[o.j].id), name:`${g} (${lx} vs ${ly})`,
         mode:"markers", type:"scatter", xaxis:xa, yaxis:ya, showlegend:false,
         marker:{size:7,color:GCOL[g],line:{width:0.8,color:"white"}},
         hovertemplate:"%{text}<extra>"+g+"</extra>"});
@@ -7742,7 +8029,11 @@ function drawScree(){
   });
   Plotly.react(el("p_scree"), traces,
     {margin:{t:30,b:34,l:46,r:10}, height:250, font:{size:9},
-     grid:{rows:1, columns:1+panels.length, pattern:"independent"}, annotations:annos}, PL);
+     grid:{rows:1, columns:1+panels.length, pattern:"independent"}, annotations:annos,
+     // export: one row per sample with its group and PC scores; variance explained as the statistics sheet
+     meta:{prismRows:[["sample","group","PC1","PC2"].concat(p3? ["PC3"] : [])].concat(idx.map((j,q)=>[S[j].id, S[j].group, p1[q], p2[q]].concat(p3? [p3[q]] : []))),
+       prismKind:"Sample table (one row per sample; plot any two PC columns as XY in Prism)", prismHow:"Create an XY table with row titles; paste the sample column as row titles and two PC columns as X and Y.",
+       statsRows:[["component","variance explained (%)"]].concat(ve.map((v,c)=>["PC"+(c+1), v]))}}, PL);
 }
 function drawStability(){
   const gA=el("selA").value, gB=el("selB").value;
@@ -7934,7 +8225,7 @@ function drawPQQ(res){
   const mx=Math.max(xs[0], ys[0])*1.03;
   Plotly.react(el("p_pqq"), [
     {x:[0,mx], y:[0,mx], mode:"lines", type:"scatter", line:{color:"#94a3b8", dash:"dash", width:1}, hoverinfo:"skip", showlegend:false},
-    {x:xs, y:ys, mode:"markers", type:"scattergl", marker:{size:3.5, color:"#334155", opacity:0.7}, hoverinfo:"skip", showlegend:false}],
+    {x:xs, y:ys, mode:"markers", type:"scattergl", name:"genes (observed vs expected)", marker:{size:3.5, color:"#334155", opacity:0.7}, hoverinfo:"none", showlegend:false}],
     {margin:{t:8,b:40,l:55,r:10}, height:230, font:{size:10},
      xaxis:{title:"expected −log₁₀ p (uniform)"}, yaxis:{title:"observed −log₁₀ p"}}, PL);
 }
@@ -10868,7 +11159,7 @@ async function makeSummaryFigure(){
 
 /* ================= session save / restore ================= */
 function sessionState(){
-  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, deTreat:DETREAT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, sampleBar:{hide:SBHIDE, coll:SBCOLL}, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
+  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, deTreat:DETREAT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, g2f:{lay:G2FLAY, stat:G2FSTAT}, sampleBar:{hide:SBHIDE, coll:SBCOLL}, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
     disco:{fam:el("dscfam").checked, cur:el("dsccur").checked, gmt:el("dscgmt").checked, mn:el("dscmin").value, mx:el("dscmax").value, B:el("dscperm").value},
     matrixName:pending&&pending.matrixName||"", nG0:FILTER.ng0, factor:FACTOR,
     factors:(pending&&pending.factors)? Object.fromEntries(baseFactorNames().map(f=>[f,pending.factors[f]])) : null,
@@ -10979,6 +11270,7 @@ function applySession(ss){
   if(ss.norm) el("normsel").value=ss.norm;
   if(ss.fontScale){ FONTSCALE=ss.fontScale; el("fontsel").value=String(ss.fontScale); }
   SESSLABEL=ss.sessLabel||"";
+  if(ss.g2f){ G2FLAY=ss.g2f.lay||"lines"; G2FSTAT=ss.g2f.stat||"de"; el("g2flay").value=G2FLAY; el("g2fstat").value=G2FSTAT; }
   SBHIDE=!!(ss.sampleBar&&ss.sampleBar.hide); SBCOLL=Object.assign({}, ss.sampleBar&&ss.sampleBar.coll);
   if(ss.trait){ setTimeout(()=>{ try{ refreshTraitUI(); el("trsel").value=ss.trait.trait; el("trtf").value=ss.trait.transform; el("tradj").checked=!!ss.trait.adjustGroup; el("trblk").value=ss.trait.block||""; el("trbmode").value=ss.trait.blockMode||"auto";
     document.querySelectorAll("#trgroups input.trg").forEach(x=>x.checked=!ss.trait.groups.length||ss.trait.groups.includes(x.dataset.g)); document.querySelectorAll("#trcovs input.trc").forEach(x=>x.checked=ss.trait.covs.includes(x.dataset.c)); }catch(e){} }, 0); }
