@@ -185,7 +185,7 @@ The **bar / box / violin** toggle sets how each group is drawn; the sample point
 
 ### Step 11. Compare all contrasts
 
-In the Differential Expression tab, click **Run all pairs (current method)**. The table and UpSet plot show the hits for every pairwise contrast. Select two or three contrasts and click **Draw Venn** for exact region counts; click a region to list its genes.
+In the Differential Expression tab, click **Run all pairs (current method)**. The table and UpSet plot show the hits for every pairwise contrast. Select two or three contrasts and click **Draw Venn** for exact region counts; click a region to list its genes. Under the list, **Heatmap**, **Enrichment** (over-representation against all kept genes, with the library loaded in the Enrichment tab) and **Compare in Gene Explorer** use exactly that region's genes; **Copy genes** and **Export list (CSV)** save them. The list stays available as a source in the Heatmap and Enrichment tabs.
 
 ### Step 12. Save your work
 

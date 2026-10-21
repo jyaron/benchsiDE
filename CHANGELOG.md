@@ -2,6 +2,10 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Gene lists and the DE table
+- NEW: the gene list of a DEG Venn region has buttons for a heatmap, an over-representation analysis, the Gene Explorer comparison, copying the symbols and a CSV export, each using exactly that region's genes. The list is offered as a source in the Heatmap tab and the Enrichment tab; the enrichment result equals that of the same genes pasted as a list.
+- NEW: the table of significant genes beside the volcano plot is sorted by clicking a column header (gene, log2FC, |log2FC|, p, FDR; click again to reverse). Sorting covers all significant genes, not only the rows shown; "Show more" adds 200 rows. The title gives the number of significant genes. Engine check gene_lists_detable.
+
 Data export of figures
 - FIXED: the data export of the ridgeline plot (Enrichment tab) held only the 12 medians, with blank row labels and columns named "series 1" to "series 12", and the "All values" sheet had no gene-set names. The Prism sheet is now a Column table with one column per gene set (full name) holding the log2 fold change of every gene in the set; a Genes sheet gives the gene behind each value, and a Statistics sheet gives each set's number of genes, median log2 fold change and enrichment FDR. Horizontal box and violin plots are exported by category in general.
 - FIXED: other figures whose export had unnamed series: the PCA score panels (now one row per sample with group and PC1 to PC3, and variance explained per component), the p-value Q-Q plot (the points were omitted from the Prism sheet), and single-series figures such as the volcano plot, library sizes and the p-value histogram (the series is now named after the axis). Engine check export_series_names covers the data export of every figure drawn in a sweep of the tabs.

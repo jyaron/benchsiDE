@@ -474,7 +474,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
           <details style="margin-top:6px" id="voomtrendwrap"><summary style="cursor:pointer;font-size:12.5px">voom mean&ndash;variance trend</summary>
           <div id="p_voomtrend" style="height:240px"></div></details></div>
         <div>
-          <h3 style="font-size:13px">Top genes by FDR (click to open in Gene Explorer)</h3>
+          <h3 style="font-size:13px" id="detabtitle">Significant genes</h3>
           <div id="detable" style="max-height:430px;overflow-y:auto"></div>
         </div>
       </div>
@@ -4428,14 +4428,28 @@ function drawDE(){
     const gs=pts.filter(pt=>pt.curveNumber===0).map(pt=>pt.pointIndex!==undefined? pt.pointIndex : pt.pointNumber);
     DESEL=gs.length? new Set(gs) : null; renderDESel(); });
   renderDESel();
-  hitIdx.sort((x2,y2)=>q[x2]-q[y2]);
-  const topHits=hitIdx.slice(0,50);
-  el("detable").innerHTML =
-    `<table class="tbl"><tr><th>Gene</th><th>log₂FC</th><th>p</th><th>FDR</th></tr>`+
-    topHits.map(g=>`<tr class="clickable" data-g="${g}"><td>${GENES[g]}</td><td style="color:${lfc[g]>0?"#dc2626":"#2563eb"}">${lfc[g].toFixed(2)}</td><td>${fmtP(p[g])}</td><td>${fmtP(q[g])}</td></tr>`).join("")+`</table>`;
-  document.querySelectorAll("#detable tr.clickable").forEach(tr=>tr.addEventListener("click",()=>{jumpToGene(+tr.dataset.g);}));
+  if(DETAB.rows.length!==hitIdx.length) DETAB.shown=50;
+  DETAB.rows=hitIdx; DETAB.lfc=lfc; DETAB.p=p; DETAB.q=q;
+  renderDETable();
 }
 
+// table of the significant genes beside the volcano plot: sorted by the clicked column header (click again to reverse)
+let DETAB={col:"q", dir:1, shown:50, rows:[], lfc:null, p:null, q:null};
+function renderDETable(){
+  const {rows, lfc, p, q}=DETAB; if(!lfc) return;
+  const key={gene:g=>GENES[g].toLowerCase(), lfc:g=>lfc[g], abs:g=>Math.abs(lfc[g]), p:g=>p[g], q:g=>q[g]}[DETAB.col]||(g=>q[g]);
+  const sorted=rows.slice().sort((a,b)=>{ const u=key(a), v=key(b); return (u<v?-1:u>v?1:0)*DETAB.dir || p[a]-p[b]; });
+  const shown=sorted.slice(0, DETAB.shown);
+  const hd=(col,lab,tip)=>`<th data-sort="${col}" style="cursor:pointer;white-space:nowrap" title="${tip}">${lab}${DETAB.col===col?(DETAB.dir>0?" \u25b2":" \u25bc"):""}</th>`;
+  el("detabtitle").textContent=`${rows.length.toLocaleString()} significant genes${rows.length>shown.length? ` (first ${shown.length} shown)` : ""}; click a column header to sort, a row to open the gene`;
+  el("detable").innerHTML=`<table class="tbl"><tr>${hd("gene","Gene","sort by gene name")}${hd("lfc","log₂FC","sort by log₂ fold change (click again to reverse)")}${hd("abs","|log₂FC|","sort by the size of the fold change, either direction")}${hd("p","p","sort by p-value")}${hd("q","FDR","sort by FDR")}</tr>`+
+    shown.map(g=>`<tr class="clickable" data-g="${g}"><td>${GENES[g]}</td><td style="color:${lfc[g]>0?"#dc2626":"#2563eb"}">${lfc[g].toFixed(2)}</td><td>${Math.abs(lfc[g]).toFixed(2)}</td><td>${fmtP(p[g])}</td><td>${fmtP(q[g])}</td></tr>`).join("")+`</table>`+
+    (rows.length>shown.length? `<button class="act ghost" id="detabmore" style="margin-top:4px">Show ${Math.min(200, rows.length-shown.length)} more</button>` : "");
+  el("detable").querySelectorAll("tr.clickable").forEach(tr=>tr.addEventListener("click",()=>{ jumpToGene(+tr.dataset.g); }));
+  el("detable").querySelectorAll("th[data-sort]").forEach(th=>th.addEventListener("click",()=>{
+    const c=th.dataset.sort; if(DETAB.col===c) DETAB.dir=-DETAB.dir; else { DETAB.col=c; DETAB.dir=(c==="lfc"||c==="abs")? -1 : 1; } renderDETable(); }));
+  const more=document.getElementById("detabmore"); if(more) more.addEventListener("click",()=>{ DETAB.shown+=200; renderDETable(); });
+}
 /* ---- genes selected on the volcano / MA plot (box or lasso) ---- */
 let DESEL=null, DESELSORT={col:"p", dir:1};
 function onPlotSelect(div, fn){
@@ -4756,6 +4770,7 @@ function refreshEnrSrc(){
   if(patState) patState.order.forEach((c,ci)=>sel.add(new Option(`Pattern P${ci+1} (${patState.cnt[c]} genes)`,"pat"+ci)));
   if(META&&META.rows&&META.rows.length) sel.add(new Option(`Meta-analysis genes (${metaEnrSpecText()})`,"meta"));
   if(IXRES&&(IXRES.up+IXRES.dn)) sel.add(new Option(`Interaction genes (${IXRES.up+IXRES.dn})`,"ix"));
+  if(GENELIST&&GENELIST.genes.length) sel.add(new Option(`Gene list: ${GENELIST.label} (${GENELIST.genes.length})`,"list"));
   if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
   el("enrpaste").style.display = sel.value==="paste" ? "block":"none";
 }
@@ -4879,6 +4894,7 @@ function metaEnrQuery(){
 function querySetIdx(){
   const src=el("enrsrc").value;
   if(src==="meta") return metaEnrQuery();
+  if(src==="list"){ if(!GENELIST) return {err:"No gene list. Choose a region of the DEG Venn diagram and click Enrichment."}; return {idx:GENELIST.genes.slice(), label:`gene list: ${GENELIST.label}`}; }
   if(src==="ix"){ if(!IXRES) return {err:"Run the interaction contrast in the DE tab first."};
     const idx=[]; for(let g=0;g<nG;g++) if(IXRES.q[g]<=IXRES.fdr&&Math.abs(IXRES.lfc[g])>=IXRES.lt) idx.push(g);
     const sp=IXRES.spec; return {idx, label:`interaction (${sp.B2} − ${sp.A2}) − (${sp.B1} − ${sp.A1}), FDR ≤ ${IXRES.fdr}, |log₂FC| ≥ ${IXRES.lt}`}; }
@@ -5452,6 +5468,13 @@ function drawHeat(){
       top=Array.from(res.p.keys()).sort((a,b)=>res.p[a]-res.p[b]).slice(0,N0);
       note=`Top ${top.length} DE genes by p-value, ${el("selB").value} vs ${el("selA").value} (${deMethodLabel()}).`;
     }
+  }
+  if(el("heatsrc").value==="list"){
+    if(!GENELIST||GENELIST.genes.length<2){ el("heatnote").innerHTML="⚠ No gene list with at least two genes. Showing the most variable genes instead."; }
+    else { const res=computeDE(); const gs=GENELIST.genes.filter(g=>g>=0&&g<nG);
+      if(!res.err) gs.sort((a,b)=>res.p[a]-res.p[b]);
+      const CAPH=500; top=gs.slice(0,CAPH);
+      note=`${top.length} genes of the list ${esc(GENELIST.label)}${gs.length>CAPH?` (the ${CAPH} with the lowest p in the current DE contrast, of ${gs.length})`:""}.`; el("heatnote").innerHTML=""; }
   }
   if(el("heatsrc").value==="sel"){
     if(!DESEL||DESEL.size<2){ el("heatnote").innerHTML="⚠ Select at least two genes on the volcano or MA plot (drag to: select). Showing the most variable genes instead."; }
@@ -7650,10 +7673,43 @@ function vennShowRegion(key){
       genes2.slice(0,shown).map(g=>`<span class="glink" data-g="${g}" style="cursor:pointer;color:#2563eb">${GENES[g].split(" (")[0]}</span>`).join(", ")+
       (shown<genes2.length? ` <a href="#" id="vennmore">+${genes2.length-shown} more</a>` : "");
     el("venngenes").querySelectorAll(".glink").forEach(s=>s.addEventListener("click",()=>jumpToGene(+s.dataset.g)));
+    if(genes2.length){ const lab=inSets.join(" ∩ ")+(outSets.length? " only" : ""); geneListBar(el("venngenes"), lab, genes2, ("venn_"+lab).replace(/[^\w+-]+/g,"_").slice(0,80)+".csv"); }
     const more=document.getElementById("vennmore");
     if(more) more.addEventListener("click",e2=>{e2.preventDefault(); shown=Math.min(shown+200,genes2.length); render();});
   };
   render();
+}
+// A named gene list (for example one region of the DEG Venn diagram) that the heatmap, the enrichment analysis and
+// the multi-gene comparison can use.
+let GENELIST=null;
+function setGeneList(label, genes){
+  GENELIST={label, genes:genes.slice()};
+  const hs=el("heatsrc"); let o=[...hs.options].find(x=>x.value==="list");
+  if(!o){ o=new Option("", "list"); hs.add(o); }
+  o.text=`gene list: ${label} (${genes.length})`;
+  refreshEnrSrc();
+}
+// action bar under a gene list; each button acts on exactly these genes
+function geneListBar(box, label, genes, csvName){
+  const bar=document.createElement("div"); bar.className="controls"; bar.style.margin="6px 0";
+  bar.innerHTML=`<button class="act ghost" data-a="heat" title="Heatmap of these genes (up to 500; with more, the 500 with the lowest p in the current DE contrast)">Heatmap</button>
+    <button class="act ghost" data-a="enr" title="Over-representation analysis of these genes against all kept genes, with the gene-set library loaded in the Enrichment tab">Enrichment</button>
+    <button class="act ghost" data-a="cmp" title="Adds up to ${CMPMAX} genes to the Gene Explorer comparison, lowest p in the current DE contrast first">Compare in Gene Explorer</button>
+    <button class="act ghost" data-a="copy" title="Copy the gene symbols, one per line">Copy genes</button>
+    <button class="act ghost" data-a="csv">Export list (CSV)</button>`;
+  box.appendChild(bar);
+  const byP=()=>{ const res=computeDE(); const gs=genes.slice(); if(!res.err) gs.sort((a,b)=>res.p[a]-res.p[b]); return gs; };
+  bar.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+    const a=b.dataset.a;
+    if(a==="heat"){ if(genes.length<2) return; setGeneList(label, genes); el("heatsrc").value="list"; switchTab("heat"); }
+    else if(a==="enr"){ setGeneList(label, genes); switchTab("enrich");
+      if(enrMethod!=="ora"){ const ob=[...document.querySelectorAll("#enrmethod button")].find(x=>x.dataset.e==="ora"); if(ob) ob.click(); }
+      refreshEnrSrc(); el("enrsrc").value="list"; el("enrpaste").style.display="none"; runEnrichment(); }
+    else if(a==="cmp"){ compareList=byP().slice(0,CMPMAX); if(!compareList.length) return; curGene=compareList[0]; switchTab("gene"); drawCompare(); }
+    else if(a==="copy"){ const t=genes.map(g=>geneTitle(g)).join("\n"); if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>{ b.textContent="Copied"; setTimeout(()=>{ b.textContent="Copy genes"; },1500); }); }
+    else if(a==="csv"){ const q=v=>{ const t=String(v); return /[",\n]/.test(t)? '"'+t.replace(/"/g,'""')+'"' : t; };
+      downloadCSV([`# ${label}`, "gene,gene_id"].concat(genes.map(g=>[geneTitle(g), IDS[g]].map(q).join(","))).join("\n")+"\n", csvName); }
+  }));
 }
 let ALLPAIRS=null;
 function runAllPairs(){

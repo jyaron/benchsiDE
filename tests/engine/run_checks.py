@@ -538,6 +538,43 @@ def export_series_names():
     return ok, {"figures": len(r["rep"]), "bad": bad, "ridge_sets": len(rd["sets"]), "ridge_counts_match": rd["counts"] == rd["nGenes"]}
 
 
+@check
+def gene_lists_detable():
+    # Venn region -> heatmap / enrichment (identical to the same genes pasted), DE table sorted over all significant genes
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(des("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="CTRL_healthy"; el("selB").value="PSO_lesional"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey="";
+  useBuiltin("hallmark_hs"); enrMethod="ora"; switchTab("enrich"); __drain();
+  VENNSTATE={picks:[{A:"CTRL_healthy",B:"PSO_lesional",label:"P"},{A:"CTRL_healthy",B:"AD_lesional",label:"A"}], dir2:"any"}; drawVenn(); vennShowRegion(3);
+  const genes=VENNSEL.genes2; setGeneList("P ∩ A", genes); refreshEnrSrc(); el("enrsrc").value="list"; el("enrmin").value="5"; el("enrmax").value="2000"; runEnrichment(); __drain();
+  const a=enrResults.rows.map(r=>[r.name, r.p, r.q]);
+  el("enrsrc").value="paste"; el("enrpaste").value=genes.map(g=>IDS[g]).join("\n"); runEnrichment(); __drain();
+  const b=enrResults.rows.map(r=>[r.name, r.p, r.q]);
+  const same=a.length===b.length && a.every((r,i)=>r[0]===b[i][0]&&r[1]===b[i][1]&&r[2]===b[i][2]);
+  el("heatsrc").value="list"; switchTab("heat"); __drain(); const hc=plotlyCalls.filter(x=>x.id==="p_heat").pop();
+  const hset=new Set(hc.traces[0].y), gset=new Set(genes.map(g=>GENES[g]));
+  const out={n:genes.length, nSets:a.length, same, heatRows:hc.traces[0].y.length, heatSubset:[...hset].every(x=>gset.has(x))};
+  // DE table sorting
+  switchTab("de"); __drain(); drawDE();
+  const rowsOf=()=>{ const h=el("detable").innerHTML; return [...h.matchAll(/data-g="(\d+)"/g)].map(m=>+m[1]); };
+  const r0=rowsOf(); out.nShown=r0.length; out.title=el("detabtitle").textContent;
+  const chk=(col,dir)=>{ DETAB.col=col; DETAB.dir=dir; renderDETable(); const r=rowsOf(); const v=r.map(g=>({gene:GENES[g].toLowerCase(), lfc:DETAB.lfc[g], abs:Math.abs(DETAB.lfc[g]), p:DETAB.p[g], q:DETAB.q[g]}[col]));
+    let ok=true; for(let i=1;i<v.length;i++) if((v[i]<v[i-1]&&dir>0)||(v[i]>v[i-1]&&dir<0)) ok=false;
+    // first shown must be the extreme over ALL significant genes
+    const all=DETAB.rows.map(g=>({gene:GENES[g].toLowerCase(), lfc:DETAB.lfc[g], abs:Math.abs(DETAB.lfc[g]), p:DETAB.p[g], q:DETAB.q[g]}[col])); const ext=dir>0? all.reduce((a,b)=>a<b?a:b) : all.reduce((a,b)=>a>b?a:b);
+    return ok && v[0]===ext; };
+  out.sorts={}; for(const [c,d] of [["gene",1],["gene",-1],["lfc",-1],["lfc",1],["abs",-1],["p",1],["q",1],["q",-1]]) out.sorts[c+d]=chk(c,d);
+  DETAB.shown=50; DETAB.col="q"; DETAB.dir=1; renderDETable(); const nb=DETAB.shown; DETAB.shown+=200; renderDETable(); out.more=[nb, rowsOf().length];
+    print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=1200)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = r["same"] and r["heatRows"] == min(500, r["n"]) and r["heatSubset"] and all(r["sorts"].values()) and r["more"] == [50, 250]
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0
