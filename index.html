@@ -1493,6 +1493,8 @@ function plotToSheets(data, layout){
   if(prism) sheets.push({name:"Prism", rows:prism});
   cols.forEach(c=>sheets.push(c));
   if(L.meta&&Array.isArray(L.meta.statsRows)&&L.meta.statsRows.length>1) sheets.push({name:"Statistics", rows:L.meta.statsRows});
+  if(L.meta&&Array.isArray(L.meta.extraSheets)) L.meta.extraSheets.forEach(x=>{ if(x&&x.name&&Array.isArray(x.rows)) sheets.push(x); });
+  if(L.meta&&L.meta.queryLabel) notes.splice(1, 0, ["Query", L.meta.queryLabel]);
   sheets.push({name:"All values", rows:long});
   sheets.push({name:"Notes", rows:notes});
   return {sheets, kind};
@@ -5334,37 +5336,55 @@ function runEnrichment(){
   el("enrexport").style.display="inline-block";
   drawSetJaccard(); drawRidgeline(); drawLeadingEdge();
 }
+// data export of the enrichment dot plot: the sets in the order drawn (top first) with their statistics, and the
+// genes behind each dot (overlap genes for over-representation, leading-edge genes for GSEA)
+function enrDotMeta(top, gsea){
+  const R=enrResults||{}, x=gsea? "NES" : "fold enrichment";
+  const noQ=top.every(r=>!isFinite(r.q)), NR="not reported (gene permutation)";
+  const prismRows=[["gene set", x, noQ? "-log10 p" : "-log10 FDR"]].concat(top.map(r=>[r.name, r.ratio, -Math.log10(Math.max(noQ? r.p : r.q,1e-300))]));
+  const statsRows= gsea? [["gene set","set size","leading-edge genes","ES","NES","p","FDR","leading-edge genes (list)"]].concat(top.map(r=>[r.name, r.m, r.k, r.es, r.NES!==undefined? r.NES : r.ratio, r.p, isFinite(r.q)? r.q : NR, r.ovIdx.map(g=>geneTitle(g)).join("; ")]))
+    : [["gene set","set size (in universe)","overlap","query genes annotated","universe","fold enrichment","p (hypergeometric, upper tail)","FDR (Benjamini-Hochberg over "+((R.rows||[]).length)+" testable sets)","overlap genes"]].concat(top.map(r=>[r.name, r.m, r.k, R.q, R.N, r.ratio, r.p, r.q, r.ovIdx.map(g=>geneTitle(g)).join("; ")]));
+  const genesRows=[["gene set", gsea? "leading-edge gene" : "overlap gene", "gene ID"]];
+  top.forEach(r=>r.ovIdx.forEach(g=>genesRows.push([r.name, geneTitle(g), IDS[g]])));
+  return {prismRows, prismKind:"Grouped (rows: gene sets, top first; columns: "+x+" and "+(noQ? "-log10 p" : "-log10 FDR")+")", prismHow:"Create a Grouped table with one value per cell; paste the sheet with the first column as row titles.",
+    statsRows, extraSheets:[{name:"Genes", rows:genesRows}], queryLabel:R.label||""};
+}
 function drawEnrLolli(rows, mode){
   const gsea = mode==="gsea";
   const base = gsea? 0 : 1;                      // semantic null: NES 0 vs fold-enrichment 1
-  const top=rows.slice(0,15);
+  // over-representation: sets with no query gene have fold enrichment 0 and p = 1; they are not among the top sets
+  const cand=gsea? rows : rows.filter(r=>r.k>0), nNone=rows.length-cand.length;
+  const top=cand.slice(0,15);
   const div=el("p_enrlolli");
+  if(!top.length){ Plotly.react(div,[],{xaxis:{visible:false},yaxis:{visible:false},annotations:[{text:"No gene set contains any of the query genes.",showarrow:false,font:{size:13,color:"#64748b"}}]},PL); return; }
   div.style.display="block";
   div.style.height=(130+Math.ceil(26*Math.max(1,FONTSCALE))*top.length)+"px";
-  const rr=top.slice().reverse();
+  const rr=top.slice().reverse(), noQ=top.every(r=>!isFinite(r.q));
   const names=rr.map(r=>shortName(r.name, 44));
   const sx=[], sy=[];
   rr.forEach((r,i)=>{ sx.push(base, r.ratio, null); sy.push(i, i, null); });
   // interaction hint lives in the info line, not the plot title, so exports stay clean
   const hint=document.createElement("span");
-  hint.textContent=` Dot size = ${gsea?"leading-edge size":"overlap"}; click a dot to list its genes.`;
+  hint.textContent=` Dot size = ${gsea?"leading-edge size":"overlap"}; click a dot to list its genes.${!gsea&&nNone? ` ${nNone} set${nNone===1?"":"s"} with no query gene ${nNone===1?"is":"are"} not drawn.` : ""}`;
   el("enrinfo").appendChild(hint);
   Plotly.react(div,[
     {x:sx, y:sy, mode:"lines", type:"scatter", line:{color:"#94a3b8", width:2}, hoverinfo:"skip", showlegend:false},
     {x:rr.map(r=>r.ratio), y:rr.map((_,i)=>i), mode:"markers", type:"scatter",
      marker:{size:rr.map(r=>Math.min(26, 6+2.2*Math.sqrt(r.k))),
-             color:rr.map(r=>-Math.log10(Math.max(r.q,1e-300))), colorscale:"Viridis",
-             colorbar:{title:{text:"−log₁₀ FDR", font:{size:12}}, thickness:14, tickfont:{size:11}}, line:{width:1, color:"#fff"}},
-     text:rr.map(r=>r.name), customdata:rr.map(r=>[r.k, r.m, r.p, r.q]),
-     hovertemplate:gsea?"%{text}<br>NES %{x:.2f} · leading edge %{customdata[0]}/%{customdata[1]}<br>p %{customdata[2]:.2e} · FDR %{customdata[3]:.2e}<extra></extra>"
-                       :"%{text}<br>fold enrichment %{x:.2f} · overlap %{customdata[0]}/%{customdata[1]}<br>p %{customdata[2]:.2e} · FDR %{customdata[3]:.2e}<extra></extra>",
+             // preranked GSEA reports no FDR (gene permutation ignores gene correlation): colour by p and say so
+             color:rr.map(r=>-Math.log10(Math.max(noQ? r.p : r.q,1e-300))), colorscale:"Viridis",
+             colorbar:{title:{text:noQ? "−log₁₀ p" : "−log₁₀ FDR", font:{size:12}}, thickness:14, tickfont:{size:11}}, line:{width:1, color:"#fff"}},
+     text:rr.map(r=>r.name), customdata:rr.map(r=>[r.k, r.m, r.p, isFinite(r.q)? r.q.toExponential(2) : "not reported"]),
+     hovertemplate:gsea?"%{text}<br>NES %{x:.2f} · leading edge %{customdata[0]}/%{customdata[1]}<br>p %{customdata[2]:.2e} · FDR %{customdata[3]}<extra></extra>"
+                       :"%{text}<br>fold enrichment %{x:.2f} · overlap %{customdata[0]}/%{customdata[1]}<br>p %{customdata[2]:.2e} · FDR %{customdata[3]}<extra></extra>",
      showlegend:false}],
     {margin:{t:Math.ceil(42*FONTSCALE), b:Math.ceil(48*FONTSCALE),
              l:Math.ceil(Math.min(380, 34+8.6*Math.max(...names.map(n=>n.length)))*FONTSCALE), r:12}, font:{size:12},
      title:{text:gsea?(GSEAMODE==="samples"?"<b>GSEA: top gene sets</b>":"<b>Preranked GSEA (ranking only): top gene sets</b>"):"<b>Over-representation: top gene sets</b>", font:{size:14}, x:0.5, xanchor:"center"},
      xaxis:{title:{text:gsea?"<b>normalized enrichment score (NES)</b>":"<b>fold enrichment</b>", font:{size:12.5}}, tickfont:{size:11.5}},
      yaxis:{tickvals:rr.map((_,i)=>i), ticktext:names.map(n=>"<b>"+n+"</b>"), tickfont:{size:11.5}},
-     shapes:[{type:"line", x0:base, x1:base, y0:-0.5, y1:top.length-0.5, line:{dash:"dot", color:"#64748b", width:1.4}}]},PL);
+     shapes:[{type:"line", x0:base, x1:base, y0:-0.5, y1:top.length-0.5, line:{dash:"dot", color:"#64748b", width:1.4}}],
+     meta:enrDotMeta(top, gsea)},PL);
   onPlotClick(div, ev=>{ const nm=ev.points[0].text; if(!nm)return;
     const row=enrResults.rows.find(r=>r.name===nm); if(row) renderEnrGenes(row); });
 }

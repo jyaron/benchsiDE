@@ -2,6 +2,11 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Enrichment dot plot
+- FIXED: the data export of the enrichment dot plot held only the gene-set names and fold enrichment, listed bottom to top. It now lists the sets in the order drawn (top first) and has a Statistics sheet (set size, overlap, number of annotated query genes, universe, fold enrichment, hypergeometric p, FDR and the overlap genes; for GSEA, set size, leading-edge size, ES, NES, p, FDR and the leading-edge genes) and a Genes sheet with one row per set and gene.
+- FIXED: with a short query list, gene sets that contain none of the query genes (fold enrichment 0, p = 1) were drawn among the "top" sets. They are no longer drawn, and the line under the plot gives their number.
+- FIXED: for preranked GSEA, which reports no FDR, the dot colour and its scale were undefined and the hover text read "NaN". Dots are coloured by -log10 p, the scale says so, and the export states that FDR is not reported. Engine check enrichment_dot_export.
+
 Gene lists and the DE table
 - NEW: the gene list of a DEG Venn region has buttons for a heatmap, an over-representation analysis, the Gene Explorer comparison, copying the symbols and a CSV export, each using exactly that region's genes. The list is offered as a source in the Heatmap tab and the Enrichment tab; the enrichment result equals that of the same genes pasted as a list.
 - NEW: the table of significant genes beside the volcano plot is sorted by clicking a column header (gene, log2FC, |log2FC|, p, FDR; click again to reverse). Sorting covers all significant genes, not only the rows shown; "Show more" adds 200 rows. The title gives the number of significant genes. Engine check gene_lists_detable.

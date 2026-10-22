@@ -575,6 +575,36 @@ def gene_lists_detable():
     return ok, r
 
 
+@check
+def enrichment_dot_export():
+    # ORA dot plot: no zero-overlap sets drawn; export in drawn order with overlap, p, FDR and genes; GSEA leading edges
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE54456")) + ", " + J(des("GSE54456")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  useBuiltin("hallmark_hs"); enrMethod="ora"; el("enrmin").value="5"; el("enrmax").value="2000"; switchTab("enrich"); __drain();
+  const out={};
+  for(const [lab,src,paste] of [["tiny","paste","TP53 CDKN1A MDM2 BAX"],["de","de_up",""]]){
+    el("enrsrc").value=src; el("enrpaste").value=paste; runEnrichment(); __drain();
+    const c=plotlyCalls.filter(x=>x.id==="p_enrlolli").pop(), sh=plotToSheets(c.traces,c.layout).sheets;
+    const P=sh.find(x=>x.name==="Prism"), St=sh.find(x=>x.name==="Statistics"), G=sh.find(x=>x.name==="Genes");
+    const exp=enrResults.rows.filter(r=>r.k>0).slice(0,15);
+    out[lab]={zeros:c.traces[1].x.filter(v=>v===0).length, order:JSON.stringify(P.rows.slice(1).map(r=>r[0]))===JSON.stringify(exp.map(r=>r.name)),
+      stats:St.rows.slice(1).every((r,i)=>r[2]===exp[i].k&&r[6]===exp[i].p&&r[7]===exp[i].q&&r[8].split("; ").length===exp[i].k), genes:G.rows.length-1===exp.reduce((a,r)=>a+r.k,0),
+      first:St.rows[1].slice(1,8)};
+  }
+  el("gseaperm").value="gene"; enrMethod="gsea"; runSync(runGSEAGen()); __drain();
+  const c=plotlyCalls.filter(x=>x.id==="p_enrlolli").pop(), sh=plotToSheets(c.traces,c.layout).sheets, St=sh.find(x=>x.name==="Statistics");
+  out.gsea={nes:St.rows.slice(1).every((r,i)=>r[4]===enrResults.rows[i].NES), fdrText:St.rows[1][6], colour:c.traces[1].marker.colorbar.title.text};
+  print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=1800)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = all(r[k]["zeros"] == 0 and r[k]["order"] and r[k]["stats"] and r[k]["genes"] for k in ("tiny", "de")) and r["gsea"]["nes"] and r["gsea"]["fdrText"].startswith("not reported") and r["gsea"]["colour"] == "−log₁₀ p"
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0
