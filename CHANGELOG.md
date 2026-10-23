@@ -2,6 +2,9 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Continuous integration
+- CHANGED: the GitHub Actions workflows use the releases of each action that run on Node.js 24 (checkout, setup-node, setup-python and upload-artifact v7, cache v6, configure-pages v6, upload-pages-artifact and deploy-pages v5, action-gh-release v3), and the Playwright tests run on Node.js 24 instead of Node.js 20, which has reached end of life. The runs no longer report the Node.js 20 deprecation warning.
+
 Group order
 - NEW: groups can be reordered by dragging, in the sample bar (session groups) and in the group editor of each comparison dataset. A group is dragged by its handle (⠿) and placed before or after the group it is dropped on; the arrow buttons remain for keyboard and touch use. Dragging and the arrows set the same order, which is used by plots, group selectors, exports and the session file; no statistic depends on it. Groups that are numeric values (a time course or dose series) keep their numeric order and cannot be reordered. Results whose layout depends on the group order are marked out of date or recomputed, as after other changes of the groups.
 - Tests: new engine check group_order; new browser test of dragging in tests/layout.spec.js.
