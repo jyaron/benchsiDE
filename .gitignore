@@ -6,3 +6,8 @@ _site/
 *.pyc
 __pycache__/
 .DS_Store
+bench-results/
+
+tests/engine/data/
+validation/fuzz/work/
+validation/fuzz/work_seed1/
