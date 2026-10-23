@@ -157,7 +157,7 @@ Warnings about low depth or outlier samples appear at the top of the tab.
 
 ### Step 8. Exclude a sample (if needed)
 
-Untick a sample in the sample bar. Every statistic in every tab recomputes immediately. Tick it again to restore it. Each group block also has an **all** checkbox. For this demo, keep all nine samples.
+Untick a sample in the sample bar. Every statistic in every tab recomputes immediately. Analyses started with a Run button (enrichment, hub genes, discovery, traits, comparison datasets) are not rerun automatically; after a change of samples, groups or the DE contrast they show an out-of-date notice until they are run again. Tick it again to restore it. Each group block also has an **all** checkbox. For this demo, keep all nine samples.
 
 With many samples the sample bar takes much of the screen. **Hide samples** hides it and shows one line with the number of samples included in each group; **Show samples** brings it back. The arrow before a group name collapses that group's samples only. The pencil after a group name renames the group (press Enter to apply): the samples and all statistics stay the same, and the new name is used everywhere. The arrows at either end of a group block move the group left or right; the order is used in every plot. A group cannot be renamed to the name of another group, because that would merge them; merge groups in the design editor before analysis.
 
@@ -264,7 +264,7 @@ Click **Compute** under **Genome-wide moderated F (any group differs)**. This si
 ### Step 4. Group genes by temporal profile
 
 1. Choose the number of genes (**500**, **1000** or **2000** most variable).
-2. Leave the number of patterns at **auto (silhouette)**. The note reports the silhouette score for each k; a best score below about 0.3 means the profiles form a continuum rather than distinct clusters.
+2. Leave the number of patterns at **auto (silhouette)**, or choose k from 2 to 12. The note reports the silhouette score for each k; a best score below about 0.3 means the profiles form a continuum rather than distinct clusters. The elbow plot below the patterns shows, for k = 1 to 12, the within-cluster sum of squares (it always falls as k grows; look for the k after which it falls little) and the mean silhouette (higher is better separated). The same choice and plot are available in the Heatmap tab when rows are ordered by k-means.
 3. Click a pattern line to list its genes; **Export cluster genes (CSV)** saves the assignment.
 4. The **Trajectory heatmap** shows every selected gene over time.
 
@@ -329,6 +329,8 @@ Each method has its own table and plots:
 | ORA | size, overlap, ratio, p, FDR, overlapping genes | lollipop chart, ridgeline, Jaccard heatmap |
 | GSEA | size, NES, p, FDR (sample permutation only), leading-edge genes | lollipop chart, running-score plot, ridgeline, Jaccard heatmap, leading-edge matrix |
 | FRY | size, direction, p and FDR (directional), p and FDR (mixed) | ridgeline, Jaccard heatmap |
+
+The table on screen shows the first 60 sets. **Download table (CSV)** and **Download table (Excel)**, directly above it, save every tested set with all statistics at full precision, and for ORA and GSEA the overlap or leading-edge genes of each set. The Excel file adds a Genes sheet (one row per set and gene) and a Notes sheet with the query, the test, the library and its citation, the size limits and the universe; the CSV starts with the same notes as lines beginning with #.
 
 FRY's directional p asks whether the set's genes change together in one direction; the mixed p asks whether they change in either direction. A set can have a large directional p and a very small mixed p when its genes change strongly in opposite directions. With many samples or a strong treatment, FRY finds most sets significant; that is a property of a self-contained test, and CAMERA or GSEA show which sets change more than the other genes.
 

@@ -605,6 +605,202 @@ def enrichment_dot_export():
     return ok, r
 
 
+@check
+def app_sweep():
+    # every tab and analysis on two public datasets: no exceptions, no NaN/undefined in the page or in plotted
+    # values, statistics drawn on a figure are in its data export, and every figure exports data
+    sweep = open(os.path.join(HERE, "audit_sweep.js")).read()
+    out = {}
+    for ds, sp, lib in [("GSE121212", "human", "hallmark_hs"), ("GSE143688", "mouse", "hallmark_hs")]:
+        body = r"""
+  el("species").value=""" + J(sp) + r"""; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat(ds)) + ", " + J(_design_with_score(ds) if ds == "GSE121212" else des(ds)) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  const LIB=""" + J(lib) + ";\n" + sweep
+        o = run(APP, body, timeout=3000)
+        R = lines_with(o, "AUD ")
+        if not R: return False, {"error": ds + " " + o[-600:]}
+        r = R[0]
+        # with two groups the sweep asks for a third group on purpose; the resulting messages are expected
+        err = [e for e in r["ERR"] if not (ds == "GSE143688" and e.startswith("venn"))]
+        txt = [t for t in r["textHits"] if not (ds == "GSE143688" and t[0] in ("venngenes",))]
+        out[ds] = {"plots": r["nPlots"], "ERR": err, "text": txt, "plot": r["plotHits"], "statsMissing": r["statsMissing"], "export": r["exportHits"], "banners": r["banners"]}
+    ok = all(not (v["ERR"] or v["text"] or v["plot"] or v["statsMissing"] or v["export"]) and v["plots"] >= 25 for v in out.values())
+    return ok, out
+
+@check
+def stale_results():
+    # after a sample is excluded: results that need Run are marked out of date until rerun; inexpensive ones recompute
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(des("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="CTRL_healthy"; el("selB").value="PSO_lesional"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey="";
+  useBuiltin("hallmark_hs"); enrMethod="ora"; el("enrmin").value="5"; el("enrmax").value="2000"; switchTab("enrich"); __drain(); el("enrsrc").value="de_up"; runEnrichment(); __drain();
+  el("hubM").value="600"; el("hubrun")._h.click(); __drain(); switchTab("de"); __drain(); runAllPairs(); computeModF(); drawModF(); __drain();
+  const ban=id=>/^<div class="stalebar"/.test(el(id).innerHTML);
+  const out={fresh:[ban("enrinfo"), ban("hubinfo")]}; const ap0=ALLPAIRS, mf0=MODF, nEnr0=enrResults.q;
+  const j=S.findIndex(x=>x.group==="PSO_lesional");
+  el("samplebar")._h["change"]({target:{dataset:{i:String(j)}, checked:false, classList:{contains:()=>false}}}); __drain();
+  switchTab("de"); __drain(); switchTab("enrich"); __drain();
+  out.after=[ban("enrinfo"), ban("hubinfo")]; out.autoPairs=ALLPAIRS!==ap0&&ALLPAIRS._sig===sampleSig(); out.autoModF=MODF!==mf0&&MODF._sig===sampleSig();
+  runEnrichment(); __drain(); out.rerun=ban("enrinfo"); out.nEnr=[nEnr0, enrResults.q];
+  el("selB").value="AD_lesional"; deKey=""; switchTab("de"); __drain(); switchTab("enrich"); __drain(); out.deChange=ban("enrinfo");
+  print("RES " + JSON.stringify(out));"""
+    o = run(APP, body, timeout=1500)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = r["fresh"] == [False, False] and r["after"] == [True, True] and r["autoPairs"] and r["autoModF"] and r["rerun"] is False and r["deChange"] is True
+    return ok, r
+
+
+@check
+def enrichment_table_export():
+    # the enrichment results table downloads (CSV and Excel) hold every tested set, not only the 60 shown, for ORA,
+    # GSEA and FRY, with no NaN; ORA fold enrichment = overlap / expected; the workbook opens as a valid xlsx
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE54456")) + ", " + J(des("GSE54456")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  useBuiltin("gobp_hs"); el("enrmin").value="5"; el("enrmax").value="2000"; switchTab("enrich"); __drain();
+  const out={}; let csv=null; const _d=downloadCSV; downloadCSV=(t,f)=>{ csv={t,f}; }; let xl=null;
+  const grab=lab=>{ csv=null; let err=null; try{ el("enrtcsv")._h.click(); }catch(e){ err=String(e); }
+    const T=enrTableSheets(); const b=xlsxBytes(T.sheets); if(lab==="ora") xl=Array.from(b);
+    const body=csv? csv.t.split("\n").filter(l=>l&&l[0]!=="#") : [];
+    out[lab]={err, dataLines:body.length-1, nRows:enrResults.rows.length, nan:csv? (csv.t.match(/NaN|undefined/g)||[]).length : -1, sheets:T.sheets.map(s=>s.name), bar:el("enrtbar").style.display}; };
+  enrMethod="ora"; el("enrsrc").value="de_up"; runEnrichment(); __drain(); grab("ora");
+  out.ratioErr=Math.max(...enrResults.rows.map(r=>Math.abs(r.ratio - r.k/(enrResults.q*r.m/enrResults.N))));
+  el("gseaperm").value="gene"; enrMethod="gsea"; runSync(runGSEAGen()); __drain(); grab("gsea");
+  enrMethod="fry"; runSync(runFRYGen()); __drain(); grab("fry");
+  downloadCSV=_d;
+  print("RES " + JSON.stringify(out)); print("XL " + JSON.stringify(xl));
+"""
+    o = run(APP, body, timeout=2400)
+    R = [json.loads(l[4:]) for l in o.split("\n") if l.startswith("RES ")]
+    X = [json.loads(l[3:]) for l in o.split("\n") if l.startswith("XL ")]
+    if not R or not X: return False, {"error": o[-600:]}
+    r = R[0]
+    import io, zipfile as _zf
+    z = _zf.ZipFile(io.BytesIO(bytes(X[0]))); names = z.namelist()
+    ok = all(r[m]["err"] is None and r[m]["nRows"] > 60 and r[m]["dataLines"] == r[m]["nRows"] and r[m]["nan"] == 0 and r[m]["bar"] == "flex" for m in ("ora", "gsea", "fry"))
+    ok = ok and r["ratioErr"] < 1e-9 and r["ora"]["sheets"] == ["Results", "Genes", "Notes"] and r["fry"]["sheets"] == ["Results", "Notes"] and "xl/workbook.xml" in names and z.testzip() is None
+    return ok, {m: {k: r[m][k] for k in ("nRows", "dataLines", "nan", "sheets")} for m in ("ora", "gsea", "fry")} | {"ratioErr": r["ratioErr"], "xlsx_parts": len(names)}
+
+
+def _design_with_score(ds):
+    # adds a numeric per-sample measure (deterministic) so that the sample-trait analyses run
+    lines = des(ds).rstrip("\n").split("\n"); n = len(lines[0].split(",")) - 1
+    return "\n".join(lines + ["score," + ",".join("%.3f" % (10 + ((i * 7919) % 97) / 9.7) for i in range(n))]) + "\n"
+
+def _adversarial_design(ds):
+    # group names with a comma and with quotes, written as a spreadsheet program writes them
+    out = []
+    for l in _design_with_score(ds).rstrip("\n").split("\n"):
+        if l.startswith("Group,"):
+            v = l.split(",")
+            l = ",".join([v[0]] + ['"AD, lesional"' if x == "AD_lesional" else '"CTRL ""healthy"""' if x == "CTRL_healthy" else x for x in v[1:]])
+        out.append(l)
+    return "\n".join(out) + "\n"
+
+def _csv_problems(t):
+    import csv as _csv, io as _io
+    body = "\n".join(l for l in t.split("\n") if not l.startswith("#"))
+    rows = [r for r in _csv.reader(_io.StringIO(body)) if r]
+    if not rows: return {"empty": True}
+    h = rows[0]; bad = re.compile(r"^(NaN|-?Infinity|undefined|null|\[object Object\])$|<span|<b>|&amp;|&lt;")
+    return {"rows": len(rows) - 1, "ragged": sum(1 for r in rows[1:] if len(r) != len(h)),
+            "bad": sum(1 for r in rows[1:] for v in r if bad.search(v)), "empty_header": sum(1 for x in h if not x.strip())}
+
+@check
+def export_audit():
+    # every export button, after every analysis has been run (group and gene-set names containing commas and quotes):
+    # each file is written without error, parses as CSV with one value per column, holds no NaN/undefined/markup;
+    # every figure's Excel export is a valid workbook; after a sample is excluded, exports of results that need a
+    # Run click are refused and inexpensive results are recomputed before export
+    import io as _io, zipfile as _zf
+    sweep = open(os.path.join(HERE, "audit_sweep.js")).read()
+    rd = lambda f: open(os.path.join(HERE, f)).read()
+    pre = r"""
+  const _ub=useBuiltin; useBuiltin=function(k){ _ub(k); if(GMT) GMT=GMT.map((x,i)=>Object.assign({}, x, {name: i%2? x.name.replace("_",", ") : x.name+' "q"'})); };
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(_adversarial_design("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  const LIB="hallmark_hs";
+""" + sweep.split("  // ---------- scans ----------")[0] + rd("export_extra.js")
+    scen = {"GSE121212": pre, "cohorts": PSO_SETUP + rd("export_cohorts.js")}
+    out = {"files": 0, "problems": [], "clickErrors": [], "stale_not_refused": [], "groups_parsed": None}
+    for nm, body in scen.items():
+        o = run(APP, body + rd("export_capture.js"), timeout=3600)
+        F = [json.loads(l[6:]) for l in o.split("\n") if l.startswith("FILES ")]
+        C = [json.loads(l[6:]) for l in o.split("\n") if l.startswith("CLICK ")]
+        if not F or not C: return False, {"error": nm + " " + o[-600:]}
+        out["clickErrors"] += C[0]["CLICKERR"] + C[0]["ERR"]
+        for x in F[0]:
+            out["files"] += 1
+            if x["kind"] == "csv" and not x["f"].endswith(".gmt"):
+                p = _csv_problems(x["t"])
+                if x["trunc"]: p["ragged"] = max(0, p.get("ragged", 0) - 1)
+                if p.get("ragged") or p.get("bad") or p.get("empty_header"): out["problems"].append([nm, x["f"], p])
+            if x["kind"] == "bin" and x.get("bytes"):
+                z = _zf.ZipFile(_io.BytesIO(bytes(x["bytes"])))
+                if z.testzip() is not None or "xl/workbook.xml" not in z.namelist(): out["problems"].append([nm, x["f"], "invalid xlsx"])
+        o = run(APP, body + rd("export_stale.js"), timeout=3600)
+        S_ = [json.loads(l[6:]) for l in o.split("\n") if l.startswith("STALE ")]
+        if not S_: return False, {"error": nm + " stale " + o[-600:]}
+        RUNKEYS = ("enr", "emat", "hub", "net", "nb", "dsc", "tr", "cmpexp", "famexp", "cons", "meta", "sig", "ix", "tf")
+        for b, nA, nB, same, after, thr, hidA in S_[0]["rep"]:
+            if thr: out["clickErrors"].append(b + " " + thr)
+            if nA and not hidA and b.startswith(RUNKEYS) and after not in ("blocked", "hidden") and same:
+                out["stale_not_refused"].append([nm, b])
+    # every figure's data workbook opens (adversarial names)
+    o = run(APP, pre + r"""
+  const ids=[...new Set(plotlyCalls.map(x=>x.id))]; let n=0; const bad=[];
+  for(const id of ids){ const c=plotlyCalls.filter(x=>x.id===id).pop(); try{ const b=xlsxBytes(plotToSheets(c.traces, c.layout).sheets); if(!(b&&b.length>100)) bad.push(id); n++; }catch(e){ bad.push(id+": "+e); } }
+  print("XLS " + JSON.stringify({n, bad, groups:GROUPS}));
+""", timeout=3000)
+    X = [json.loads(l[4:]) for l in o.split("\n") if l.startswith("XLS ")]
+    if not X: return False, {"error": "xlsx " + o[-600:]}
+    out["figures"] = X[0]["n"]; out["figure_errors"] = X[0]["bad"]; out["groups_parsed"] = X[0]["groups"]
+    ok = (out["files"] >= 40 and not out["problems"] and not out["clickErrors"] and not out["stale_not_refused"]
+          and out["figures"] >= 30 and not out["figure_errors"] and "AD, lesional" in out["groups_parsed"] and 'CTRL "healthy"' in out["groups_parsed"])
+    return ok, out
+
+
+@check
+def kmeans_k():
+    # heatmap and expression patterns: a k chosen by the user is used; auto k is unchanged (mean silhouette, k = 2-10);
+    # the elbow plot's within-cluster sum of squares and mean silhouette equal independent computations from the
+    # clusters drawn; the elbow plot shows 0 on both axes and its data export names both series
+    import numpy as np
+    o = run(APP, r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(des("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+  const last=id=>plotlyCalls.filter(x=>x.id===id).pop(), out={};
+  switchTab("heat"); __drain(); el("heatN").value="100"; el("heatord").value="kmeans"; el("heatK").value="5"; drawHeat();
+  const he=last("p_heatelbow"); out.heat={nC:new Set(heatClusters.map(r=>r.cluster)).size, wrap:el("heatkwrap").style.display, wcss:he.traces[0].y, xr:he.layout.xaxis.range, yr:he.layout.yaxis.range, vline:he.layout.shapes[0].x0};
+  switchTab("patterns"); __drain(); el("patK").value="auto"; drawPatterns(); out.autoK=patState.order.length; out.autoSil=autoK(patState.profiles).k;
+  el("patK").value="8"; drawPatterns(); const pe=last("p_patelbow");
+  out.pat={k:patState.order.length, asg:Array.from(patState.km.asg), P:patState.profiles, wcss:pe.traces[0].y, sil:pe.traces[1].y, silk:pe.traces[1].x, names:pe.traces.map(t=>t.name), sheet:plotToSheets(pe.traces, pe.layout).sheets[0].rows[0]};
+  el("heatord").value="hier"; drawHeat(); out.hier=[el("heatkwrap").style.display, el("p_heatelbow").style.display];
+  print("RES " + JSON.stringify(out));
+""", timeout=1800)
+    R = lines_with(o, "RES ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]; P = np.array(r["pat"]["P"]); a = np.array(r["pat"]["asg"])
+    w = float(sum(((P[a == c] - P[a == c].mean(0)) ** 2).sum() for c in np.unique(a)))
+    D = np.sqrt(((P[:, None, :] - P[None, :, :]) ** 2).sum(-1)); sil = []
+    for i in range(len(P)):
+        same = a == a[i]
+        if same.sum() <= 1: sil.append(0.0); continue
+        ai = D[i, same].sum() / (same.sum() - 1); bi = min(D[i, a == c].mean() for c in np.unique(a) if c != a[i])
+        sil.append((bi - ai) / max(ai, bi))
+    s_ind = float(np.mean(sil)); s_app = r["pat"]["sil"][r["pat"]["silk"].index(8)]
+    res = {"heat_k": r["heat"]["nC"], "pat_k": r["pat"]["k"], "wcss_rel": abs(r["pat"]["wcss"][7] - w) / w, "sil_diff": abs(s_app - s_ind),
+           "autoK": [r["autoK"], r["autoSil"]], "origin": [r["heat"]["xr"][0], r["heat"]["yr"][0]], "hier": r["hier"], "sheet": r["pat"]["sheet"]}
+    ok = (r["heat"]["nC"] == 5 and r["heat"]["vline"] == 5 and r["heat"]["wrap"] == "inline" and r["pat"]["k"] == 8 and res["wcss_rel"] < 1e-9
+          and res["sil_diff"] < 1e-6 and r["autoK"] == r["autoSil"] and res["origin"] == [0, 0] and r["hier"] == ["none", "none"]
+          and all(np.diff(r["pat"]["wcss"]) <= 1e-9) and "mean silhouette" in res["sheet"] and "within-cluster sum of squares" in res["sheet"])
+    return ok, res
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0

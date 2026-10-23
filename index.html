@@ -37,6 +37,14 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
   .warn { background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:8px 12px; font-size:12.5px; margin-bottom:12px; }
+  .warnchip { display:inline-block; background:#fef3c7; color:#78350f; border:1px solid #f59e0b; border-radius:6px; padding:2px 8px; margin:2px 0; font-size:12.5px; line-height:1.45; }
+  .alertbox { display:block; background:#fee2e2; color:#7f1d1d; border:1px solid #fca5a5; border-left:5px solid #dc2626; border-radius:6px; padding:6px 10px; margin:6px 0; font-size:12.5px; line-height:1.45; }
+  .alertbox .alerthead { display:block; font-weight:700; font-size:13px; margin-bottom:2px; }
+  .duptag { display:inline-block; background:#dc2626; color:#fff; border-radius:4px; padding:0 6px; margin-left:4px; font-size:11px; font-weight:600; }
+  /* a checkbox or radio button stays on the line of its text; a select or text box stays with the words that name it */
+  label:has(> input[type=checkbox]), label:has(> input[type=radio]) { display:inline-flex; align-items:center; gap:3px; }
+  label > input[type=checkbox], label > input[type=radio] { flex:none; margin:0 2px 0 0; }
+  .ctl { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
   #samplebar { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; font-size:12.5px; }
   #samplebar .grp { display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center; padding:3px 8px; border-radius:6px; background:#f1f5f9; max-width:100%; }
   #samplebar label { display:flex; align-items:center; gap:2px; cursor:pointer; }
@@ -637,11 +645,11 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
     <div class="card">
       <div class="controls">
         Cluster top <select id="patN"><option>500</option><option selected>1000</option><option>2000</option></select>
-        variable genes into <select id="patK"><option value="auto">auto (silhouette)</option><option>4</option><option selected>6</option><option>8</option><option>10</option></select>
+        variable genes into <select id="patK" title="Number of k-means patterns; auto chooses the k with the largest mean silhouette (k = 2 to 10). The elbow plot below helps to choose."><option value="auto">auto (silhouette)</option><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select>
         patterns <span class="footer-note">(k-means on per-group mean z-profiles)</span>
       </div>
       <div class="grid2">
-        <div><div id="p_pat" style="height:400px"></div></div>
+        <div><div id="p_pat" style="height:400px"></div><div id="p_patelbow" style="height:240px;display:none;margin-top:6px"></div></div>
         <div>
           <h3 style="font-size:13px" id="patlisthdr">Click a pattern line to list its genes</h3>
           <div id="patlist" style="max-height:380px;overflow-y:auto"></div>
@@ -714,7 +722,10 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
       <div id="p_enrmat"></div>
       <div id="enrmatnote" class="footer-note" style="margin:4px 0"></div>
       <div id="enrgenes" style="display:none;margin:10px 0;padding:10px 12px;background:#f8fafc;border-radius:8px;line-height:2"></div>
-      <div id="enrtable" style="max-height:480px;overflow-y:auto"></div>
+      <div id="enrtbar" class="controls" style="display:none;margin:6px 0 4px"><b id="enrtcount" style="font-size:12.5px"></b>
+      <button class="act ghost" id="enrtcsv" title="All tested gene sets with every statistic and the genes behind each row">Download table (CSV)</button>
+      <button class="act ghost" id="enrtxlsx" title="Sheets: Results (all tested sets), Genes (one row per set and gene), Notes (query, library, test, universe)">Download table (Excel)</button></div>
+    <div id="enrtable" style="max-height:480px;overflow-y:auto"></div>
       <div class="footer-note" id="enrfootnote" style="display:none">One-sided hypergeometric (Fisher exact) test of query&ndash;set overlap; universe = the kept genes annotated in the library; Benjamini&ndash;Hochberg FDR across tested sets. DE-based queries use the current Differential Expression contrast, method, and thresholds.</div>
     </div>
   </div>
@@ -757,8 +768,9 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
         </select>
         &middot; rows: <select id="heatord">
           <option value="hier" selected>hierarchical clustering</option>
-          <option value="kmeans">k-means (auto k, silhouette)</option>
+          <option value="kmeans">k-means</option>
         </select>
+        <span id="heatkwrap" style="display:none">k <select id="heatK" title="Number of k-means clusters; auto chooses the k with the largest mean silhouette (k = 2 to 10). The elbow plot below the heatmap helps to choose."><option value="auto" selected>auto (silhouette)</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select></span>
         &middot; columns: <select id="heatcols">
           <option value="samples" selected>label samples</option>
           <option value="groups">label groups</option>
@@ -768,6 +780,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
       <div id="heatnote" class="footer-note" style="margin-bottom:6px"></div>
       <div id="heatenr" style="display:none"></div>
       <div id="p_heat" style="height:640px"></div>
+    <div id="p_heatelbow" style="height:260px;display:none;margin-top:8px"></div>
     </div>
   </div>
   <div class="footer-note" id="methodsnote"></div>
@@ -950,6 +963,159 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
 
 <script>
 "use strict";
+/* ================= results that are out of date =================
+   Each analysis result records the inputs it was computed from: the included samples, the grouping, the
+   normalization and filtering, and (where the result uses them) the DE contrast and its settings. When the
+   inputs change, inexpensive results are recomputed when their tab is shown; results that need a Run click
+   are marked out of date until they are run again, so that no panel shows values from earlier inputs as current. */
+function sampleSig(){
+  const v=id=>{ const e=document.getElementById(id); return e? e.value : ""; };
+  return [FACTOR, GROUPS.join("\u0001"), included.map(x=>x?1:0).join(""), v("normsel"), v("fmode"), v("fthr"), v("unitsel"), nG, nS].join("\u0002");
+}
+function deSig(){
+  const v=id=>{ const e=document.getElementById(id); return e? e.value : ""; };
+  return sampleSig()+"\u0002"+[v("selA"), v("selB"), deMethod, DEFIT, DETREAT, (DECOVSEL||[]).join(","), v("selFDR"), v("fcthr"), v("treatlfc")].join("\u0002");
+}
+let POWERSIG=null, VENNSIG=null, CMPSIG=null;
+// result getters; `auto` recomputes in place, otherwise the result is marked out of date in `box`
+function staleRegistry(){ return [
+  {key:"enr",  get:()=>enrResults, sig:deSig, box:"enrinfo", what:"This enrichment result"},
+  {key:"emat", get:()=>ENRMAT, sig:sampleSig, box:"enrmatnote", what:"This enrichment matrix"},
+  {key:"hubs", get:()=>HUBS, sig:sampleSig, box:"hubinfo", what:"This hub-gene screen"},
+  {key:"disco",get:()=>DISCO, sig:sampleSig, box:"dscinfo", what:"This discovery screen"},
+  {key:"trait",get:()=>TRAITRES, sig:sampleSig, box:"trinfo", what:"This sample-trait analysis"},
+  {key:"cmp",  get:()=>CMPLAST, sig:deSig, box:"cmpinfo", what:"This dataset comparison"},
+  {key:"multi",get:()=>CONSENSUS, sig:deSig, box:"consensusout", what:"This consensus across contrasts"},
+  {key:"meta", get:()=>META, sig:deSig, box:"metainfo", what:"This meta-analysis"},
+  {key:"sig",  get:()=>SIGRES, sig:deSig, box:"siginfo", what:"This signature transfer"},
+  {key:"pairs",get:()=>ALLPAIRS, sig:sampleSig, tab:"de", auto:()=>{ runAllPairs(); }},
+  {key:"modf", get:()=>MODF, sig:sampleSig, tab:"de", auto:()=>{ computeModF(); drawModF(); }},
+  {key:"cc",   get:()=>CCLAST, sig:sampleSig, tab:"de", auto:()=>{ runCC(); }},
+  {key:"load", get:()=>PCALOADS, sig:sampleSig, tab:"overview", auto:()=>{ drawLoadings(); }},
+  {key:"power",get:()=>POWERSIG, sig:sampleSig, tab:"overview", auto:()=>{ drawPower(); }},
+  {key:"venn", get:()=>VENNSIG, sig:deSig, tab:"de", auto:()=>{ drawVenn(); if(VENNSEL) vennShowRegion(VENNSEL.key); }},
+  {key:"mcmp", get:()=>CMPSIG, sig:deSig, tab:"gene", auto:()=>{ if(compareList&&compareList.length) drawCompare(); }},
+  {key:"ix",   get:()=>IXRES, sig:sampleSig, box:"ixinfo", what:"This interaction contrast"},
+  {key:"tf",   get:()=>TFRES, sig:sampleSig, box:"tfout", what:"This two-factor analysis"},
+  {key:"fam",  get:()=>FAMROWS, sig:deSig, box:"faminfo", what:"This homology-family comparison"},
+  {key:"nb",   get:()=>HUBNB, sig:sampleSig, box:"nbinfo", what:"This neighbourhood"},
+  {key:"hubx", get:()=>HUBX, sig:sampleSig, box:"nbinfo", what:"This neighbourhood across datasets"},
+  {key:"tmod", get:()=>TRAITMOD, sig:sampleSig, box:"trmodinfo", what:"This module × trait analysis"},
+  {key:"tcam", get:()=>TRAITCAM, sig:sampleSig, box:"trcaminfo", what:"This gene-set × trait analysis"},
+]; }
+// Exports: a result that is out of date is not exported (the file would describe earlier inputs as current);
+// inexpensive results are recomputed first. Returns false when there is nothing current to export.
+function exportOK(key){
+  const R=staleRegistry().find(x=>x.key===key); if(!R) return true;
+  let o=null; try{ o=R.get(); }catch(e){ return false; }
+  if(!o||typeof o!=="object") return false;
+  if(o._sig===undefined) return true;
+  let cur; try{ cur=R.sig(); }catch(e){ return true; }
+  if(o._sig===cur) return true;
+  if(R.auto){ try{ R.auto(); }catch(e){ return false; } const o2=R.get(); return !!o2; }
+  const msg=`${R.what} was computed before the included samples, the groups${R.sig===deSig? ", the DE contrast or its settings" : " or the normalization"} changed. Click Run again before exporting.`;
+  staleBanner(R.box, msg.replace(" before exporting.", " to update.")); alert(msg); return false;
+}
+function onExport(id, key, fn){ el(id).addEventListener("click", function(e){ if(!exportOK(key)) return; return fn.call(this, e); }); }
+function stampResult(get, sigFn, before){ const o=get(); if(o&&typeof o==="object"&&o!==before) try{ o._sig=sigFn(); }catch(e){} }
+// wrap a run function (or generator function) so that a new result records the inputs it was computed from
+function stampRun(fn, get, sigFn){
+  if(Object.prototype.toString.call(fn)==="[object GeneratorFunction]")
+    return function*(...a){ const before=get(), sg=sigFn(); const r=yield* fn.apply(this,a); const o=get(); if(o&&typeof o==="object"&&o!==before) o._sig=sg; return r; };
+  if(Object.prototype.toString.call(fn)==="[object AsyncFunction]")
+    return async function(...a){ const before=get(), sg=sigFn(); const r=await fn.apply(this,a); const o=get(); if(o&&typeof o==="object"&&o!==before) o._sig=sg; return r; };
+  return function(...a){ const before=get(), sg=sigFn(); const r=fn.apply(this,a); const o=get(); if(o&&typeof o==="object"&&o!==before) o._sig=sg; return r; };
+}
+const STALEMARK=/^<div class="stalebar"[\s\S]*?<\/div>/;
+// Each control is kept on one line with the text that names it, also when the line wraps: a checkbox or radio
+// button with the text after it, and a select or text box with the short text before it ("FDR ≤ [0.05]").
+// Applied to the page at start and to every part drawn later.
+function bindControlText(root){
+  if(!root||typeof root.querySelectorAll!=="function") return;
+  const SKIP=/^(LABEL|BUTTON|OPTION|SELECT|TD|TH|SUMMARY|A)$/;
+  const lastSep=v=>Math.max(v.lastIndexOf("\u00b7"), v.lastIndexOf("|"), v.lastIndexOf("\u00a0\u00a0"), v.lastIndexOf(";"));
+  const firstSep=v=>{ const c=[v.indexOf("\u00b7"), v.indexOf("|"), v.indexOf("\u00a0\u00a0"), v.indexOf(";")].filter(x=>x>=0); return c.length? Math.min(...c) : -1; };
+  for(const c of Array.from(root.querySelectorAll("input,select,textarea"))){
+    const p=c.parentNode; if(!p||!p.tagName||SKIP.test(p.tagName)||(p.classList&&p.classList.contains("ctl"))) continue;
+    const t=String(c.type||"").toLowerCase();
+    if(t==="checkbox"||t==="radio"){
+      const nx=c.nextSibling; if(!nx||nx.nodeType!==3||!nx.nodeValue.trim()) continue;
+      const v=nx.nodeValue, cut=firstSep(v), head=cut>=0? v.slice(0,cut) : v, rest=cut>=0? v.slice(cut) : "";
+      if(!head.trim()||head.trim().length>60) continue;
+      const lab=document.createElement("label"); lab.className="ctl";
+      p.insertBefore(lab, c); lab.appendChild(c); lab.appendChild(document.createTextNode(" "+head.trim()));
+      if(rest) nx.nodeValue=" "+rest; else p.removeChild(nx);
+    } else if(c.tagName==="SELECT"||c.tagName==="TEXTAREA"||t==="text"||t==="number"||t==="search"){
+      const pv=c.previousSibling; if(!pv||pv.nodeType!==3) continue;
+      const v=pv.nodeValue, cut=lastSep(v), tail=v.slice(cut+1), head=v.slice(0,cut+1);
+      if(!tail.trim()||tail.trim().length>40) continue;
+      const sp=document.createElement("span"); sp.className="ctl";
+      p.insertBefore(sp, c); sp.appendChild(document.createTextNode(tail.trim())); sp.appendChild(c);
+      if(head.trim()) pv.nodeValue=head+" "; else p.removeChild(pv);
+    }
+  }
+}
+(function start(){
+  if(typeof document==="undefined"||typeof MutationObserver==="undefined") return;
+  if(!document.body){ if(document.addEventListener) document.addEventListener("DOMContentLoaded", start); return; }
+  const pend=new Set(); let tm=0;
+  const flush=()=>{ tm=0; const a=[...pend]; pend.clear(); a.forEach(n=>{ try{ bindControlText(n); }catch(e){} }); };
+  new MutationObserver(ms=>{ for(const m of ms) for(const n of m.addedNodes){ const r=n.nodeType===1? n : n.parentNode; if(r) pend.add(r.parentNode||r); }
+    if(pend.size&&!tm) tm=(typeof requestAnimationFrame==="function"? requestAnimationFrame : setTimeout)(flush); })
+    .observe(document.body, {childList:true, subtree:true});
+  try{ bindControlText(document.body); }catch(e){}
+})();
+function staleBanner(id, msg){
+  const b=document.getElementById(id); if(!b) return;
+  const cur=String(b.innerHTML||""), clean=cur.replace(STALEMARK,"");
+  const nw= msg? `<div class="stalebar" style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:5px 9px;margin:4px 0;font-size:12.5px;color:#78350f">&#9888; ${msg}</div>`+clean : clean;
+  if(nw!==cur) b.innerHTML=nw;
+}
+let STALEBUSY=false;
+function checkStale(tab){
+  if(STALEBUSY||!S||!S.length) return; STALEBUSY=true;
+  try{
+    for(const R of staleRegistry()){
+      let o=null; try{ o=R.get(); }catch(e){ continue; }
+      if(!o||typeof o!=="object"||o._sig===undefined) { if(R.box) staleBanner(R.box, ""); continue; }
+      let cur; try{ cur=R.sig(); }catch(e){ continue; }
+      if(o._sig===cur){ if(R.box) staleBanner(R.box, ""); continue; }
+      if(R.auto){ if(tab===undefined||tab===R.tab){ try{ R.auto(); }catch(e){} } continue; }
+      staleBanner(R.box, `${R.what} was computed before the included samples, the groups${R.sig===deSig? ", the DE contrast or its settings" : " or the normalization"} changed and is out of date. Click Run again to update.`);
+    }
+  } finally { STALEBUSY=false; }
+}
+function wireStale(){
+  runEnrichment=stampRun(runEnrichment, ()=>enrResults, deSig);
+  runGSEAGen=stampRun(runGSEAGen, ()=>enrResults, deSig);
+  runFRYGen=stampRun(runFRYGen, ()=>enrResults, deSig);
+  runEnrMatrixGen=stampRun(runEnrMatrixGen, ()=>ENRMAT, sampleSig);
+  computeHubs=stampRun(computeHubs, ()=>HUBS, sampleSig);
+  discoveryRun=stampRun(discoveryRun, ()=>DISCO, sampleSig);
+  traitRun=stampRun(traitRun, ()=>TRAITRES, sampleSig);
+  runCompare=stampRun(runCompare, ()=>CMPLAST, deSig);
+  runMulti=stampRun(runMulti, ()=>CONSENSUS, deSig);
+  runMeta=stampRun(runMeta, ()=>META, deSig);
+  runSigTransferGen=stampRun(runSigTransferGen, ()=>SIGRES, deSig);
+  runAllPairs=stampRun(runAllPairs, ()=>ALLPAIRS, sampleSig);
+  computeModF=stampRun(computeModF, ()=>MODF, sampleSig);
+  runCC=stampRun(runCC, ()=>CCLAST, sampleSig);
+  computeLoadings=stampRun(computeLoadings, ()=>PCALOADS, sampleSig);
+  runInteraction=stampRun(runInteraction, ()=>IXRES, sampleSig);
+  runTwoFactor=stampRun(runTwoFactor, ()=>TFRES, sampleSig);
+  runFamilies=stampRun(runFamilies, ()=>FAMROWS, deSig);
+  drawNeighborhood=stampRun(drawNeighborhood, ()=>HUBNB, sampleSig);
+  hubxGen=stampRun(hubxGen, ()=>HUBX, sampleSig);
+  traitModRun=stampRun(traitModRun, ()=>TRAITMOD, sampleSig);
+  traitCamRun=stampRun(traitCamRun, ()=>TRAITCAM, sampleSig);
+  const dv=drawVenn; drawVenn=function(...a){ const r=dv.apply(this,a); VENNSIG=VENNSTATE? {_sig:deSig()} : null; return r; };
+  const dc=drawCompare; drawCompare=function(...a){ const r=dc.apply(this,a); CMPSIG={_sig:deSig()}; return r; };
+  const rt=refreshTab; refreshTab=function(t){ const r=rt.apply(this,arguments); checkStale(t); return r; };
+  const dd=drawDE; drawDE=function(...a){ const r=dd.apply(this,a); if(!STALEBUSY) checkStale(typeof curTab!=="undefined"? curTab : undefined); return r; };
+  const dp=drawPower; drawPower=function(...a){ const r=dp.apply(this,a); POWERSIG={_sig:sampleSig()}; return r; };
+}
+wireStale();
+
 /* ================= state ================= */
 let S=[], nS=0, nG=0, GENES=[], IDS=[], BT=[], BIOTYPES=[], L=null, VALS=null;
 let GROUPS=[], GX={}, GCOL={}, FACTOR="group", NUMERIC=false, DATALOG=false, NORMNOTE="", UNMAPPED=[], PATELBOW="";
@@ -995,7 +1161,7 @@ el("coN").addEventListener("change",()=>{ if(coGene!==null) drawCoexp(); });
 el("coexp").addEventListener("click",()=>{
   if(coGene===null||!coR) return;
   const rows=["gene,r,slope,p,FDR"];
-  for(let g=0;g<nG;g++) if(g!==coGene) rows.push([GENES[g].replace(/,/g,";"), coR[g].toFixed(5), coB[g].toFixed(5), coP[g].toExponential(4), coQ[g].toExponential(4)].join(","));
+  for(let g=0;g<nG;g++) if(g!==coGene) rows.push([GENES[g].replace(/,/g,";"), coR[g].toFixed(5), coB[g].toFixed(5), coP[g].toExponential(4), coQ[g].toExponential(4)].map(csvq).join(","));
   downloadCSV(rows.join("\n"), "coexpression_"+GENES[coGene].split(" (")[0]+".csv");
 });
 function applyExpSize(){
@@ -2042,18 +2208,32 @@ function downloadCSV(text,fname){ saveBlob(new Blob([text],{type:"text/csv"}), f
 
 /* ================= parsing ================= */
 let pending=null; // {header, sampleCols, idCol, nameCol, btCol, rows, sampleNames, factors, groups, factorNames}
-function sniffDelim(line){ const t=(line.match(/\t/g)||[]).length, c=(line.match(/,/g)||[]).length, s=(line.match(/;/g)||[]).length;
+// one line of a delimited file (RFC 4180 quoting: a field in double quotes may contain the delimiter, and "" stands for ")
+// one CSV cell: text containing a comma, quote or line break is quoted (RFC 4180); a cell that is already quoted is kept
+function csvq(v){ if(v===null||v===undefined) return ""; if(typeof v==="number") return Number.isFinite(v)? String(v) : "";
+  const t=String(v); if(/^"(?:[^"]|"")*"$/.test(t)) return t; return /[",\n\r]/.test(t)? '"'+t.replace(/"/g,'""')+'"' : t; }
+function splitFields(line, delim){
+  if(line.indexOf('"')<0) return line.split(delim);
+  const out=[]; let cur="", q=false, started=false;
+  for(let i=0;i<line.length;i++){ const ch=line[i];
+    if(q){ if(ch==='"'){ if(line[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; }
+    else if(ch==='"' && cur.trim()===""){ q=true; cur=""; }
+    else if(ch===delim){ out.push(cur); cur=""; }
+    else cur+=ch; }
+  out.push(cur); return out;
+}
+function sniffDelim(line){ line=String(line).replace(/"(?:[^"]|"")*"/g,"x"); const t=(line.match(/\t/g)||[]).length, c=(line.match(/,/g)||[]).length, s=(line.match(/;/g)||[]).length;
   if(t>=c&&t>=s)return "\t"; return c>=s?",":";"; }
 function parseMatrixText(text){
   const lines=text.replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim().length);
   if(lines.length<3) throw "Matrix file has fewer than 3 lines.";
   const delim=sniffDelim(lines[0]);
-  const header=lines[0].split(delim).map(s=>s.trim());
+  const header=splitFields(lines[0], delim).map(s=>s.trim());
   const probe=Math.min(lines.length-1,200);
   const ncol=header.length;
   const numericCount=new Array(ncol).fill(0);
   const probeRows=[];
-  for(let i=1;i<=probe;i++){ const r=lines[i].split(delim); probeRows.push(r);
+  for(let i=1;i<=probe;i++){ const r=splitFields(lines[i], delim); probeRows.push(r);
     for(let c=0;c<ncol;c++){ const v=r[c]; if(v!==undefined&&v!==""&&isFinite(Number(v))) numericCount[c]++; } }
   const isNum=numericCount.map(c=>c/probe>0.8);
   // a numeric column can still be an ID column (Entrez gene IDs are bare integers):
@@ -2086,7 +2266,7 @@ function parseMatrixText(text){
   const sampleNames=uniqueSampleNames(origNames);
   const ids=[], names=[], bts=[], vals=[]; let nBad=0;
   for(let i=1;i<lines.length;i++){
-    const r=lines[i].split(delim);
+    const r=splitFields(lines[i], delim);
     if(r.length<ncol-2) continue;
     ids.push((r[idCol]||"g"+i).trim());
     names.push(((nameCol!==undefined?r[nameCol]:null)||r[idCol]||"g"+i).trim());
@@ -2120,7 +2300,7 @@ function dupLabelCounts(names){
 function parseDesignText(text, sampleNames){
   const lines=text.replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim().length);
   const delim=sniffDelim(lines[0]);
-  const grid=lines.map(l=>l.split(delim).map(s=>s.trim().replace(/^"(.*)"$/,"$1").replace(/^'(.*)'$/,"$1").trim()));   // R write.csv quotes every field
+  const grid=lines.map(l=>splitFields(l, delim).map(s=>s.trim().replace(/^"(.*)"$/,"$1").replace(/^'(.*)'$/,"$1").trim()));   // R write.csv quotes every field
   const sset=new Set(sampleNames);
   // repeated sample names in the design file are numbered in the same way as repeated matrix columns
   { const h=grid[0].slice(1); if(dupLabelCounts(h)){ const u=uniqueSampleNames(h); u.forEach((v,j)=>{ grid[0][j+1]=v; }); }
@@ -2859,7 +3039,7 @@ function* analyzeGen(){
   if(dl) dl.addEventListener("click",e=>{ e.preventDefault(); downloadCSV("unmapped_id\n"+UNMAPPED.join("\n"),"unmapped_gene_ids.csv"); });
   el("methodsnote").textContent=useFBE? `Filter: edgeR filterByExpr, default settings (${nG.toLocaleString()} of ${ng0.toLocaleString()} genes kept).` : `Filter: linear expression ≥ ${thr} in ≥ ${minS} samples (${nG.toLocaleString()} of ${ng0.toLocaleString()} genes kept).`;
   FILTER={thr, minS, ng0, mode:useFBE?"fbe":"cpm"};
-  GMT=null; GMTname=""; enrResults=null; el("gmtinfo").textContent=""; el("enrtable").innerHTML=""; el("enrinfo").textContent=""; el("enrexport").style.display="none";
+  GMT=null; GMTname=""; enrResults=null; el("gmtinfo").textContent=""; el("enrtable").innerHTML=""; el("enrinfo").textContent=""; el("enrexport").style.display="none"; enrTbar(false);
   // build UI
   buildCovars();
   buildSampleBar(); buildDESelectors(); buildCCSelectors();
@@ -3049,7 +3229,7 @@ function drawPCA(){
   const {vals,vecs}=jacobiEig(B.map(r=>r.slice()));
   const tot=vals.reduce((s,v)=>s+v,0)||1;
   const pc1=vecs[0].map(v=>v*Math.sqrt(vals[0])), pc2=vecs[1].map(v=>v*Math.sqrt(vals[1]));
-  PCASTATE={top, vecs, vals, idx, n};
+  PCASTATE={top, vecs, vals, idx, n}; if(PCALOADS&&el("pcaloadout")&&el("pcaloadout").innerHTML){ try{ drawLoadings(); }catch(e){} }
   const hulls=[];
   for(const g of GROUPS){
     const ii=idx.map((j,q)=>({j,q})).filter(o=>S[o.j].group===g);
@@ -3158,7 +3338,7 @@ el("pwsel").addEventListener("change",drawGene);
 el("g2flay").addEventListener("change",()=>{ G2FLAY=el("g2flay").value; drawGene(); });
 el("g2fstat").addEventListener("change",()=>{ G2FSTAT=el("g2fstat").value; drawGene(); });
 el("tfrun").addEventListener("click",runTwoFactor);
-el("tfexp").addEventListener("click",exportTwoFactor);
+onExport("tfexp", "tf",exportTwoFactor);
 el("tfcmpbtn").addEventListener("click",()=>{ if(!TFRES||!TFRES.rows||!TFRES.rows.length) return; compareList=TFRES.rows.slice(0,CMPMAX).map(r=>r.g); curGene=compareList[0]; switchTab("gene"); drawCompare(); });
 el("gplottoggle").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ GPLOT=b.dataset.g; document.querySelectorAll("#gplottoggle button").forEach(x=>x.classList.toggle("on",x===b)); drawGene(); if(compareList.length) drawCompare(); }));
 ["cmpchart","cmppts","cmparr"].forEach(id=>el(id).addEventListener("change",()=>{ if(id==="cmpchart") CMPCHART=el("cmpchart").value; if(id==="cmparr") CMPARR=el("cmparr").value; drawCompare(); }));
@@ -3392,7 +3572,9 @@ function buildGenePlot(g){
     title:{x:0.5,xanchor:"center",text:geneTitle(g),font:{size:15}},
     xaxis:AXX(),yaxis:{title:scale==="log"?"log₂ expression":"linear expression",rangemode:"tozero"},
     legend:{orientation:"h",y:1.02,yanchor:"bottom",x:1,xanchor:"right"},barmode:"overlay",boxmode:"overlay",violinmode:"overlay",
-    shapes,annotations:pAnnos};
+    shapes,annotations:pAnnos,
+    // data export: every pairwise test, with whether it is drawn as a bracket
+    meta: pw&&pw.length? {statsRows:[["gene","group A","group B","Welch p","Holm-adjusted p","label","drawn as bracket"]].concat(pw.map(r=>[geneTitle(g), r.a, r.b, r.untestable? "not testable" : r.p, r.untestable? "not testable" : r.padj, r.untestable? "" : starOf(r.padj), pwShown.includes(r)? "yes" : "no"]))} : undefined};
   return {data:barTraces.concat(ptTraces), layout, testGroups, testNames, pw, pwShown, gi, raw, lg:lgU};
 }
 function genePlotNote(){
@@ -3952,7 +4134,7 @@ el("deexport").addEventListener("click",()=>{
   const rows=hdr.concat([`gene,gene_id,biotype,${meanLab}_${A},${meanLab}_${B},AveExpr,log2FC_${B}_vs_${A},SE,${res.treat?"t_treat,p_treat,FDR_treat":"t,p,FDR"},call`]);
   for(let g=0;g<nG;g++){ const call=res.q[g]<=fdr&&Math.abs(res.lfc[g])>=fc? (res.lfc[g]>0?"up":"down") : "";
     rows.push([GENES[g].replace(/,/g,";"),IDS[g],BIOTYPES[BT[g]],
-    res.aM[g].toFixed(5),res.bM[g].toFixed(5),res.Amean[g].toFixed(5),res.lfc[g].toFixed(5),res.se[g].toExponential(5),res.tv[g].toFixed(5),res.p[g].toExponential(5),res.q[g].toExponential(5),call].join(",")); }
+    res.aM[g].toFixed(5),res.bM[g].toFixed(5),res.Amean[g].toFixed(5),res.lfc[g].toFixed(5),res.se[g].toExponential(5),res.tv[g].toFixed(5),res.p[g].toExponential(5),res.q[g].toExponential(5),call].map(csvq).join(",")); }
   downloadCSV(rows.join("\n"),`DE_${el("selB").value}_vs_${el("selA").value}.csv`); });
 let deMethod="mod";
 let DETREAT=false;   // test the fold-change threshold with TREAT
@@ -4422,7 +4604,7 @@ function drawDE(){
     hovertemplate:dePlot==="volcano"?"%{text}<br>log₂FC %{x:.2f} · −log₁₀p %{y:.1f}<extra></extra>":"%{text}<br>mean log₂ %{x:.2f} · log₂FC %{y:.2f}<extra></extra>"}],
     {margin:{t:26,b:45,l:55,r:10},font:{size:12},title:{text:`${el("selB").value} vs ${el("selA").value}`,font:{size:14}},
      xaxis:{title:dePlot==="volcano"?"log₂ fold change":"average log₂ expression (all fitted samples)"},
-     yaxis:{title:dePlot==="volcano"?(res.treat? `−log₁₀ p (TREAT, |log₂FC| > ${res.treat.lfc})` : "−log₁₀ p"):"log₂ fold change"}, shapes, annotations:annos, dragmode:el("dedrag").value},
+     yaxis:{title:dePlot==="volcano"?(res.treat? `−log₁₀ p (TREAT, |log₂FC| > ${res.treat.lfc})` : "−log₁₀ p"):"log₂ fold change", rangemode:dePlot==="volcano"? "tozero" : "normal"}, shapes, annotations:annos, dragmode:el("dedrag").value},
     Object.assign({}, PL, {modeBarButtonsToRemove:PL.modeBarButtonsToRemove.filter(b=>b!=="select2d"&&b!=="lasso2d")}));
   onPlotClick(el("p_volcano"), ev=>{ const i=nameToIdx[ev.points[0].text.toLowerCase()]; if(i!==undefined){jumpToGene(i);} });
   // point k of the trace is gene k (every gene is drawn, in index order), so the selection maps directly
@@ -4498,7 +4680,7 @@ el("deselcsv").addEventListener("click",()=>{
   const rows=deSelRows(); if(!rows||!rows.length) return; rows.sort((x,y)=>x.p-y.p);
   const A=el("selA").value.replace(/[,\s]+/g,"_"), B=el("selB").value.replace(/[,\s]+/g,"_");
   downloadCSV([`gene,id,log2FC_${B}_vs_${A},mean_log2_${A},mean_log2_${B},AveExpr,p,FDR,call`].concat(rows.map(r=>[GENES[r.g].replace(/,/g,";"), IDS[r.g], r.lfc.toFixed(5), r.a.toFixed(5), r.b.toFixed(5), r.ave.toFixed(5),
-    r.p.toExponential(4), r.q.toExponential(4), r.sig>0?"up":r.sig<0?"down":"ns"].join(","))).join("\n"), "selected_genes.csv"); });
+    r.p.toExponential(4), r.q.toExponential(4), r.sig>0?"up":r.sig<0?"down":"ns"].map(csvq).join(","))).join("\n"), "selected_genes.csv"); });
 el("deselcopy").addEventListener("click",()=>{ const t=deSelSymbols().join("\n");
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>{ el("deselcopy").textContent="Copied"; setTimeout(()=>{ el("deselcopy").textContent="Copy genes"; },1500); }); });
 el("deselheat").addEventListener("click",()=>{ if(!DESEL||DESEL.size<2) return; el("heatsrc").value="sel"; switchTab("heat"); });
@@ -4626,6 +4808,64 @@ function drawCoScatter(){
 /* ================= patterns ================= */
 ["patN","patK"].forEach(id=>el(id).addEventListener("change",drawPatterns));
 function wcssOf(profiles,km){ let s=0; km.asg.forEach((c,i)=>{ s+=sqd(profiles[i],km.cents[c]); }); return s; }
+// within-cluster sum of squares (k = 1..kmax) and mean silhouette (k = 2..kmax) for an elbow plot; the k-means
+// solutions are the same deterministic ones used to draw the clusters
+function kCurve(profiles, kmax){
+  const n=profiles.length; kmax=Math.min(kmax, n-1);
+  const dim=profiles[0].length, cen=new Float64Array(dim);
+  profiles.forEach(p=>{ for(let q=0;q<dim;q++) cen[q]+=p[q]/n; });
+  let tss=0; profiles.forEach(p=>{ for(let q=0;q<dim;q++){ const d=p[q]-cen[q]; tss+=d*d; } });
+  const ks=[1], wcss=[tss];
+  for(let k2=2;k2<=kmax;k2++){ ks.push(k2); wcss.push(wcssOf(profiles, kmeans(profiles,k2))); }
+  const sil=silhouetteByK(profiles, kmax);
+  return {ks, wcss, sil, tss};
+}
+function silhouetteByK(profiles, kmax){
+  const n=profiles.length, dim=profiles[0].length;
+  const D=new Float32Array(n*n);
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+    let s=0; for(let q=0;q<dim;q++){const d=profiles[i][q]-profiles[j][q]; s+=d*d;}
+    const v=Math.sqrt(s); D[i*n+j]=v; D[j*n+i]=v;
+  }
+  const sil={};
+  for(let k2=2;k2<=Math.min(kmax,n-1);k2++){
+    const km=kmeans(profiles,k2), a=km.asg;
+    const cnt=new Array(k2).fill(0); a.forEach(c=>cnt[c]++);
+    let stot=0; const sums=new Float64Array(k2);
+    for(let i=0;i<n;i++){
+      sums.fill(0);
+      for(let j=0;j<n;j++) if(j!==i) sums[a[j]]+=D[i*n+j];
+      if(cnt[a[i]]<=1) continue;    // singleton cluster: s(i) = 0 (Rousseeuw 1987; cluster::silhouette)
+      const ai=sums[a[i]]/(cnt[a[i]]-1);
+      let bi=Infinity;
+      for(let c=0;c<k2;c++) if(c!==a[i]&&cnt[c]>0) bi=Math.min(bi,sums[c]/cnt[c]);
+      const mx2=Math.max(ai,bi);
+      stot+= mx2>0? (bi-ai)/mx2 : 0;
+    }
+    sil[k2]=stot/n;
+  }
+  return sil;
+}
+// elbow plot: WCSS (left axis) and mean silhouette (right axis) against k, with the k in use marked
+function drawElbow(divId, cur, chosen, how, unit){
+  const div=el(divId); if(!div) return;
+  if(!cur){ div.style.display="none"; return; }
+  div.style.display="block";
+  const sk=cur.ks.filter(k=>cur.sil[k]!==undefined), ymax=Math.max(...cur.wcss)*1.05;
+  const traces=[
+    {x:cur.ks, y:cur.wcss, type:"scatter", mode:"lines+markers", name:"within-cluster sum of squares", line:{color:"#334155", width:2}, marker:{size:6}},
+    {x:sk, y:sk.map(k=>cur.sil[k]), type:"scatter", mode:"lines+markers", name:"mean silhouette", yaxis:"y2", line:{color:"#dc2626", width:2, dash:"dot"}, marker:{size:6}}];
+  Plotly.react(divId, traces, {margin:{t:30,b:44,l:62,r:62}, font:{size:11},
+    title:{text:`Choosing k: ${unit}, ${how} k = ${chosen}`, font:{size:12}},
+    xaxis:{title:"number of clusters k", range:[0, cur.ks[cur.ks.length-1]+0.5], dtick:1, zeroline:true},
+    yaxis:{title:"within-cluster SS", range:[0, ymax], zeroline:true},
+    yaxis2:{title:"mean silhouette", overlaying:"y", side:"right", range:[Math.min(0, ...sk.map(k=>cur.sil[k]))-0.02, 1], showgrid:false, zeroline:true},
+    shapes:[{type:"line", x0:chosen, x1:chosen, xref:"x", y0:0, y1:1, yref:"paper", line:{color:"#2563eb", width:1.5, dash:"dash"}}],
+    annotations:[{x:chosen, xref:"x", y:1, yref:"paper", yanchor:"bottom", text:`k = ${chosen}`, showarrow:false, font:{size:10, color:"#2563eb"}}],
+    legend:{orientation:"h", y:-0.28, x:0}}, PL);
+}
+const KCURVE={};
+function kCurveCached(key, profiles, kmax){ if(KCURVE[key]&&KCURVE[key].k===kmax) return KCURVE[key].c; const c=kCurve(profiles, kmax); KCURVE[key]={k:kmax, c}; return c; }
 function autoK(profiles){
   // mean-silhouette selection, k = 2..10. WCSS-elbow criteria are weakly identified on
   // expression profiles (smooth convex curves put the "elbow" at k≈4-5 even on noise);
@@ -4662,19 +4902,24 @@ function drawPatterns(){
   const N=Math.min(parseInt(el("patN").value,10)||1000, nG);
   const gi=groupsIdx(), gs=GROUPS.filter(d=>gi[d].length>0);
   const idx=[].concat(...gs.map(d=>gi[d])), n=idx.length;
-  if(gs.length<3||n<6){ Plotly.react("p_pat",[],{annotations:[{text:"Need ≥3 groups with included samples",showarrow:false}]},PL); return; }
+  if(gs.length<3||n<6){ Plotly.react("p_pat",[],{annotations:[{text:"Need ≥3 groups with included samples",showarrow:false}]},PL); drawElbow("p_patelbow", null); return; }
   const varr=new Float64Array(nG);
   for(let g=0;g<nG;g++){ let s1=0,s2=0; for(const j of idx){const v=L[g*nS+j];s1+=v;s2+=v*v;} const m=s1/n; varr[g]=s2/n-m*m; }
   const top=Array.from(varr.keys()).sort((a,b)=>varr[b]-varr[a]).slice(0,N);
   const profiles=top.map(g=>{ const row=idx.map(j=>L[g*nS+j]); const m=mean(row), sd=Math.sqrt(variance(row,m))||1;
     return gs.map(d=>mean(gi[d].map(j=>(L[g*nS+j]-m)/sd))); });
   let k, elbowNote="";
-  if(el("patK").value==="auto"){
+  const kAuto=el("patK").value==="auto";
+  if(kAuto){
     const eb=autoK(profiles); k=eb.k;
     elbowNote=` · auto k = ${k} by mean silhouette (s = ${eb.s.toFixed(2)}${eb.s<0.3?": weak cluster structure; treat patterns as descriptive":""}${gs.length<4?`; with ${gs.length} groups the profiles lie near a circle and silhouette favours k = 2 regardless of the true number of patterns, so choose k manually`:""}; by k: ${Object.entries(eb.sil).map(([kk,v])=>kk+":"+v.toFixed(2)).join(", ")})`;
   } else k=parseInt(el("patK").value,10)||6;
+  k=Math.max(2, Math.min(k, N-1));
+  const curK=kCurveCached("pat|"+sampleSig()+"|"+N+"|"+gs.join("\u0001"), profiles, Math.min(12, N-1));
+  if(!kAuto) elbowNote=` · k = ${k} chosen by the user (mean silhouette ${curK.sil[k]!==undefined? curK.sil[k].toFixed(2) : "–"}${curK.sil[k]!==undefined&&curK.sil[k]<0.3? ": weak cluster structure; treat patterns as descriptive" : ""})`;
+  drawElbow("p_patelbow", curK, k, kAuto? "auto (largest mean silhouette)" : "chosen", `${N} genes, ${gs.length} group means`);
   PATELBOW=elbowNote;
-  const km=kmeans(profiles,Math.min(k,N));
+  const km=kmeans(profiles,k);
   const cnt=new Array(k).fill(0); km.asg.forEach(c=>cnt[c]++);
   const order=Array.from({length:k},(_,c)=>c).sort((a,b)=>cnt[b]-cnt[a]);
   patState={top,profiles,km,gs,order,cnt};
@@ -4696,7 +4941,7 @@ function showPatCluster(ci){
   document.querySelectorAll("#patlist tr.clickable").forEach(tr=>tr.addEventListener("click",()=>{jumpToGene(+tr.dataset.g);}));
   const btn=el("patexport"); btn.style.display="inline-block";
   btn.onclick=()=>downloadCSV("gene,gene_id,biotype\n"+members.map(i=>
-    [GENES[top[i]].replace(/,/g,";"),IDS[top[i]],BIOTYPES[BT[top[i]]]].join(",")).join("\n"),`pattern_P${ci+1}_genes.csv`);
+    [GENES[top[i]].replace(/,/g,";"),IDS[top[i]],BIOTYPES[BT[top[i]]]].map(csvq).join(",")).join("\n"),`pattern_P${ci+1}_genes.csv`);
 }
 el("gsrun").addEventListener("click",drawGeneSet);
 function drawGeneSet(){
@@ -4849,11 +5094,11 @@ function exportIx(){
   const r=IXRES; if(!r) return; const sp=r.spec;
   const lines=[`# benchsiDE ${APP_VERSION} interaction contrast (${sp.B2} - ${sp.A2}) - (${sp.B1} - ${sp.A1}); ${r.method==="voom"?"voom":"limma-trend"}; design ~ 0 + group${covAdjustedText(r.prior)?" + "+covAdjustedText(r.prior):""}${covFullyDropped(r.prior).length?"; not estimable and left out: "+covFullyDropped(r.prior).join(", "):""}; ${r.prior.nFit} samples`,
     ["gene","id","interaction_log2FC","SE",`log2FC_${sp.B1}_vs_${sp.A1}`,`log2FC_${sp.B2}_vs_${sp.A2}`,"mean_log2_expression","t","p","FDR","significant"].map(h=>h.replace(/[,\s]+/g,"_")).join(",")];
-  ixRows().sort((a,b)=>a.p-b.p).forEach(x=>lines.push([GENES[x.g].replace(/,/g,";"), IDS[x.g], x.ix.toPrecision(6), r.se[x.g].toPrecision(6), x.e1.toPrecision(6), x.e2.toPrecision(6), x.ave.toPrecision(6), x.t.toPrecision(6), x.p.toExponential(4), x.q.toExponential(4), x.sig>0?"up":x.sig<0?"down":""].join(",")));
+  ixRows().sort((a,b)=>a.p-b.p).forEach(x=>lines.push([GENES[x.g].replace(/,/g,";"), IDS[x.g], x.ix.toPrecision(6), r.se[x.g].toPrecision(6), x.e1.toPrecision(6), x.e2.toPrecision(6), x.ave.toPrecision(6), x.t.toPrecision(6), x.p.toExponential(4), x.q.toExponential(4), x.sig>0?"up":x.sig<0?"down":""].map(csvq).join(",")));
   downloadCSV(lines.join("\n")+"\n", "interaction_contrast.csv");
 }
 el("ixrun").addEventListener("click", runInteraction);
-el("ixexp").addEventListener("click", exportIx);
+onExport("ixexp", "ix", exportIx);
 el("ixenr").addEventListener("click", ()=>{ if(!IXRES) return; switchTab("enrich"); enrMethod="ora"; document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e==="ora")); setEnrMethodUI();
   el("enrsrcwrap").style.display="inline"; refreshEnrSrc(); el("enrsrc").value="ix"; el("enrpaste").style.display="none";
   if(!GMT){ el("enrinfo").innerHTML='<span class="warnchip">Choose a gene-set library (step 1), then click Run enrichment.</span>'; return; } runEnrichment(); });
@@ -5107,7 +5352,7 @@ function* runGSEAGen(){
   if(GSEAMODE==="genes"){ const qv=bh(rows.map(r=>r.p)); rows.forEach((r,i)=>{ r.q=qv[i]; }); }
   rows.forEach(r=>{ r.ratio=r.NES; });
   if(GSEAMODE==="samples") rows.sort((a,b)=>a.q-b.q || Math.abs(b.NES)-Math.abs(a.NES)); else rows.sort((a,b)=>a.p-b.p || Math.abs(b.NES)-Math.abs(a.NES));
-  enrResults={rows, q:null, label: GSEAMODE==="samples"? `GSEA (sample permutation, moderated t), ${el("selB").value} vs ${el("selA").value}` : `GSEA preranked by ${deMethodLabel()}, ${el("selB").value} vs ${el("selA").value}`, mode:"gsea", wAbs, nUniv:nG, esSel:null};
+  enrResults={rows, q:null, label: GSEAMODE==="samples"? `GSEA (sample permutation, moderated t), ${el("selB").value} vs ${el("selA").value}` : `GSEA preranked by ${deMethodLabel()}, ${el("selB").value} vs ${el("selA").value}`, mode:"gsea", wAbs, nUniv:nG, esSel:null}; enrStampLib(mn, mx);
   // sample permutation: report at FDR <= 0.25 (GSEA documentation). Gene permutation: FDR is not reported,
   // because the gene-permutation null ignores gene-gene correlation (benchsiDE calibration: false sets in nearly
   // every null split; fgsea behaves the same).
@@ -5138,7 +5383,7 @@ function* runGSEAGen(){
   }));
   drawEnrLolli(rows,"gsea");
   drawESPlot();
-  el("enrexport").style.display="inline-block";
+  el("enrexport").style.display="inline-block"; enrTbar(true);
   drawSetJaccard(); drawRidgeline(); drawLeadingEdge();
 }
 el("esplotN").addEventListener("change",()=>{ if(enrResults){ enrResults.esSel=null; drawESPlot(); } });
@@ -5254,7 +5499,7 @@ function* runFRYGen(){
   const q=bh(rows.map(r=>r.p)), qm=bh(rows.map(r=>r.pm));
   rows.forEach((r,i)=>{ r.q=q[i]; r.qm=qm[i]; });
   rows.sort((x,y)=>x.p-y.p || y.m-x.m || x.pm-y.pm);
-  enrResults={rows, label:`FRY self-contained test, ${el("selB").value} vs ${el("selA").value}${res.covUsed&&res.covUsed.length?" adjusted for "+res.covUsed.join(" + "):""}${res.covOut&&res.covOut.length?" (⚠ "+res.covOut.join(", ")+" not estimable, left out of the model)":""}`, mode:"fry", covUsed:res.covUsed||[], covOut:res.covOut||[], nFit:res.nFit};
+  enrResults={rows, label:`FRY self-contained test, ${el("selB").value} vs ${el("selA").value}${res.covUsed&&res.covUsed.length?" adjusted for "+res.covUsed.join(" + "):""}${res.covOut&&res.covOut.length?" (⚠ "+res.covOut.join(", ")+" not estimable, left out of the model)":""}`, mode:"fry", covUsed:res.covUsed||[], covOut:res.covOut||[], nFit:res.nFit}; enrStampLib(mn, mx);
   const nsig=rows.filter(r=>r.q<=0.05).length;
   el("enrinfo").innerHTML=`<b>${enrResults.label}</b>: ${rows.length} testable sets from ${GMTname} (residual df = ${res.dfres}). <b>${nsig}</b> sets at FDR ≤ 0.05 (directional). FRY asks whether the set's genes move together in this dataset (self-contained); CAMERA/GSEA ask whether they move MORE than other genes (competitive); self-contained tests are more sensitive and reject more, so read the two side by side.`;
   el("enrgenes").style.display="none";
@@ -5262,7 +5507,7 @@ function* runFRYGen(){
   el("esplotwrap").style.display="none";
   el("enrtable").innerHTML=`<table class="tbl"><tr><th>Gene set</th><th>size</th><th>direction</th><th>p</th><th>FDR</th><th>p (mixed)</th><th>FDR (mixed)</th><th>plot</th></tr>`+
     rows.slice(0,60).map(r=>`<tr${r.q<=0.05?' style="background:#f0fdf4"':''}><td style="text-align:left">${setNameHTML(r.name)}</td><td class="num">${r.m}</td><td style="color:${r.dir==="Up"?"#dc2626":"#2563eb"}">${r.dir}</td><td class="num">${fmtP(r.p)}</td><td class="num">${fmtP(r.q)}</td><td class="num">${fmtP(r.pm)}</td><td class="num">${fmtP(r.qm)}</td><td><span class="bclink" data-r="${enrResults.rows.indexOf(r)}" style="cursor:pointer;color:#7c3aed" title="barcode + ECDF">bc</span></td></tr>`).join("")+`</table>`;
-  el("enrexport").style.display="inline-block";
+  el("enrexport").style.display="inline-block"; enrTbar(true);
   drawSetJaccard(); drawRidgeline();
   document.querySelectorAll("#enrtable .bclink").forEach(s=>s.addEventListener("click",()=>{
     const r=enrResults.rows[+s.dataset.r];
@@ -5276,7 +5521,7 @@ function clearEnrDisplay(msg){
   el("esplotwrap").style.display="none";
   el("enrgenes").style.display="none";
   el("enrtable").innerHTML="";
-  el("enrexport").style.display="none";
+  el("enrexport").style.display="none"; enrTbar(false);
 }
 function setNameHTML(n){ return esc(String(n)).replace(/_/g,"_<wbr>"); }   // long set names wrap at underscores, not mid-word
 function enrMethodText(m){
@@ -5325,7 +5570,7 @@ function runEnrichment(){
   rows.sort((a,b)=>a.p-b.p);
   enrResults={rows, q, label:qs.label};
   const nsig=rows.filter(r=>r.q<=0.05).length;
-  enrResults.qAll=qAll; enrResults.N=N;
+  enrResults.qAll=qAll; enrResults.N=N; enrResults.mode="ora"; enrStampLib(mn, mx);
   el("enrinfo").innerHTML=`Query: <b>${qs.label}</b>, ${q} of ${qAll} genes annotated in the library, against a universe of the ${N.toLocaleString()} ${srcE==="meta"?"genes tested in the meta-analysis":patU?"pattern-analysis genes":"filtered genes"} annotated in ${GMTname}; ${rows.length} testable sets. <b>${nsig}</b> sets at FDR ≤ 0.05. <span class="footer-note">The hypergeometric test treats genes as independent; for lists of co-regulated genes (for example the top of a ranking) it is anti-conservative, and FRY or CAMERA (Discovery tab) are the appropriate tests.</span>`;
   el("enrgenes").style.display="none";
   el("enrtable").innerHTML=`<table class="tbl"><tr><th>Gene set</th><th>size</th><th>overlap</th><th>ratio</th><th>p</th><th>FDR</th><th>leading genes (click for kinetics)</th></tr>`+
@@ -5333,7 +5578,7 @@ function runEnrichment(){
   document.querySelectorAll("#enrtable .glink").forEach(s=>s.addEventListener("click",()=>{ jumpToGene(+s.dataset.g); }));
   document.querySelectorAll("#enrtable .setlink").forEach(s=>s.addEventListener("click",()=>renderEnrGenes(enrResults.rows[+s.dataset.r])));
   drawEnrLolli(rows);
-  el("enrexport").style.display="inline-block";
+  el("enrexport").style.display="inline-block"; enrTbar(true);
   drawSetJaccard(); drawRidgeline(); drawLeadingEdge();
 }
 // data export of the enrichment dot plot: the sets in the order drawn (top first) with their statistics, and the
@@ -5418,15 +5663,61 @@ function renderEnrGenes(row){
       `(${gsea?`GSEA: NES ${row.NES.toFixed(2)}, leading edge ${row.k}/${row.m}`:`ORA: ${row.k}/${row.m} overlap, ${row.ratio.toFixed(1)}× enrichment`}, p = ${fmtP(row.p)}, FDR = ${fmtP(row.q)})`);
   });
 }
-el("enrexport").addEventListener("click",()=>{
-  if(!enrResults)return;
-  const gsea=enrResults.mode==="gsea";
-  const rows=[gsea?"gene_set,set_size,leading_edge_size,ES,NES,p,FDR,leading_edge_genes"
-                  :"gene_set,set_size,overlap,enrichment_ratio,p,FDR,overlap_genes"];
-  enrResults.rows.forEach(r=>rows.push([r.name.replace(/,/g,";"),r.m,r.k,
-    ...(gsea?[r.es.toFixed(3),r.NES.toFixed(3)]:[r.ratio.toFixed(2)]),
-    r.p.toExponential(3),r.q.toExponential(3),'"'+r.ovIdx.map(g=>GENES[g]).join(";")+'"'].join(",")));
-  downloadCSV(rows.join("\n"),gsea?"gsea_results.csv":"enrichment_results.csv"); });
+// the library, size limits and time of the run are recorded with the result, so that an export made after the
+// library or the settings were changed still describes the run that produced it
+function enrStampLib(mn, mx){ if(!enrResults) return; enrResults.lib=GMTname; enrResults.libCite=GMTCITE; enrResults.sizeMin=mn; enrResults.sizeMax=mx; if(enrResults.mode==="gsea"){ enrResults.gseaMode=GSEAMODE; enrResults.gseaB=GSEAB; } enrResults.when=new Date().toISOString().slice(0,16).replace("T"," "); }
+// all tested sets (the on-screen table shows the first 60), with every statistic at full precision and the genes behind each row
+function enrTableSheets(){
+  const R=enrResults; if(!R||!R.rows) return null;
+  const mode=R.mode||"ora", gname=g=>geneTitle(g), nr="not reported (gene permutation)", gm=R.gseaMode||GSEAMODE, gb=R.gseaB||GSEAB;
+  let hdr, rows, geneKind;
+  if(mode==="gsea"){
+    hdr=["gene set","set size","leading-edge size","ES","NES","p","FDR","leading-edge genes"]; geneKind="leading-edge gene";
+    rows=R.rows.map(r=>[r.name, r.m, r.k, r.es, r.NES, r.p, isFinite(r.q)? r.q : nr, r.ovIdx.map(gname).join("; ")]);
+  } else if(mode==="fry"){
+    hdr=["gene set","set size","direction","p","FDR","p (mixed)","FDR (mixed)"]; geneKind=null;
+    rows=R.rows.map(r=>[r.name, r.m, r.dir, r.p, r.q, r.pm, r.qm]);
+  } else {
+    hdr=["gene set","set size (in universe)","overlap","expected overlap","fold enrichment","p (hypergeometric, upper tail)","FDR","overlap genes"]; geneKind="overlap gene";
+    rows=R.rows.map(r=>[r.name, r.m, r.k, R.q*r.m/R.N, r.ratio, r.p, r.q, r.ovIdx.map(gname).join("; ")]);
+  }
+  // Genes sheet (one row per set and gene): the significant sets, or the first 60 sets when fewer are significant
+  const thr= mode==="gsea"? (gm==="samples"? 0.25 : -1) : 0.05;
+  let gsel=R.rows.filter(r=>isFinite(r.q)&&r.q<=thr); const gWhich= gsel.length>=60? `the ${gsel.length} sets at FDR ≤ ${thr}` : `the first ${Math.min(60,R.rows.length)} sets in the table`;
+  if(gsel.length<60) gsel=R.rows.slice(0,60);
+  const genes=[["gene set", geneKind||"", "gene ID"]];
+  if(geneKind) gsel.forEach(r=>(r.ovIdx||[]).forEach(g=>genes.push([r.name, gname(g), IDS[g]])));
+  const test= mode==="gsea"? `GSEA (Subramanian et al., 2005), ${gm==="samples"? "sample-label" : "gene"} permutation${gb? ", "+gb+" permutations" : ""}; FDR ${gm==="samples"? "from the permutation null (sets are reported at FDR ≤ 0.25)" : "not reported (gene permutation ignores correlation between genes; use the ranking only)"}`
+    : mode==="fry"? "FRY self-contained rotation test (limma::fry; Wu et al., 2010); Benjamini–Hochberg FDR across tested sets, separately for the directional and mixed tests"
+    : "one-sided hypergeometric test of the query–set overlap (Fisher exact); Benjamini–Hochberg FDR across tested sets";
+  const notes=[["Field","Value"],["Analysis", R.label||""],["Test", test],
+    ["Gene-set library", (R.lib||GMTname||"")+((R.libCite||GMTCITE)? " ("+(R.libCite||GMTCITE)+")" : "")],
+    ["Set size limits", `${R.sizeMin??""}–${R.sizeMax??""} genes`], ["Sets tested", R.rows.length]];
+  if(mode==="ora") notes.push(["Query genes annotated in the library", `${R.q} of ${R.qAll}`], ["Universe", `${R.N} genes (kept genes annotated in the library)`], ["Expected overlap", "query genes annotated × set size / universe"]);
+  if(geneKind) notes.push(["Genes sheet", `${geneKind}s of ${gWhich} (all sets: last column of Results)`]);
+  else notes.push(["Set genes", "FRY tests every gene of the set; the members are those of the gene-set library within the kept genes"]);
+  notes.push(["Computed", R.when||""], ["Software", "benchsiDE "+APP_VERSION]);
+  const sheets=[{name:"Results", rows:[hdr].concat(rows)}]; if(geneKind) sheets.push({name:"Genes", rows:genes}); sheets.push({name:"Notes", rows:notes});
+  return {mode, hdr, rows, sheets, notes};
+}
+function enrTbar(on){ const b=document.getElementById("enrtbar"); if(!b) return; b.style.display= on&&enrResults&&enrResults.rows? "flex" : "none";
+  if(on&&enrResults&&enrResults.rows){ const n=enrResults.rows.length; el("enrtcount").textContent= n>60? `${n} gene sets tested; the table shows the first 60, the download has all ${n}.` : `${n} gene sets tested.`; } }
+function enrBase(){ const m=(enrResults&&enrResults.mode)||"ora"; return m==="gsea"? "gsea_results" : m==="fry"? "fry_results" : "enrichment_results"; }
+function exportEnrCSV(){
+  const T=enrTableSheets(); if(!T) return;
+  const q=v=>{ const t=String(v); return /[",\n#]/.test(t)? '"'+t.replace(/"/g,'""')+'"' : t; };
+  const lines=T.notes.slice(1).map(r=>"# "+r[0]+": "+String(r[1]).replace(/\n/g," "));
+  lines.push(T.hdr.map(q).join(","));
+  T.rows.forEach(r=>lines.push(r.map(v=>typeof v==="number"? (Number.isFinite(v)? String(v) : "") : q(v)).join(",")));
+  downloadCSV(lines.join("\n")+"\n", enrBase()+".csv");
+}
+function exportEnrXLSX(){
+  const T=enrTableSheets(); if(!T) return;
+  saveBlob(new Blob([xlsxBytes(T.sheets)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), enrBase()+".xlsx");
+}
+onExport("enrexport", "enr", exportEnrCSV);
+onExport("enrtcsv", "enr", exportEnrCSV);
+onExport("enrtxlsx", "enr", exportEnrXLSX);
 
 /* ================= methods text ================= */
 let FILTER={thr:1,minS:2,ng0:0};
@@ -5515,10 +5806,14 @@ function drawHeat(){
     return row.map(v=>(v-m)/sd); });
   // --- row ordering ---
   let order, shapes=[], annos=[];
+  el("heatkwrap").style.display= el("heatord").value==="kmeans"? "inline" : "none";
+  if(el("heatord").value!=="kmeans") drawElbow("p_heatelbow", null);
   if(el("heatord").value==="kmeans"){
-    const eb=autoK(Z), km=kmeans(Z,eb.k);
-    const cnt=new Array(eb.k).fill(0); km.asg.forEach(c=>cnt[c]++);
-    const corder=Array.from({length:eb.k},(_,c)=>c).sort((a,b)=>cnt[b]-cnt[a]);
+    const kSel=el("heatK").value, auto=kSel==="auto", eb=auto? autoK(Z) : null;
+    const K=Math.max(2, Math.min(auto? eb.k : (parseInt(kSel,10)||4), N-1));
+    const km=kmeans(Z,K);
+    const cnt=new Array(K).fill(0); km.asg.forEach(c=>cnt[c]++);
+    const corder=Array.from({length:K},(_,c)=>c).sort((a,b)=>cnt[b]-cnt[a]);
     order=[];
     heatClusters=[];
     let pos=0;
@@ -5532,7 +5827,9 @@ function drawHeat(){
       if(ci<corder.length-1) shapes.push({type:"line",x0:0,x1:1,xref:"paper",y0:y1,y1:y1,yref:"y",line:{color:"#0f172a",width:2}});
       pos+=mem.length;
     });
-    note+=` Rows: k-means, k = ${eb.k} by mean silhouette (s = ${eb.s.toFixed(2)}); clusters ordered by size, genes by distance to centroid.`;
+    const cur=kCurveCached("heat|"+sampleSig()+"|"+top.join(","), Z, Math.min(12, N-1)), sK=cur.sil[K];
+    drawElbow("p_heatelbow", cur, K, auto? "auto (largest mean silhouette)" : "chosen", `${N} genes × ${n} samples (z-scores)`);
+    note+=` Rows: k-means, k = ${K} ${auto? "by mean silhouette" : "chosen by the user"} (mean silhouette ${sK!==undefined? sK.toFixed(2) : "–"}${sK!==undefined&&sK<0.3? ": weak cluster structure" : ""}); clusters ordered by size, genes by distance to centroid. The elbow plot below shows the within-cluster sum of squares and the mean silhouette for k = 1 to ${cur.ks[cur.ks.length-1]}.`;
   } else {
     const D=[]; for(let a=0;a<N;a++){D.push(new Float64Array(N));}
     for(let a=0;a<N;a++)for(let b2=a+1;b2<N;b2++){ let s=0; for(let q=0;q<n;q++)s+=Z[a][q]*Z[b2][q]; D[a][b2]=D[b2][a]=1-s/(n-1); }
@@ -5646,7 +5943,7 @@ function renderHeatEnrichment(){
   const eb2=div.querySelector("#heatenrexport");
   if(eb2) eb2.addEventListener("click",()=>{
     const rows=["cluster,gene_set,set_size,overlap,enrichment_ratio,p,FDR,overlap_genes"];
-    heatEnr.forEach(r=>rows.push([r.cluster, r.name.replace(/,/g,";"), r.m, r.k, r.ratio.toFixed(2), r.p.toExponential(3), r.q.toExponential(3), '"'+r.ovIdx.map(g=>GENES[g]).join(";")+'"'].join(",")));
+    heatEnr.forEach(r=>rows.push([r.cluster, r.name.replace(/,/g,";"), r.m, r.k, r.ratio.toFixed(2), r.p.toExponential(3), r.q.toExponential(3), '"'+r.ovIdx.map(g=>GENES[g]).join(";")+'"'].map(csvq).join(",")));
     downloadCSV(rows.join("\n"), "heatmap_cluster_enrichment.csv");
   });
 }
@@ -5654,7 +5951,7 @@ el("heatexport").addEventListener("click",()=>{
   if(!heatClusters)return;
   downloadCSV("gene,gene_id,cluster\n"+heatClusters.map(r=>`${r.gene.replace(/,/g,";")},${r.id},${r.cluster}`).join("\n"),"heatmap_clusters.csv");
 });
-["heatsrc","heatord","heatcols"].forEach(id=>el(id).addEventListener("change",drawHeat));
+["heatsrc","heatord","heatcols","heatK"].forEach(id=>el(id).addEventListener("change",drawHeat));
 
 /* ================= tabs ================= */
 el("fontsel").addEventListener("change",()=>{ FONTSCALE=parseFloat(el("fontsel").value)||1; refreshTab(curTab); });
@@ -6220,7 +6517,7 @@ function renderCmpSlots(){
     const gk=(d.gorder||Object.keys(d.gi)).filter(g=>d.gi[g]&&d.gi[g].length>=2);
     const slot=document.createElement("div");
     slot.className="grp"; slot.style.cssText="display:block;margin:6px 0;padding:8px 10px";
-    slot.innerHTML=`<input type="text" class="slotlab" data-k="${k2}" value="${esc(d.label)}" title="Name used for this dataset in every plot, table, export and the methods text. Press Enter to apply." style="width:170px;font-weight:600">: ${d.nG.toLocaleString()} genes × ${d.nS} samples · ${d.nCust?`custom map (${d.nCust.toLocaleString()}) + `:``}${d.cross?"MGI 1:1 ortholog":"symbol"} match ${(100*d.matched/nG).toFixed(1)}%${d.hasCounts?" · TMM":""}${d.cross?" · "+d.species:""}${d.matchWarn?`<br><span class="warnchip">\u26a0 ${d.matchWarn}</span>`:""}${d.dupOf?`<br><span class="warnchip">\u26a0 ${d.dupN&&d.dupN<d.nS? `${d.dupN} of ${d.nS} samples` : `Same samples`} as in ${esc(d.dupOf==="session"? dsLabel(0) : d.dupOf.label)} (matched by sample ID or identical library size): the same data loaded twice${d.dupN&&d.dupN<d.nS?" in part":""}. It is left out of the meta-analysis by default; remove it, or it will also be counted twice in the consensus table.</span>`:""}
+    slot.innerHTML=`<input type="text" class="slotlab" data-k="${k2}" value="${esc(d.label)}" title="Name used for this dataset in every plot, table, export and the methods text. Press Enter to apply." style="width:170px;font-weight:600">: ${d.nG.toLocaleString()} genes × ${d.nS} samples · ${d.nCust?`custom map (${d.nCust.toLocaleString()}) + `:``}${d.cross?"MGI 1:1 ortholog":"symbol"} match ${(100*d.matched/nG).toFixed(1)}%${d.hasCounts?" · TMM":""}${d.cross?" · "+d.species:""}${d.matchWarn?`<br><span class="warnchip">\u26a0 ${d.matchWarn}</span>`:""}${d.dupOf?`<div class="alertbox"><span class="alerthead">\u26a0 Same data loaded twice</span>${d.dupN&&d.dupN<d.nS? `${d.dupN} of the ${d.nS} samples` : `All ${d.nS} samples`} are also in ${esc(d.dupOf==="session"? (/session/i.test(dsLabel(0))? dsLabel(0) : dsLabel(0)+" (the session data)") : d.dupOf.label)}, matched by sample ID or identical library size. Analysed together, the same samples would be counted as independent evidence. It is left out of the meta-analysis by default, and of the pooled signature replication and the across-dataset family and hub analyses; remove it, or it is counted twice in the consensus table.</div>`:""}
       &nbsp; contrast: <select class="slotA" data-k="${k2}">${gk.map(g=>`<option${g===d.selA?" selected":""}>${g}</option>`).join("")}</select>
       vs <select class="slotB" data-k="${k2}">${gk.map(g=>`<option${g===d.selB?" selected":""}>${g}</option>`).join("")}</select>
       ${d.factorNames&&d.factorNames.length>1? `&nbsp; groups from <select class="slotF" data-k="${k2}">${d.factorNames.map(f=>`<option${f===d.gfactor?" selected":""}>${esc(f)}</option>`).join("")}</select>
@@ -6355,7 +6652,8 @@ function onAddDataset(){
   const memAfter=dsMemTotal()+dsBytes(d);
   if(memAfter>DSMEM_MAX){ el("cmpinfo").innerHTML=`<span class="warnchip">Not added: the comparison datasets would use about ${fmtMB(memAfter)}, above the ${fmtMB(DSMEM_MAX)} this page allows so the browser does not run out of memory. Remove a dataset or filter this one more strictly.</span>`; return; }
   DSETS.push(d);
-  el("cmpinfo").textContent=`${d.label}: ${d.nG.toLocaleString()} genes × ${d.nS} samples; groups ${Object.keys(d.gi).map(g=>g+"(n="+d.gi[g].length+")").join(", ")}. ${d.matched.toLocaleString()} of ${nG.toLocaleString()} session genes matched by symbol.`;
+  el("cmpinfo").innerHTML=esc(`${d.label}: ${d.nG.toLocaleString()} genes × ${d.nS} samples; groups ${Object.keys(d.gi).map(g=>g+"(n="+d.gi[g].length+")").join(", ")}. ${d.matched.toLocaleString()} of ${nG.toLocaleString()} session genes matched by symbol.`)
+    + (d.dupOf? `<div class="alertbox"><span class="alerthead">\u26a0 Same data loaded twice</span>${d.dupN&&d.dupN<d.nS? `${d.dupN} of the ${d.nS} samples` : `All ${d.nS} samples`} of ${esc(d.label)} are also in ${esc(d.dupOf==="session"? (/session/i.test(dsLabel(0))? dsLabel(0) : dsLabel(0)+" (the session data)") : d.dupOf.label)}. See the dataset list below.</div>` : "");
   CMPB_TXT=null; CMPB_DES=null; CMPB_NAME=null;
   refreshCmpUI();
 }
@@ -6627,18 +6925,18 @@ function runFamilies(){
 }
 el("famrun").addEventListener("click",runFamilies); el("fddraw").addEventListener("click",drawFamDot); el("mfdraw").addEventListener("click",drawMetaForest);
 el("famclear").addEventListener("click",famReset);
-el("famexp").addEventListener("click",()=>{
+onExport("famexp", "fam",()=>{
   if(!FAMROWS) return;
   const cx=FAMX?FAMX.label.replace(/[, ]/g,"_"):"x", cy=FAMDS?FAMDS.label.replace(/[, ]/g,"_"):"y";
   const rows=[`family,members_${cx},members_${cy},delta_${cx},fdr_${cx},delta_${cy},fdr_${cy},concordant`];
-  FAMROWS.forEach(r=>rows.push([r.label.replace(/,/g,";"),r.kS+"/"+r.tS,r.kB+"/"+r.tB,r.dS.toFixed(4),r.qS.toExponential(3),r.dB.toFixed(4),r.qB.toExponential(3),r.conc].join(",")));
+  FAMROWS.forEach(r=>rows.push([r.label.replace(/,/g,";"),r.kS+"/"+r.tS,r.kB+"/"+r.tB,r.dS.toFixed(4),r.qS.toExponential(3),r.dB.toFixed(4),r.qB.toExponential(3),r.conc].map(csvq).join(",")));
   downloadCSV(rows.join("\n"),"homology_families.csv");
 });
 el("cmprun").addEventListener("click",runCompare);
-el("cmpexp").addEventListener("click",()=>{
+onExport("cmpexp", "cmp",()=>{
   if(!CMPLAST) return;
   const rows=[`gene,lfc_X,t_X,lfc_Y,t_Y`];
-  for(let k2=0;k2<CMPLAST.N;k2++) rows.push([CMPLAST.names[k2].replace(/,/g,";"),CMPLAST.xs[k2].toFixed(4),CMPLAST.tA[k2].toFixed(4),CMPLAST.ys[k2].toFixed(4),CMPLAST.tB[k2].toFixed(4)].join(","));
+  for(let k2=0;k2<CMPLAST.N;k2++) rows.push([CMPLAST.names[k2].replace(/,/g,";"),CMPLAST.xs[k2].toFixed(4),CMPLAST.tA[k2].toFixed(4),CMPLAST.ys[k2].toFixed(4),CMPLAST.tB[k2].toFixed(4)].map(csvq).join(","));
   downloadCSV(rows.join("\n"),"cross_dataset_matched.csv");
 });
 
@@ -6867,10 +7165,10 @@ function drawForest(g){
 }
 el("forestbtn").addEventListener("click",()=>{ const g=nameToIdx[el("forestgene").value.trim().toLowerCase()]; drawForest(g===undefined?-1:g); });
 el("multirun").addEventListener("click",runMulti);
-el("consexp").addEventListener("click",()=>{
+onExport("consexp", "multi",()=>{
   if(!CONSENSUS) return;
   const rows=["gene,n_significant,concordant,"+CONSENSUS.labels.map(l=>"lfc_"+l.replace(/,/g,";")).join(",")];
-  CONSENSUS.rows.forEach(r=>rows.push([GENES[r.g].split(" (")[0].replace(/,/g,";"),r.nSig,r.sameDir,...r.lfcs.map(v=>isFinite(v)? v.toFixed(4) : "")].join(",")));
+  CONSENSUS.rows.forEach(r=>rows.push([GENES[r.g].split(" (")[0].replace(/,/g,";"),r.nSig,r.sameDir,...r.lfcs.map(v=>isFinite(v)? v.toFixed(4) : "")].map(csvq).join(",")));
   downloadCSV(rows.join("\n"),"consensus_genes.csv");
 });
 /* ================= meta-analysis across datasets =================
@@ -7183,7 +7481,7 @@ function renderMetaDatasets(){
   let h="datasets: ";
   for(let i=0;i<=DSETS.length;i++){ const on=prev[i]!==undefined? prev[i] : !(i>0&&DSETS[i-1].dupOf);
     let nTxt=""; try{ const mi=metaSampleInfo(i); if(mi.A&&mi.B) nTxt=` <span class="footer-note" title="${esc(mi.B)} vs ${esc(mi.A)}; counts before any sample is left out for a missing covariate value (final counts appear after the run)">(${mi.nB} v ${mi.nA})</span>`; }catch(e){}
-    h+=`<label style="margin-right:10px"><input type="checkbox" class="metaon" data-i="${i}"${on?" checked":""}> ${esc(dsLabel(i))}${nTxt}</label>`; }
+    h+=`<label style="margin-right:10px"><input type="checkbox" class="metaon" data-i="${i}"${on?" checked":""}> ${esc(dsLabel(i))}${nTxt}${i>0&&DSETS[i-1].dupOf? `<span class="duptag" title="shares samples with ${esc(DSETS[i-1].dupOf==="session"? dsLabel(0) : DSETS[i-1].dupOf.label)}">same data loaded twice</span>` : ""}</label>`; }
   box.innerHTML=h;
   const mk=el("metamink"), cur=mk.value; mk.innerHTML="";
   for(let k=2;k<=DSETS.length+1;k++) mk.add(new Option(k===DSETS.length+1? `in all ${k}` : `in \u2265 ${k}`, String(k)));
@@ -7219,8 +7517,8 @@ function exportMetaGMT(){
 el("metarun").addEventListener("click", runMeta);
 el("metapi").addEventListener("change",()=>{ el("metapi")._touched=true; });
 el("metamink").addEventListener("change",()=>{ el("metamink")._touched=true; });
-el("metaexp").addEventListener("click", exportMeta);
-el("metagmt").addEventListener("click", exportMetaGMT);
+onExport("metaexp", "meta", exportMeta);
+onExport("metagmt", "meta", exportMetaGMT);
 el("metaheatn").addEventListener("change", drawMetaHeat);
 el("metaheatrank").addEventListener("change", drawMetaHeat);
 el("metatabsrc").addEventListener("change", renderMetaTable);
@@ -7558,17 +7856,17 @@ function renderSigMap(){
     `<div class="footer-note">${R.maps.map(({d},j)=>`${esc(d.label)}: ${cnt[j]}`).join("; ")}. Purple: carried through a homology family (scored once per family, on the members present in that dataset).</div>`;
   el("sigmapwrap").style.display="block";
 }
-el("sigexp").addEventListener("click", ()=>{
+onExport("sigexp", "sig", ()=>{
   const R=SIGRES; if(!R) return;
   const q=v=>`"${String(v).replace(/"/g,'""')}"`, f=(x,d2)=> x==null||!isFinite(x)? "" : (+x).toPrecision(d2||6);
   const lines=[`# benchsiDE signature transfer: ${R.label}; ${R.spec.genes.length} genes; homology families ${R.useFam?"used":"not used"}; ${R.NNULL} random signatures per dataset`,
-    ["dataset","species","B","A","n_B","n_A","units","genes_matched","one_to_one","genes_via_families","families","AUC","score_t","hedges_g","var_g","empirical_p","verdict","pooled"].join(",")];
-  if(R.disc) lines.push([q(R.disc.label), R.disc.species, q(R.disc.B), q(R.disc.A), R.disc.n2, R.disc.n1, "", R.spec.genes.length, "", "", "", "", "", f(R.disc.g), f(R.disc.v), "", "discovery", "no"].join(","));
-  R.rows.forEach(r=>lines.push([q(r.d.label), r.d.species, q(r.d.selB), q(r.d.selA), r.nB, r.nA, r.M.units.length, r.M.nGenes, r.M.nOrth, r.M.nFamGenes, r.M.nFamUnits, f(r.auc), f(r.t), f(r.g), f(r.v), f(r.pEmp), q(r.verdict), r.dup? "no" : "yes"].join(",")));
-  if(R.pooled){ const P=R.pooled; lines.push(["pooled","","","","","","","","","","","","",f(P.mu),"",f(P.pEmp),q(`${P.method}${P.hk?"+"+P.hk:""}; 95% CI ${f(P.ciLo,4)} to ${f(P.ciHi,4)}; p ${f(P.p,4)}; I2 ${f(100*P.I2,3)}%`),""].join(",")); }
+    ["dataset","species","B","A","n_B","n_A","units","genes_matched","one_to_one","genes_via_families","families","AUC","score_t","hedges_g","var_g","empirical_p","verdict","pooled"].map(csvq).join(",")];
+  if(R.disc) lines.push([q(R.disc.label), R.disc.species, q(R.disc.B), q(R.disc.A), R.disc.n2, R.disc.n1, "", R.spec.genes.length, "", "", "", "", "", f(R.disc.g), f(R.disc.v), "", "discovery", "no"].map(csvq).join(","));
+  R.rows.forEach(r=>lines.push([q(r.d.label), r.d.species, q(r.d.selB), q(r.d.selA), r.nB, r.nA, r.M.units.length, r.M.nGenes, r.M.nOrth, r.M.nFamGenes, r.M.nFamUnits, f(r.auc), f(r.t), f(r.g), f(r.v), f(r.pEmp), q(r.verdict), r.dup? "no" : "yes"].map(csvq).join(",")));
+  if(R.pooled){ const P=R.pooled; lines.push(["pooled","","","","","","","","","","","","",f(P.mu),"",f(P.pEmp),q(`${P.method}${P.hk?"+"+P.hk:""}; 95% CI ${f(P.ciLo,4)} to ${f(P.ciHi,4)}; p ${f(P.p,4)}; I2 ${f(100*P.I2,3)}%`),""].map(csvq).join(",")); }
   downloadCSV(lines.join("\n")+"\n", "signature_transfer.csv");
 });
-el("sigmapexp").addEventListener("click", ()=>{
+onExport("sigmapexp", "sig", ()=>{
   const R=SIGRES; if(!R) return; const rows=sigMapRows(); const q=v=>`"${String(v).replace(/"/g,'""')}"`;
   const lines=[["signature_gene","direction"].concat(R.maps.map(({d})=>q(d.label))).join(",")].concat(rows.map(r=>[q(r.gene), r.sign].concat(r.per.map(p=>q(p.txt))).join(",")));
   downloadCSV(lines.join("\n")+"\n", "signature_gene_mapping.csv");
@@ -7682,6 +7980,7 @@ function drawVenn(){
   el("venngenes").innerHTML='<div class="footer-note">Click a number to list that exact region\u2019s genes.</div>';
 }
 function vennShowRegion(key){
+  if(!VENNSTATE||!VENNSTATE.reg) return;
   const {picks, reg}=VENNSTATE;
   const genes2=(reg[key]||[]).slice().sort((a,b)=>GENES[a].localeCompare(GENES[b]));
   const inSets=picks.filter((_,i2)=>key&(1<<i2)).map(p=>p.label);
@@ -7811,7 +8110,7 @@ function drawSaturation(){
   Plotly.react(el("p_saturation"), traces,
     {margin:{t:30,b:44,l:64,r:10}, height:300, font:{size:10},
      title:{text:"Depth saturation: detected genes vs subsampled depth (binomial thinning)", font:{size:12}},
-     xaxis:{title:"% of library depth"}, yaxis:{title:"filtered genes detected (≥1 read)", rangemode:"tozero"}}, PL);
+     xaxis:{title:"% of library depth", rangemode:"tozero"}, yaxis:{title:"filtered genes detected (≥1 read)", rangemode:"tozero"}}, PL);
   el("saturationnote").textContent="Curves flattening before 100% mean added depth would find few new genes; still-rising curves mean the library is undersampled. Lines colored by group. Seeded thinning, so the display is reproducible; detection at count v under fraction f uses P = 1 − (1−f)^v.";
 }
 function drawRidgeline(){
@@ -8041,8 +8340,8 @@ function drawScaleFree(){
   const r2v=Math.pow((n2*sxy-sx*sy),2)/((n2*sxx-sx*sx)*(n2*syy-sy*sy));
   const slope=(n2*sxy-sx*sy)/(n2*sxx-sx*sx);
   Plotly.react(el("p_scalefree"), [
-    {x:pts.map(p2=>p2.x), y:pts.map(p2=>p2.y), mode:"markers", type:"scatter",
-     marker:{size:7,color:"#334155"}, showlegend:false, hoverinfo:"skip"},
+    {x:pts.map(p2=>p2.x), y:pts.map(p2=>p2.y), mode:"markers", type:"scatter", name:"log10 P(k) per connectivity bin",
+     marker:{size:7,color:"#334155"}, showlegend:false, hoverinfo:"x+y"},
     {x:[pts[0].x, pts[n2-1].x], y:[sy/n2+slope*(pts[0].x-sx/n2), sy/n2+slope*(pts[n2-1].x-sx/n2)],
      mode:"lines", type:"scatter", line:{color:"#dc2626",width:1.6}, showlegend:false, hoverinfo:"skip"}],
     {margin:{t:30,b:44,l:60,r:10}, height:260, font:{size:10},
@@ -8130,7 +8429,7 @@ function drawStability(){
     {margin:{t:30,b:42,l:60,r:10}, height:280, font:{size:10},
      title:{text:"Hit-count stability: how threshold choices move the list", font:{size:12}},
      legend:{orientation:"h",y:1.02,yanchor:"bottom",x:1,xanchor:"right"},
-     xaxis:{title:"FDR threshold"}, yaxis:{title:"significant genes"},
+     xaxis:{title:"FDR threshold", rangemode:"tozero"}, yaxis:{title:"significant genes", rangemode:"tozero"},
      shapes:[{type:"line",x0:curF,x1:curF,yref:"paper",y0:0,y1:1,line:{color:"#94a3b8",dash:"dot",width:1}}]}, PL);
 }
 function drawComplexity(){
@@ -8343,6 +8642,8 @@ function drawVolcanoGrid(){
   });
   const layout={margin:{t:26,b:40,l:50,r:10}, height:230*nrow+60, font:{size:9},
     grid:{rows:nrow, columns:ncol, pattern:"independent"}, annotations:annos};
+  // every panel shows the origin (-log10 p from 0)
+  pairs.forEach((_,k2)=>{ const a=k2===0? "" : String(k2+1); layout["yaxis"+a]=Object.assign(layout["yaxis"+a]||{}, {rangemode:"tozero"}); });
   Plotly.react(el("p_volcgrid"), traces, layout, PL);
   onPlotClick(el("p_volcgrid"), ev=>{ const nm=String(ev.points[0].text||""); const i2=nameToIdx[nm.toLowerCase()]; if(i2!==undefined) jumpToGene(i2); });
 }
@@ -8410,7 +8711,7 @@ function drawUpset(){
 }
 el("allpairsbtn").addEventListener("click",runAllPairs);
 el("enrmatbtn").addEventListener("click",()=>{ el("enrmatout").innerHTML=""; runProgress("Enrichment across contrasts", runEnrMatrixGen()); });
-el("enrmatexp").addEventListener("click",()=>{
+onExport("enrmatexp", "emat",()=>{
   if(!ENRMAT) return;
   const {sets, cols, contrasts}=ENRMAT;
   const rows2=["set,"+contrasts.map(c=>c.replace(/,/g,";")+" FDR,"+c.replace(/,/g,";")+" direction").join(",")];
@@ -8424,7 +8725,7 @@ el("vennbtn").addEventListener("click",()=>{
   VENNSTATE={picks:cks.map(c=>({A:c.dataset.a,B:c.dataset.b,label:c.dataset.b+" vs "+c.dataset.a})), dir2:el("venndir").value};
   drawVenn();
 });
-el("vennexp").addEventListener("click",()=>{
+onExport("vennexp", "venn",()=>{
   if(!VENNSTATE||!VENNSTATE.reg) return;
   const {picks,reg}=VENNSTATE;
   const rows2=["gene,"+picks.map(p=>p.label.replace(/,/g,";")).join(",")];
@@ -8434,10 +8735,10 @@ el("vennexp").addEventListener("click",()=>{
   downloadCSV(rows2.join("\n"),"venn_regions.csv");
 });
 el("volcgridbtn").addEventListener("click",drawVolcanoGrid);
-el("allpairsexp").addEventListener("click",()=>{
+onExport("allpairsexp", "pairs",()=>{
   if(!ALLPAIRS) return;
   const rows=["contrast,method,up,down,fdr,lfc_threshold"];
-  ALLPAIRS.rows.forEach(r=>rows.push(`${r.B} vs ${r.A},${ALLPAIRS.method},${r.err?"":r.up},${r.err?"":r.dn},${ALLPAIRS.fdr},${ALLPAIRS.thr}`));
+  ALLPAIRS.rows.forEach(r=>rows.push([`${r.B} vs ${r.A}`, ALLPAIRS.method, r.err?"":r.up, r.err?"":r.dn, ALLPAIRS.fdr, ALLPAIRS.thr].map(csvq).join(",")));
   downloadCSV(rows.join("\n"),"all_pairwise_contrasts.csv");
 });
 let CCLAST=null;
@@ -8529,10 +8830,10 @@ function runCC(){
   el("ccexp").style.display="inline-block";
 }
 el("ccrun").addEventListener("click",runCC);
-el("ccexp").addEventListener("click",()=>{
+onExport("ccexp", "cc",()=>{
   if(!CCLAST) return;
   const rows=[`gene,id,lfc_${CCLAST.l1.replace(/,/g,";")},q_x,lfc_${CCLAST.l2.replace(/,/g,";")},q_y`];
-  for(let g=0;g<nG;g++) rows.push([GENES[g].replace(/,/g,";"),IDS[g],CCLAST.r1.lfc[g].toFixed(4),CCLAST.r1.q[g].toExponential(3),CCLAST.r2.lfc[g].toFixed(4),CCLAST.r2.q[g].toExponential(3)].join(","));
+  for(let g=0;g<nG;g++) rows.push([GENES[g].replace(/,/g,";"),IDS[g],CCLAST.r1.lfc[g].toFixed(4),CCLAST.r1.q[g].toExponential(3),CCLAST.r2.lfc[g].toFixed(4),CCLAST.r2.q[g].toExponential(3)].map(csvq).join(","));
   downloadCSV(rows.join("\n"),"contrast_comparison.csv");
 });
 /* ================= sample dendrogram + QC flags ================= */
@@ -9006,10 +9307,10 @@ function drawLoadings(){
   el("pcaloadexp").style.display="inline-block";
 }
 el("pcaloadbtn").addEventListener("click",drawLoadings);
-el("pcaloadexp").addEventListener("click",()=>{
+onExport("pcaloadexp", "load",()=>{
   if(!PCALOADS) return;
   const rows=["gene,id,"+Array.from({length:PCALOADS.nPC},(_,c)=>"PC"+(c+1)).join(",")];
-  PCALOADS.rows.forEach(r=>rows.push([GENES[r.g].replace(/,/g,";"),IDS[r.g],...r.ld.map(v=>v.toFixed(6))].join(",")));
+  PCALOADS.rows.forEach(r=>rows.push([GENES[r.g].replace(/,/g,";"),IDS[r.g],...r.ld.map(v=>v.toFixed(6))].map(csvq).join(",")));
   downloadCSV(rows.join("\n"),"pca_loadings.csv");
 });
 /* ================= FRY self-contained gene-set test (limma::fry, default settings) ================= */
@@ -9301,10 +9602,10 @@ function drawModF(){
 }
 el("modfrun").addEventListener("click",()=>{ computeModF(); drawModF(); });
 el("modffdr").addEventListener("change",()=>{ if(MODF) drawModF(); });
-el("modfexport").addEventListener("click",()=>{
+onExport("modfexport", "modf",()=>{
   const rows=["gene,id,F,p,FDR,max_delta_log2"];
   const ord=Array.from({length:nG},(_,i)=>i).sort((a,b)=>MODF.P[a]-MODF.P[b]);
-  ord.forEach(g=>rows.push([GENES[g].replace(/,/g,";"),IDS[g],MODF.F[g].toFixed(4),MODF.P[g].toExponential(4),MODF.q[g].toExponential(4),MODF.maxD[g].toFixed(4)].join(",")));
+  ord.forEach(g=>rows.push([GENES[g].replace(/,/g,";"),IDS[g],MODF.F[g].toFixed(4),MODF.P[g].toExponential(4),MODF.q[g].toExponential(4),MODF.maxD[g].toFixed(4)].map(csvq).join(",")));
   downloadCSV(rows.join("\n"),"moderated_F.csv");
 });
 /* ================= network hub genes ================= */
@@ -9411,7 +9712,7 @@ function drawHubs(){
       hovertemplate:"%{text}<br>k/(M−1) %{x:.3f} · |t| %{y:.1f}<extra></extra>", showlegend:false}],
       {margin:{t:30,b:44,l:56,r:10}, height:300, font:{size:10},
        title:{text:"Connectivity vs differential expression: upper-right = candidate drivers", font:{size:12}},
-       xaxis:{title:"normalized connectivity k/(M−1)"}, yaxis:{title:`|moderated t| (${el("selB").value} vs ${el("selA").value})`}}, PL);
+       xaxis:{title:"normalized connectivity k/(M−1)", rangemode:"tozero"}, yaxis:{title:`|moderated t| (${el("selB").value} vs ${el("selA").value})`, rangemode:"tozero"}}, PL);
     onPlotClick(el("p_hubscatter"), ev=>{ const i2=nameToIdx[String(ev.points[0].text||"").toLowerCase()]; if(i2!==undefined) jumpToGene(i2); });
   } else { el("p_hubscatter").innerHTML='<div class="footer-note">Run a DE contrast to see connectivity against differential expression.</div>'; }
   // table with expandable neighborhoods
@@ -9442,11 +9743,11 @@ function drawHubs(){
   el("hubexport").style.display="inline-block";
 }
 el("hubrun").addEventListener("click",()=>{ computeHubs(); HUBNB=null; HUBX=null; HUBXCONS=null; for(const k in PRESPOOL) delete PRESPOOL[k]; for(const k in PRESBASE) delete PRESBASE[k]; el("hubxcard").style.display="none"; el("nbcard").style.display="none"; drawHubs(); drawScaleFree(); });
-el("hubexport").addEventListener("click",()=>{
+onExport("hubexport", "hubs",()=>{
   const de=(deCache&&!deCache.err)?deCache:null;
   const rows=["rank,gene,id,k,k_norm,strongest_partner,partner_r"+(de?",log2FC,FDR":"")];
   HUBS.rows.forEach((r,i)=>rows.push([i+1,GENES[r.g].replace(/,/g,";"),IDS[r.g],r.k.toFixed(4),r.kNorm.toFixed(5),
-    r.partner!==null?GENES[r.partner].replace(/,/g,";"):"",r.r.toFixed(4)].join(",")+(de?","+de.lfc[r.g].toFixed(4)+","+de.q[r.g].toExponential(3):"")));
+    r.partner!==null?GENES[r.partner].replace(/,/g,";"):"",r.r.toFixed(4)].map(csvq).join(",")+(de?","+de.lfc[r.g].toFixed(4)+","+de.q[r.g].toExponential(3):"")));
   downloadCSV(rows.join("\n"),"hub_genes.csv");
 });
 
@@ -9596,17 +9897,17 @@ function drawNeighborhood(){
   el("nbacross").style.display= el("nbtransfer").style.display;
 }
 ["nbhub","nbN","nbmode","nbR"].forEach(id=>el(id).addEventListener("change",drawNeighborhood));
-el("nbcyto").addEventListener("click",()=>{
+onExport("nbcyto", "nb",()=>{
   if(!HUBNB) return; const de=(deCache&&!deCache.err)?deCache:null, memb=nbMembers();
   const e=["source,target,r,p,edge_type,correlation"]; const mlab=HUBNB.mode==="within"?"within-group partial r":"Pearson r, all samples";
-  HUBNB.partners.forEach(o=>e.push([geneTitle(HUBNB.hub),geneTitle(o.g),o.r.toFixed(5),o.p.toExponential(4),"hub-partner",mlab].join(",")));
+  HUBNB.partners.forEach(o=>e.push([geneTitle(HUBNB.hub),geneTitle(o.g),o.r.toFixed(5),o.p.toExponential(4),"hub-partner",mlab].map(csvq).join(",")));
   const rmin=parseFloat(el("nbR").value)||0.7;
-  for(let i=1;i<memb.length;i++) for(let j=i+1;j<memb.length;j++){ const r=HUBNB.R[i][j]; if(Math.abs(r)>=rmin) e.push([geneTitle(memb[i]),geneTitle(memb[j]),r.toFixed(5),corrP(r,HUBNB.df).toExponential(4),"partner-partner",mlab].join(",")); }
-  const nn=["gene,id,role,r_with_hub,log2FC,FDR"]; memb.forEach((gg,i)=>nn.push([geneTitle(gg),IDS[gg],i===0?"hub":"partner",i===0?"":HUBNB.partners[i-1].r.toFixed(5),de?de.lfc[gg].toFixed(5):"",de?de.q[gg].toExponential(4):""].join(",")));
+  for(let i=1;i<memb.length;i++) for(let j=i+1;j<memb.length;j++){ const r=HUBNB.R[i][j]; if(Math.abs(r)>=rmin) e.push([geneTitle(memb[i]),geneTitle(memb[j]),r.toFixed(5),corrP(r,HUBNB.df).toExponential(4),"partner-partner",mlab].map(csvq).join(",")); }
+  const nn=["gene,id,role,r_with_hub,log2FC,FDR"]; memb.forEach((gg,i)=>nn.push([geneTitle(gg),IDS[gg],i===0?"hub":"partner",i===0?"":HUBNB.partners[i-1].r.toFixed(5),de?de.lfc[gg].toFixed(5):"",de?de.q[gg].toExponential(4):""].map(csvq).join(",")));
   const base=`neighbourhood_${geneTitle(HUBNB.hub)}`.replace(/[^\w\-]+/g,"_");
   downloadCSV(e.join("\n"), base+"_edges.csv"); setTimeout(()=>downloadCSV(nn.join("\n"), base+"_nodes.csv"), 300);
 });
-el("nbgmt").addEventListener("click",()=>{ if(!HUBNB) return; const nm=`${geneTitle(HUBNB.hub)}_neighbourhood`;
+onExport("nbgmt", "nb",()=>{ if(!HUBNB) return; const nm=`${geneTitle(HUBNB.hub)}_neighbourhood`;
   downloadCSV([nm, `benchsiDE ${APP_VERSION}; ${HUBNB.N} partners; ${HUBNB.mode==="within"?"within-group partial r":"Pearson r, all samples"}`].concat(nbMembers().map(geneTitle)).join("\t")+"\n", nm.replace(/[^\w\-]+/g,"_")+".gmt"); });
 el("nbtransfer").addEventListener("click",()=>{ if(!HUBNB) return; buildSigSelector(); el("sigsel").value="hubnb"; switchTab("compare"); runSigTransfer(); });
 
@@ -9974,13 +10275,13 @@ async function hubxConsRun(){
 el("nbacross").addEventListener("click",()=>{ switchTab("compare"); hubxOpen(); if(el("hubxcard").scrollIntoView) el("hubxcard").scrollIntoView({behavior:"smooth"}); });
 el("hubxrun").addEventListener("click",hubxRun);
 el("hubxcons").addEventListener("click",hubxConsRun);
-el("hubxcsv").addEventListener("click",()=>{
+onExport("hubxcsv", "nb",()=>{
   const lines=["section,dataset,gene,statistic,value"];
   if(HUBX){ HUBX.pres.forEach(r=>{ if(r.err) return; for(const [k,v] of Object.entries({Zsummary:r.Zsummary, Zdensity:r.Zdensity, Zconnectivity:r.Zconnectivity, p_vs_random_sets:r.pSets, percentile_vs_random_neighbourhoods:r.pctNbs, members_matched:r.nMatched}))
-      lines.push(["preservation", r.label, geneTitle(HUBNB.hub), k, v].join(",")); for(const [k,v] of Object.entries(r.Z)) lines.push(["preservation", r.label, geneTitle(HUBNB.hub), "Z."+k, v].join(",")); });
-    HUBX.rew.sets.forEach(st=>st.cells.forEach((c,j)=>{ if(!c) return; const g=geneTitle(HUBX.rew.partners[j]); [["r_"+st.A,c.rA],["r_"+st.B,c.rB],["delta_z",c.dz],["p_fisher",c.p],["FDR_fisher",c.q],["p_DE_matched",c.pDE],["FDR_DE_matched",c.qDE]].forEach(([k,v])=>lines.push(["rewiring", st.label, g, k, v].join(","))); }));
-    HUBX.rew.repl.forEach((o,j)=>{ const g=geneTitle(HUBX.rew.partners[j]); lines.push(["rewiring","independent comparison datasets", g, "replicated_gain_of", o.up+"/"+o.m].join(",")); lines.push(["rewiring","independent comparison datasets", g, "replicated_loss_of", o.dn+"/"+o.m].join(",")); }); }
-  if(HUBXCONS) HUBXCONS.rows.forEach(r=>{ lines.push(["consensus","all",geneTitle(r.g),"rho",r.rho].join(",")); lines.push(["consensus","all",geneTitle(r.g),"FDR",r.q].join(",")); r.ranks.forEach((k,i)=>lines.push(["consensus",HUBXCONS.labels[i],geneTitle(r.g),"rank",k].join(","))); });
+      lines.push(["preservation", r.label, geneTitle(HUBNB.hub), k, v].map(csvq).join(",")); for(const [k,v] of Object.entries(r.Z)) lines.push(["preservation", r.label, geneTitle(HUBNB.hub), "Z."+k, v].map(csvq).join(",")); });
+    HUBX.rew.sets.forEach(st=>st.cells.forEach((c,j)=>{ if(!c) return; const g=geneTitle(HUBX.rew.partners[j]); [["r_"+st.A,c.rA],["r_"+st.B,c.rB],["delta_z",c.dz],["p_fisher",c.p],["FDR_fisher",c.q],["p_DE_matched",c.pDE],["FDR_DE_matched",c.qDE]].forEach(([k,v])=>lines.push(["rewiring", st.label, g, k, v].map(csvq).join(","))); }));
+    HUBX.rew.repl.forEach((o,j)=>{ const g=geneTitle(HUBX.rew.partners[j]); lines.push(["rewiring","independent comparison datasets", g, "replicated_gain_of", o.up+"/"+o.m].map(csvq).join(",")); lines.push(["rewiring","independent comparison datasets", g, "replicated_loss_of", o.dn+"/"+o.m].map(csvq).join(",")); }); }
+  if(HUBXCONS) HUBXCONS.rows.forEach(r=>{ lines.push(["consensus","all",geneTitle(r.g),"rho",r.rho].map(csvq).join(",")); lines.push(["consensus","all",geneTitle(r.g),"FDR",r.q].map(csvq).join(",")); r.ranks.forEach((k,i)=>lines.push(["consensus",HUBXCONS.labels[i],geneTitle(r.g),"rank",k].map(csvq).join(","))); });
   downloadCSV(lines.join("\n"), `hub_across_datasets_${HUBNB?geneTitle(HUBNB.hub):"all"}.csv`.replace(/[^\w\-.]+/g,"_"));
 });
 
@@ -10511,15 +10812,15 @@ el("trcmpadd").addEventListener("click",()=>{ if(TRAITGENE==null) return; if(!co
 el("trsel").addEventListener("change", refreshTraitUI);
 el("trcamrun").addEventListener("click", traitCamRun);
 el("trmodrun").addEventListener("click", traitModRun);
-el("trcsv").addEventListener("click",()=>{ const R=TRAITRES; if(!R) return;
+onExport("trcsv", "trait",()=>{ const R=TRAITRES; if(!R) return;
   const lines=[`# trait ${R.o.trait} (${R.D.trLab}); model ${traitModelText(R)}; ${R.mode==="means"?R.n+" "+R.o.block+" means":R.n+" samples"}${R.blockMode==="dupcor"?"; intra-block correlation "+R.rho.toFixed(4):""}; residual df ${R.df}; prior df ${isFinite(R.df0)?R.df0.toFixed(3):"Inf"}`,
     "gene,log2FC_per_unit,log2FC_per_SD,SE_per_SD,t,p,FDR,AveExpr,max_Cooks_D,max_Cooks_unit"];
   const ord=Array.from({length:nG},(_,g)=>g).sort((a,b)=>R.p[a]-R.p[b]);
-  ord.forEach(g=>lines.push([GENES[g].replace(/,/g,";"), R.perUnit[g].toExponential(6), R.perSD[g].toExponential(6), R.se[g].toExponential(6), R.t[g].toFixed(5), R.p[g].toExponential(5), R.q[g].toExponential(5), R.Amean[g].toFixed(5), R.cook[g].toFixed(4), String(R.unitLabels[R.cookQ[g]]).replace(/,/g,";")].join(",")));
+  ord.forEach(g=>lines.push([GENES[g].replace(/,/g,";"), R.perUnit[g].toExponential(6), R.perSD[g].toExponential(6), R.se[g].toExponential(6), R.t[g].toFixed(5), R.p[g].toExponential(5), R.q[g].toExponential(5), R.Amean[g].toFixed(5), R.cook[g].toFixed(4), String(R.unitLabels[R.cookQ[g]]).replace(/,/g,";")].map(csvq).join(",")));
   downloadCSV(lines.join("\n"), `trait_${R.o.trait}.csv`.replace(/[^\w\-.]+/g,"_")); });
-el("trmodcsv").addEventListener("click",()=>{ if(!TRAITMOD&&!TRAITCAM){ el("trmodinfo").innerHTML='<span class="warnchip">Run the gene-set (CAMERA) or module × trait analysis first.</span>'; return; } const lines=["section,module,genes,trait,statistic,value"];
-  if(TRAITMOD) TRAITMOD.rows.forEach(r=>r.cells.forEach((c,j)=>{ if(!c) return; const tr=TRAITMOD.cols[j].trait; [["partial_r",c.r],["t",c.t],["p",c.p],["FDR",c.q]].forEach(([k,v])=>lines.push(["module",`"${r.name.replace(/"/g,"'")}"`,r.m,tr,k,v].join(","))); }));
-  if(TRAITCAM) TRAITCAM.rows.forEach(r=>[["direction",r.dir],["inter_gene_r",r.cor],["p",r.p],["FDR",r.q]].forEach(([k,v])=>lines.push(["camera",`"${r.name.replace(/"/g,"'")}"`,r.m,TRAITCAM.trait,k,v].join(","))));
+el("trmodcsv").addEventListener("click", e=>{ if((TRAITMOD&&!exportOK("tmod"))||(TRAITCAM&&!exportOK("tcam"))) return; trmodCSV(e); }); const trmodCSV=(()=>{ if(!TRAITMOD&&!TRAITCAM){ el("trmodinfo").innerHTML='<span class="warnchip">Run the gene-set (CAMERA) or module × trait analysis first.</span>'; return; } const lines=["section,module,genes,trait,statistic,value"];
+  if(TRAITMOD) TRAITMOD.rows.forEach(r=>r.cells.forEach((c,j)=>{ if(!c) return; const tr=TRAITMOD.cols[j].trait; [["partial_r",c.r],["t",c.t],["p",c.p],["FDR",c.q]].forEach(([k,v])=>lines.push(["module",`"${r.name.replace(/"/g,"'")}"`,r.m,tr,k,v].map(csvq).join(","))); }));
+  if(TRAITCAM) TRAITCAM.rows.forEach(r=>[["direction",r.dir],["inter_gene_r",r.cor],["p",r.p],["FDR",r.q]].forEach(([k,v])=>lines.push(["camera",`"${r.name.replace(/"/g,"'")}"`,r.m,TRAITCAM.trait,k,v].map(csvq).join(","))));
   downloadCSV(lines.join("\n"), "trait_gene_sets_modules.csv"); });
 
 /* ================= timing benchmark =================
@@ -10812,12 +11113,12 @@ function drawHubNet(){
 function exportHubNet(){
   if(!HUBNET) return;
   const N=HUBNET, de=(deCache&&!deCache.err)?deCache:null, nm=g=>GENES[g].split(" (")[0].replace(/,/g,";");
-  downloadCSV(["source,target,r,abs_r"].concat(N.edges.map(e=>[nm(N.genes[e.i]), nm(N.genes[e.j]), e.r.toFixed(5), Math.abs(e.r).toFixed(5)].join(","))).join("\n"), "hub_network_edges.csv");
+  downloadCSV(["source,target,r,abs_r"].concat(N.edges.map(e=>[nm(N.genes[e.i]), nm(N.genes[e.j]), e.r.toFixed(5), Math.abs(e.r).toFixed(5)].map(csvq).join(","))).join("\n"), "hub_network_edges.csv");
   downloadCSV(["gene,id,role,k_norm,edges_shown,x,y"+(de?",log2FC,FDR":"")].concat(N.genes.map((g,i)=>[nm(g), IDS[g], N.isHub[i]?"hub":"neighbor", N.kN[i].toFixed(5), N.deg[i],
-    N.X[i].toFixed(4), N.Y[i].toFixed(4)].join(",")+(de?","+de.lfc[g].toFixed(4)+","+de.q[g].toExponential(3):""))).join("\n"), "hub_network_nodes.csv");
+    N.X[i].toFixed(4), N.Y[i].toFixed(4)].map(csvq).join(",")+(de?","+de.lfc[g].toFixed(4)+","+de.q[g].toExponential(3):""))).join("\n"), "hub_network_nodes.csv");
 }
 el("netdraw").addEventListener("click", drawHubNet);
-el("netexp").addEventListener("click", exportHubNet);
+onExport("netexp", "hubs", exportHubNet);
 ["netLayout","netLab","netCol","netK","netR"].forEach(id=>el(id).addEventListener("change",()=>{ if(HUBNET) drawHubNet(); }));
 /* ================= Discovery mode =================
    Screens candidate modules (gene families from symbol structure + loaded gene-set
@@ -11100,7 +11401,7 @@ function drawDisco(){
   if(!DISCO) el("dscinfo").innerHTML=`Ready: screening will use the current sample inclusion, groups${GMT?` and the loaded library (${GMTname})`:" (no gene-set library loaded; only families will be screened; pick a built-in in the Enrichment tab for pathway modules)"}. Click <b>Run discovery</b>.`;
 }
 el("dscrun").addEventListener("click",()=>{ el("dscinfo").textContent="Running…"; setTimeout(discoveryRun,20); });
-el("dscexport").addEventListener("click",()=>{
+onExport("dscexport", "disco",()=>{
   if(!DISCO)return;
   const camMode=DISCO.rows.length&&DISCO.rows[0].camera;
   const rows=["module,type,n_genes,effect_label,"+(DISCO.gk.length===2?"delta_z":"F")+",inter_gene_correlation,vif,test,p,FDR,n_individually_significant,genes"];
@@ -11108,7 +11409,7 @@ el("dscexport").addEventListener("click",()=>{
     (DISCO.gk.length===2?r.eff:r.stat).toFixed(4),
     r.cor===null?"":r.cor.toFixed(6), r.vif===null?"":r.vif.toFixed(6), r.camera?"CAMERA":"permutation",
     r.p.toExponential(3),r.q.toExponential(3),r.kInd,
-    '"'+r.rows.map(g=>GENES[g].split(" (")[0]).join(";")+'"'].join(",")));
+    '"'+r.rows.map(g=>GENES[g].split(" (")[0]).join(";")+'"'].map(csvq).join(",")));
   downloadCSV(rows.join("\n"),"discovery_modules.csv");
 });
 
@@ -11245,7 +11546,7 @@ function sessionState(){
     gene:curGene!==null?GENES[curGene]:null, compare:compareList.map(g=>GENES[g]),
     gmt:GMT?(GMTBUILTIN?{builtin:GMTBUILTIN}:{name:GMTname, sets:GMT}):null, enrMethod,
     anno:ANNO?(ANNO.builtin?{builtin:ANNO.builtin}:ANNO):null, species:el("species").value,
-    pat:{N:el("patN").value, K:el("patK").value}, heatN:el("heatN").value, ix:{A1:el("ixA1").value, B1:el("ixB1").value, A2:el("ixA2").value, B2:el("ixB2").value, meth:el("ixmeth").value, fit:el("ixfit").value, fdr:el("ixfdr").value, lfc:el("ixlfc").value, cov:[...el("ixcov").querySelectorAll("input:checked")].map(x=>x.dataset.c)}, sig:{fam:el("sigfam").checked}, meta:{method:el("metamethod").value, hk:el("metahk").value, mink:el("metamink").value, fdr:el("metafdr").value, lfc:el("metalfc").value, pi:el("metapi").checked}};
+    pat:{N:el("patN").value, K:el("patK").value}, heatN:el("heatN").value, heat:{ord:el("heatord").value, K:el("heatK").value}, ix:{A1:el("ixA1").value, B1:el("ixB1").value, A2:el("ixA2").value, B2:el("ixB2").value, meth:el("ixmeth").value, fit:el("ixfit").value, fdr:el("ixfdr").value, lfc:el("ixlfc").value, cov:[...el("ixcov").querySelectorAll("input:checked")].map(x=>x.dataset.c)}, sig:{fam:el("sigfam").checked}, meta:{method:el("metamethod").value, hk:el("metahk").value, mink:el("metamink").value, fdr:el("metafdr").value, lfc:el("metalfc").value, pi:el("metapi").checked}};
 }
 el("savesess").addEventListener("click",()=>{
   saveBlob(new Blob([JSON.stringify(sessionState())],{type:"application/json"}), "rnaseq_session.json");
@@ -11408,7 +11709,7 @@ function applySession(ss){
   enrMethod=ss.enrMethod||"ora";
   document.querySelectorAll("#enrmethod button").forEach(x=>x.classList.toggle("on",x.dataset.e===enrMethod)); setEnrMethodUI(); el("enrsrcwrap").style.display=enrMethod==="ora"?"inline":"none";
   if(ss.pat){ el("patN").value=ss.pat.N; el("patK").value=ss.pat.K; }
-  if(ss.heatN) el("heatN").value=ss.heatN;
+  if(ss.heatN) el("heatN").value=ss.heatN; if(ss.heat){ if(ss.heat.ord) el("heatord").value=ss.heat.ord; if(ss.heat.K) el("heatK").value=ss.heat.K; }
   const gi=nameToIdx[(ss.gene||"").toLowerCase()]; if(gi!==undefined) curGene=gi;
   compareList=(ss.compare||[]).map(n=>nameToIdx[n.toLowerCase()]).filter(i=>i!==undefined);
   deKey=""; coKey=""; scorrKey=""; patState=null; enrResults=null;
