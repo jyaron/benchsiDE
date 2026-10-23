@@ -2,6 +2,12 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Figures and heatmap clusters
+- FIXED: in the enrichment dot plot, a dark line ran along the bottom row (Plotly's zero line of the row axis), and the fold-enrichment or NES axis did not start at 0. The axis now includes 0 and the rows are padded. The same zero line was drawn, under the data, through the first group of figures whose categories are placed at positions 0, 1, 2, ... (Gene Explorer, expression patterns, heatmap columns); it is now off for every such axis.
+- CHANGED: the cluster enrichment under the heatmap tests each cluster against all filtered genes by default, as the Enrichment tab does, so that it reports which gene sets each cluster is enriched for. Testing against the clustered genes only (which sets distinguish the clusters from one another; previously the only option) is available in a menu. Against the clustered genes, a cluster that holds 90% or more of them cannot show enrichment; it is now reported as such instead of listing sets at FDR 1. The CSV export records the background and gives full-precision values.
+- CHANGED: when k-means (heatmap rows) produces a cluster with fewer than 3 genes or under 5% of the genes, the note warns that a high mean silhouette then reflects a few outlying genes rather than distinct groups, and points to the elbow plot and the k menu.
+- Tests: new engine check axes_cluster_enrichment. The CI engine job installs statsmodels, which the compare_stats check uses as its reference for the Holm adjustment.
+
 Continuous integration
 - CHANGED: the GitHub Actions workflows use the releases of each action that run on Node.js 24 (checkout, setup-node, setup-python and upload-artifact v7, cache v6, configure-pages v6, upload-pages-artifact and deploy-pages v5, action-gh-release v3), and the Playwright tests run on Node.js 24 instead of Node.js 20, which has reached end of life. The runs no longer report the Node.js 20 deprecation warning.
 

@@ -1749,8 +1749,16 @@ try{ const _pmq=window.matchMedia&&window.matchMedia("print");
   if(_pmq){ const onP=e=>{ reguardPlots(true); }; if(_pmq.addEventListener) _pmq.addEventListener("change", onP); else if(_pmq.addListener) _pmq.addListener(onP); } }catch(e){}
 window.addEventListener("beforeprint", ()=>reguardPlots(true));
 window.addEventListener("afterprint", ()=>{ setTimeout(()=>reguardPlots(true), 50); });
+// An axis whose ticks are category positions (integer tick values with tick labels) has no meaningful zero, and
+// Plotly's default zero line would be drawn through the first category (a line through the first group, or along
+// the bottom row of a dot plot). It is switched off unless the figure asks for it.
+function noCategoryZeroline(layout){
+  if(!layout||typeof layout!=="object") return;
+  for(const k of Object.keys(layout)){ if(!/^[xy]axis\d*$/.test(k)) continue; const A=layout[k];
+    if(A&&Array.isArray(A.tickvals)&&Array.isArray(A.ticktext)&&A.tickvals.length&&A.tickvals.every(v=>Number.isInteger(v))&&A.zeroline===undefined) A.zeroline=false; }
+}
 Plotly.react=function(div,traces,layout,cfg){
-  traces=noGL(traces);
+  traces=noGL(traces); noCategoryZeroline(layout);
   const d0=typeof div==="string"? document.getElementById(div) : div; const noG=layout&&layout.__noGuard; if(noG) delete layout.__noGuard;
   const attachFull=()=>{ if(FULLPEND&&layout){ layout.meta=Object.assign({}, layout.meta, {fullLabels:Object.assign({}, layout.meta&&layout.meta.fullLabels, FULLPEND)}); } FULLPEND=null; };
   attachFull();
@@ -5644,8 +5652,8 @@ function drawEnrLolli(rows, mode){
     {margin:{t:Math.ceil(42*FONTSCALE), b:Math.ceil(48*FONTSCALE),
              l:Math.ceil(Math.min(380, 34+8.6*Math.max(...names.map(n=>n.length)))*FONTSCALE), r:12}, font:{size:12},
      title:{text:gsea?(GSEAMODE==="samples"?"<b>GSEA: top gene sets</b>":"<b>Preranked GSEA (ranking only): top gene sets</b>"):"<b>Over-representation: top gene sets</b>", font:{size:14}, x:0.5, xanchor:"center"},
-     xaxis:{title:{text:gsea?"<b>normalized enrichment score (NES)</b>":"<b>fold enrichment</b>", font:{size:12.5}}, tickfont:{size:11.5}},
-     yaxis:{tickvals:rr.map((_,i)=>i), ticktext:names.map(n=>"<b>"+n+"</b>"), tickfont:{size:11.5}},
+     xaxis:{title:{text:gsea?"<b>normalized enrichment score (NES)</b>":"<b>fold enrichment</b>", font:{size:12.5}}, tickfont:{size:11.5}, rangemode:"tozero", zeroline:true},
+     yaxis:{range:[-0.6, top.length-0.4], zeroline:false, tickvals:rr.map((_,i)=>i), ticktext:names.map(n=>"<b>"+n+"</b>"), tickfont:{size:11.5}},
      shapes:[{type:"line", x0:base, x1:base, y0:-0.5, y1:top.length-0.5, line:{dash:"dot", color:"#64748b", width:1.4}}],
      meta:enrDotMeta(top, gsea)},PL);
   onPlotClick(div, ev=>{ const nm=ev.points[0].text; if(!nm)return;
@@ -5847,7 +5855,8 @@ function drawHeat(){
     });
     const cur=kCurveCached("heat|"+sampleSig()+"|"+top.join(","), Z, Math.min(12, N-1)), sK=cur.sil[K];
     drawElbow("p_heatelbow", cur, K, auto? "auto (largest mean silhouette)" : "chosen", `${N} genes × ${n} samples (z-scores)`);
-    note+=` Rows: k-means, k = ${K} ${auto? "by mean silhouette" : "chosen by the user"} (mean silhouette ${sK!==undefined? sK.toFixed(2) : "–"}${sK!==undefined&&sK<0.3? ": weak cluster structure" : ""}); clusters ordered by size, genes by distance to centroid. The elbow plot below shows the within-cluster sum of squares and the mean silhouette for k = 1 to ${cur.ks[cur.ks.length-1]}.`;
+    const minC=Math.min(...cnt), smallWarn= minC<Math.max(3, 0.05*N)? ` <span class="warnchip">The smallest cluster has ${minC} gene${minC===1?"":"s"}: the mean silhouette is high when a few genes lie far from all others, so a large value here does not mean distinct groups of genes. Check the elbow plot and choose k in the menu.</span>` : "";
+    note+=` Rows: k-means, k = ${K} ${auto? "by mean silhouette" : "chosen by the user"} (mean silhouette ${sK!==undefined? sK.toFixed(2) : "–"}${sK!==undefined&&sK<0.3? ": weak cluster structure" : ""}); clusters ordered by size, genes by distance to centroid. The elbow plot below shows the within-cluster sum of squares and the mean silhouette for k = 1 to ${cur.ks[cur.ks.length-1]}.`+smallWarn;
   } else {
     const D=[]; for(let a=0;a<N;a++){D.push(new Float64Array(N));}
     for(let a=0;a<N;a++)for(let b2=a+1;b2<N;b2++){ let s=0; for(let q=0;q<n;q++)s+=Z[a][q]*Z[b2][q]; D[a][b2]=D[b2][a]=1-s/(n-1); }
@@ -5929,6 +5938,7 @@ function oraRows(idxArr, univIdx){
   return rows;
 }
 let heatEnr=null;
+let HEATENRBG="all";
 function renderHeatEnrichment(){
   const div=el("heatenr");
   if(!heatClusters){ div.style.display="none"; heatEnr=null; return; }
@@ -5940,9 +5950,15 @@ function renderHeatEnrichment(){
   const byC={};
   heatClusters.forEach(r=>{ (byC[r.cluster]=byC[r.cluster]||[]).push(r.gidx); });
   heatEnr=[];
-  let html=`<div style="margin:4px 0 2px"><b style="font-size:13px">Cluster enrichment</b> <span class="footer-note">hypergeometric against the clustered genes annotated in ${GMTname} (the genes the clusters were drawn from), BH-FDR within cluster</span> <button class="act ghost" id="heatenrexport" style="font-size:11px;padding:2px 8px">CSV</button></div>`;
+  // background: all filtered genes (what each cluster is enriched for, as in the Enrichment tab) or the clustered
+  // genes (what distinguishes the clusters from one another)
+  const allBg=HEATENRBG!=="clustered", nClu=heatClusters.length;
+  const bg= allBg? Array.from({length:nG},(_,g)=>g) : heatClusters.map(r=>r.gidx);
+  let html=`<div style="margin:4px 0 2px"><b style="font-size:13px">Cluster enrichment</b> <select id="heatenrbg" title="Background of the hypergeometric test"><option value="all"${allBg?" selected":""}>against all filtered genes</option><option value="clustered"${allBg?"":" selected"}>against the clustered genes</option></select> <span class="footer-note">hypergeometric, genes annotated in ${esc(GMTname)}; ${allBg? `which sets each cluster is enriched for among the ${nG.toLocaleString()} filtered genes` : `which sets distinguish each cluster from the other clustered genes`}; BH-FDR within cluster</span> <button class="act ghost" id="heatenrexport" style="font-size:11px;padding:2px 8px">CSV</button></div>`;
   for(const cname of Object.keys(byC)){
-    const rows=oraRows(byC[cname], heatClusters.map(r=>r.gidx)).filter(r=>r.k>=2);
+    const frac=byC[cname].length/nClu;
+    if(!allBg&&frac>=0.9){ html+=`<div style="margin:2px 0"><b>${cname}</b> (${byC[cname].length} genes): <span class="warnchip">this cluster holds ${Math.round(100*frac)}% of the clustered genes, so against the clustered genes no set can be enriched in it; choose "against all filtered genes", or another k</span></div>`; byC[cname+"__shown"]=[]; continue; }
+    const rows=oraRows(byC[cname], bg).filter(r=>r.k>=2);
     const sig=rows.filter(r=>r.q<=0.05), show=(sig.length?sig:rows).slice(0,5);
     rows.slice(0,20).forEach(r=>heatEnr.push({cluster:cname, ...r}));
     html+=`<div style="margin:2px 0"><b>${cname}</b> (${byC[cname].length} genes): `+
@@ -5953,6 +5969,7 @@ function renderHeatEnrichment(){
     byC[cname+"__shown"]=show;
   }
   div.innerHTML=html;
+  const bs=div.querySelector("#heatenrbg"); if(bs) bs.addEventListener("change",()=>{ HEATENRBG=bs.value; renderHeatEnrichment(); });
   div.querySelectorAll(".hclink").forEach(s2=>s2.addEventListener("click",()=>{
     const row=byC[s2.dataset.c+"__shown"][+s2.dataset.i];
     renderEnrGenes({name:`${s2.dataset.c}: ${row.name}`, k:row.k, m:row.m, p:row.p, q:row.q, ratio:row.ratio, ovIdx:row.ovIdx});
@@ -5960,8 +5977,8 @@ function renderHeatEnrichment(){
   }));
   const eb2=div.querySelector("#heatenrexport");
   if(eb2) eb2.addEventListener("click",()=>{
-    const rows=["cluster,gene_set,set_size,overlap,enrichment_ratio,p,FDR,overlap_genes"];
-    heatEnr.forEach(r=>rows.push([r.cluster, r.name.replace(/,/g,";"), r.m, r.k, r.ratio.toFixed(2), r.p.toExponential(3), r.q.toExponential(3), '"'+r.ovIdx.map(g=>GENES[g]).join(";")+'"'].map(csvq).join(",")));
+    const rows=["# background: "+(HEATENRBG==="clustered"? "the "+heatClusters.length+" clustered genes" : "all "+nG+" filtered genes")+"; library: "+GMTname, "cluster,gene_set,set_size,overlap,enrichment_ratio,p,FDR,overlap_genes"];
+    heatEnr.forEach(r=>rows.push([r.cluster, r.name, r.m, r.k, r.ratio, r.p, r.q, r.ovIdx.map(g=>GENES[g]).join(";")].map(csvq).join(",")));
     downloadCSV(rows.join("\n"), "heatmap_cluster_enrichment.csv");
   });
 }

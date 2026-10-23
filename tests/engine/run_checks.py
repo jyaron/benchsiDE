@@ -837,6 +837,39 @@ def group_order():
     return ok, {k: r[k] for k in ("g1", "g2", "deDiff", "d1", "num")}
 
 
+CAT_AXES_JS = r'''
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(@MAT@, @DES@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  useBuiltin("gobp_hs"); el("enrmin").value="5"; el("enrmax").value="2000";
+  const a={};
+  switchTab("heat"); __drain(); el("heatsrc").value="de"; el("heatN").value="100"; el("heatord").value="kmeans"; el("heatK").value="auto"; drawHeat(); __drain();
+  const byC={}; heatClusters.forEach(r=>(byC[r.cluster]=byC[r.cluster]||[]).push(r.gidx)); a.nClusters=Object.keys(byC).length;
+  HEATENRBG="all"; renderHeatEnrichment(); const big=Object.keys(byC).sort((x,y)=>byC[y].length-byC[x].length)[0];
+  const mine=heatEnr.filter(r=>r.cluster===big).slice(0,5), ref=oraRows(byC[big]).filter(r=>r.k>=2).slice(0,5);
+  a.same=mine.length===5&&mine.every((r,i)=>r.name===ref[i].name&&r.p===ref[i].p&&r.q===ref[i].q);
+  HEATENRBG="clustered"; renderHeatEnrichment(); a.untestable=byC[big].length/heatClusters.length<0.9 || /no set can be enriched/.test(el("heatenr")._c||""); HEATENRBG="all";
+  switchTab("enrich"); __drain(); el("enrsrc").value="de_up"; runEnrichment(); __drain();
+  const c=plotlyCalls.filter(x=>x.id==="p_enrlolli").pop(); a.lolli={xr:c.layout.xaxis.rangemode, xz:c.layout.xaxis.zeroline, yr:c.layout.yaxis.range, yz:c.layout.yaxis.zeroline};
+  a.heatXz=plotlyCalls.filter(x=>x.id==="p_heat").pop().layout.xaxis.zeroline;
+  curGene=nameToIdx["pi3"]; switchTab("gene"); __drain(); drawGene(); a.geneXz=plotlyCalls.filter(x=>x.id==="p_gene").pop().layout.xaxis.zeroline;
+  print("R " + JSON.stringify(a));
+'''
+
+@check
+def axes_cluster_enrichment():
+    # category axes have no zero line through the first category; the enrichment dot plot shows 0 and pads its rows;
+    # heatmap cluster enrichment against all filtered genes equals the Enrichment-tab test of the same gene list, and
+    # against the clustered genes a cluster holding >= 90% of them is reported as untestable
+    o = run(APP, CAT_AXES_JS.replace("@MAT@", J(mat("GSE54456"))).replace("@DES@", J(des("GSE54456"))), timeout=1500)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = (r["lolli"] == {"xr": "tozero", "xz": True, "yr": [-0.6, 14.6], "yz": False} and r["heatXz"] is False and r["geneXz"] is False
+          and r["same"] and r["untestable"] and r["nClusters"] == 2)
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0
