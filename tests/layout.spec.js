@@ -40,3 +40,23 @@ for (const width of [1400, 900, 560]) {
     expect(bad).toEqual([]);
   });
 }
+
+test("session groups can be reordered by dragging", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(PAGE);
+  await page.evaluate(([m, d]) => {
+    document.getElementById("normsel").value = "tmm"; document.getElementById("fmode").value = "fbe";
+    loadFromText(m, d); GROUPTYPE = "auto"; analyzeNow();
+  }, [read("demo/GSE63310_counts.tsv"), read("demo/GSE63310_design.tsv")]);
+  const before = await page.evaluate(() => GROUPS.slice());
+  expect(before.length).toBeGreaterThanOrEqual(3);
+  const last = before[before.length - 1], first = before[0];
+  await page.locator(`#samplebar .grp[data-g="${last}"] .ghandle`).dragTo(page.locator(`#samplebar .grp[data-g="${first}"]`), { targetPosition: { x: 4, y: 8 } });
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => GROUPS.slice());
+  expect(after).toEqual([last].concat(before.slice(0, -1)));
+  // the sample bar is redrawn in the new order, and the arrows give the same order back
+  expect(await page.locator("#samplebar .grp").first().getAttribute("data-g")).toBe(last);
+  await page.locator(`#samplebar .grp[data-g="${last}"] .gmove[data-d="1"]`).click();
+  expect(await page.evaluate(() => GROUPS[1])).toBe(last);
+});

@@ -2,6 +2,10 @@
 
 ## 1.0.0-rc.3 (2026-10-07)
 
+Group order
+- NEW: groups can be reordered by dragging, in the sample bar (session groups) and in the group editor of each comparison dataset. A group is dragged by its handle (⠿) and placed before or after the group it is dropped on; the arrow buttons remain for keyboard and touch use. Dragging and the arrows set the same order, which is used by plots, group selectors, exports and the session file; no statistic depends on it. Groups that are numeric values (a time course or dose series) keep their numeric order and cannot be reordered. Results whose layout depends on the group order are marked out of date or recomputed, as after other changes of the groups.
+- Tests: new engine check group_order; new browser test of dragging in tests/layout.spec.js.
+
 Clustering and page layout
 - NEW: the number of k-means clusters can be chosen in the heatmap (rows: k-means; k from 2 to 12, or auto) and in Expression patterns (k from 2 to 12, or auto). Auto keeps the k with the largest mean silhouette (k = 2 to 10), unchanged. An elbow plot below each figure shows the within-cluster sum of squares (k = 1 to 12) and the mean silhouette (k = 2 to 12) for the genes and samples in use, with the k in use marked; it is recomputed when the included samples change and exports its data like the other figures. The heatmap note and the pattern caption state whether k was chosen automatically or by the user, with its mean silhouette. The heatmap row ordering and k are saved in sessions.
 - CHANGED: a comparison dataset that shares samples with the session or with another comparison dataset is marked with a red notice ("Same data loaded twice") in its slot and when it is added, and with a red tag in the meta-analysis dataset list. Warning messages throughout the page now have an amber background; previously they were plain text.

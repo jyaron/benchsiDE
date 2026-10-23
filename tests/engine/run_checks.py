@@ -801,6 +801,42 @@ def kmeans_k():
     return ok, res
 
 
+GROUP_ORDER_JS = r'''
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(@MAT121212@, @DES121212@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="CTRL_healthy"; el("selB").value="PSO_lesional"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; const r0=computeDE();
+  const out={g0:GROUPS.slice()};
+  const tgt=orderAfterDrop(GROUPS, "PSO_lesional", GROUPS[0], false); out.tgt=tgt;
+  setGroupOrder(tgt); out.g1=GROUPS.slice(); out.sel=[el("selA").value, el("selB").value];
+  deKey=""; const r1=computeDE(); let md=0; for(let g=0;g<nG;g++) md=Math.max(md, Math.abs(r1.tv[g]-r0.tv[g]), Math.abs(r1.q[g]-r0.q[g])); out.deDiff=md;
+  GROUPORDER=null; deriveGroups(S.map(x=>x.group)); while(GROUPS.indexOf("PSO_lesional")>0) moveGroup("PSO_lesional",-1); out.arrows=GROUPS.slice();
+  setGroupOrder(orderAfterDrop(GROUPS, "AD_lesional", GROUPS[GROUPS.length-1], true)); out.g2=GROUPS.slice();
+  out.bad=setGroupOrder(["x"]); out.sess=sessionState().groupOrder;
+  el("cmpspecies").value="human"; CMPB_TXT=@MAT83645@; CMPB_DES=@DES83645@; CMPB_NAME="GSE83645"; onAddDataset(); __drain();
+  const d=DSETS[0]; out.d0=(d.gorder||Object.keys(d.gi)).slice(); setDsGroupOrder(d, orderAfterDrop(out.d0, out.d0[1], out.d0[0], false)); out.d1=d.gorder.slice(); out.dsel=[d.selA,d.selB];
+  el("species").value="mouse"; useBuiltinAnno();
+  loadFromText(@MAT143688@, @DESNUM@); applyFactor("Day"); GROUPTYPE="auto"; analyzeNow(); __drain();
+  out.num={NUMERIC, groups:GROUPS.slice(), refused:setGroupOrder(GROUPS.slice().reverse())===false, after:GROUPS.slice()};
+  print("R " + JSON.stringify(out));
+'''
+
+@check
+def group_order():
+    # group order set by dragging (orderAfterDrop + setGroupOrder) equals the same order reached with the arrows; no
+    # statistic changes; the contrast is kept; the order is saved in the session; comparison datasets likewise;
+    # numeric (time) groups are not reordered
+    lines = des("GSE143688").rstrip("\n").split("\n")
+    dn = "\n".join((l.replace(",d3", ",3").replace(",d7", ",7") if l.split(",")[0] == "Day" else l) for l in lines) + "\n"
+    o = run(APP, GROUP_ORDER_JS.replace("@MAT121212@", J(mat("GSE121212"))).replace("@DES121212@", J(des("GSE121212"))).replace("@MAT83645@", J(mat("GSE83645"))).replace("@DES83645@", J(des("GSE83645"))).replace("@MAT143688@", J(mat("GSE143688"))).replace("@DESNUM@", J(dn)), timeout=1800)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-600:]}
+    r = R[0]
+    ok = (r["g1"] == r["tgt"] == r["arrows"] and r["g1"][0] == "PSO_lesional" and r["deDiff"] == 0 and r["sel"] == ["CTRL_healthy", "PSO_lesional"]
+          and r["g2"][-1] == "AD_lesional" and r["bad"] is False and r["sess"] == r["g2"] and r["d1"] == r["d0"][::-1] and r["dsel"] == ["psoriasis", "uninvolved"]
+          and r["num"]["NUMERIC"] is True and r["num"]["refused"] is True and r["num"]["after"] == r["num"]["groups"])
+    return ok, {k: r[k] for k in ("g1", "g2", "deDiff", "d1", "num")}
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0

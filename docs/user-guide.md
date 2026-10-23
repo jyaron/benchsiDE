@@ -159,7 +159,7 @@ Warnings about low depth or outlier samples appear at the top of the tab.
 
 Untick a sample in the sample bar. Every statistic in every tab recomputes immediately. Analyses started with a Run button (enrichment, hub genes, discovery, traits, comparison datasets) are not rerun automatically; after a change of samples, groups or the DE contrast they show an out-of-date notice until they are run again. Tick it again to restore it. Each group block also has an **all** checkbox. For this demo, keep all nine samples.
 
-With many samples the sample bar takes much of the screen. **Hide samples** hides it and shows one line with the number of samples included in each group; **Show samples** brings it back. The arrow before a group name collapses that group's samples only. The pencil after a group name renames the group (press Enter to apply): the samples and all statistics stay the same, and the new name is used everywhere. The arrows at either end of a group block move the group left or right; the order is used in every plot. A group cannot be renamed to the name of another group, because that would merge them; merge groups in the design editor before analysis.
+With many samples the sample bar takes much of the screen. **Hide samples** hides it and shows one line with the number of samples included in each group; **Show samples** brings it back. The arrow before a group name collapses that group's samples only. The pencil after a group name renames the group (press Enter to apply): the samples and all statistics stay the same, and the new name is used everywhere. To move a group, drag it by its handle (⠿) and drop it before or after another group, or use the arrows at either end of the group block; the order is used in every plot. Groups that are numbers (a time course or doses) stay in numeric order. A group cannot be renamed to the name of another group, because that would merge them; merge groups in the design editor before analysis.
 
 ### Step 9. Run differential expression (Differential Expression tab)
 
@@ -388,7 +388,7 @@ The slot reports how many genes matched. If the count is low, the message names 
 
 Each dataset has a name field. A GEO file such as `GSE54456_raw_counts_GRCh38.p13_NCBI.tsv` is named `GSE54456` by default. Type any other name (for example `Li et al. 2014`) and press Enter; it is used in every plot, table, export and the methods text. The session's own dataset is named in the field above the slots (default "A (this session)"), and that name is saved with the session.
 
-**Edit groups** opens the dataset's groups. In the first row, rename a group by typing a new name and pressing Enter, and change the group order with the arrows; the order is used in the contrast menus and in the dataset's plots. The table below assigns individual samples to groups. The arrows next to **Remove** move the dataset up or down in the list; comparison plots, tables and exports follow that order.
+**Edit groups** opens the dataset's groups. In the first row, rename a group by typing a new name and pressing Enter, and change the group order by dragging a group by its handle (⠿) or with the arrows; the order is used in the contrast menus and in the dataset's plots. The table below assigns individual samples to groups. The arrows next to **Remove** move the dataset up or down in the list; comparison plots, tables and exports follow that order.
 
 ### Step 2. How genes are matched
 

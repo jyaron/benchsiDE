@@ -45,6 +45,10 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
   label:has(> input[type=checkbox]), label:has(> input[type=radio]) { display:inline-flex; align-items:center; gap:3px; }
   label > input[type=checkbox], label > input[type=radio] { flex:none; margin:0 2px 0 0; }
   .ctl { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .ghandle { cursor:grab; color:#94a3b8; font-size:13px; padding:0 2px; user-select:none; -webkit-user-select:none; }
+  .grp.dragging { opacity:0.45; }
+  .grp.dropbefore { box-shadow:-3px 0 0 #2563eb; }
+  .grp.dropafter { box-shadow:3px 0 0 #2563eb; }
   #samplebar { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; font-size:12.5px; }
   #samplebar .grp { display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center; padding:3px 8px; border-radius:6px; background:#f1f5f9; max-width:100%; }
   #samplebar label { display:flex; align-items:center; gap:2px; cursor:pointer; }
@@ -3084,17 +3088,29 @@ function deriveGroups(groups){
   GX={}; GROUPS.forEach((g,i)=>GX[g]=NUMERIC?Number(g):i);
   GCOL={}; GROUPS.forEach((g,i)=>GCOL[g]=(typeof GCUSTOM!=="undefined"&&GCUSTOM[g])||PAL[i%PAL.length]);
 }
+// order after moving group `from` to just before (after=false) or after (after=true) group `to`
+function orderAfterDrop(order, from, to, after){
+  const o=order.slice(), i=o.indexOf(from); if(i<0||o.indexOf(to)<0||from===to) return o;
+  o.splice(i,1); const j=o.indexOf(to); o.splice(after? j+1 : j, 0, from); return o;
+}
 function moveGroup(g,dir){
-  if(!GROUPORDER) GROUPORDER=GROUPS.slice();
-  const i=GROUPORDER.indexOf(g), j=i+dir;
-  if(i<0||j<0||j>=GROUPORDER.length) return;
-  [GROUPORDER[i],GROUPORDER[j]]=[GROUPORDER[j],GROUPORDER[i]];
+  const o=(GROUPORDER||GROUPS).slice(), i=o.indexOf(g), j=i+dir;
+  if(i<0||j<0||j>=o.length) return;
+  [o[i],o[j]]=[o[j],o[i]]; setGroupOrder(o);
+}
+// one ordering for the session groups, set by the arrows or by dragging; categorical groups only
+function setGroupOrder(order){
+  if(NUMERIC) return false;
+  if(!(order.length===GROUPS.length && GROUPS.every(g=>order.includes(g)))) return false;
+  if(order.every((g,i)=>g===GROUPS[i])) return true;
+  GROUPORDER=order.slice();
   const A=el("selA").value, B=el("selB").value;
   deriveGroups(S.map(s=>s.group));
   buildSampleBar(); buildDESelectors(); buildCCSelectors();
   el("selA").value=A; el("selB").value=B;
   deKey=""; coKey=""; scorrKey=""; patState=null;
   refreshTab(curTab);
+  return true;
 }
 let SBHIDE=false, SBCOLL={};   // whole sample list hidden; groups whose sample boxes are collapsed
 function sampleBarSummary(){
@@ -3108,10 +3124,11 @@ function buildSampleBar(){
   bar.style.display= SBHIDE? "none" : "";
   const showArrows=!NUMERIC&&GROUPS.length>1;
   GROUPS.forEach((g,gi2)=>{
-    const div=document.createElement("div"); div.className="grp";
+    const div=document.createElement("div"); div.className="grp"; div.dataset.g=g;
     const coll=!!SBCOLL[g];
     let head=`<span class="gcoll" data-g="${esc(g)}" title="${coll?"show":"hide"} the samples of this group" style="cursor:pointer;color:#64748b">${coll?"&#9656;":"&#9662;"}</span><b class="gname" data-g="${esc(g)}" style="color:${GCOL[g]}">${esc(g)}</b><span class="gren" data-g="${esc(g)}" title="rename this group" style="cursor:pointer;color:#64748b">&#9998;</span>`;
     if(showArrows) head=
+      `<span class="ghandle" title="drag to move this group" aria-hidden="true">&#10303;</span>`+
       `<span class="gmove" data-g="${esc(g)}" data-d="-1" title="move group left" style="cursor:pointer;color:${gi2===0?'#d1d5db':'#64748b'}">&#9664;</span>`+head+
       `<span class="gmove" data-g="${esc(g)}" data-d="1" title="move group right" style="cursor:pointer;color:${gi2===GROUPS.length-1?'#d1d5db':'#64748b'}">&#9654;</span>`;
     const mem=S.map((s,i)=>i).filter(i=>S[i].group===g), nIn=mem.filter(i=>included[i]).length;
@@ -3127,6 +3144,7 @@ function buildSampleBar(){
     bar.appendChild(div);
   });
   bar.querySelectorAll(".gmove").forEach(sp=>sp.addEventListener("click",()=>moveGroup(sp.dataset.g,+sp.dataset.d)));
+  if(showArrows) makeGroupsDraggable(bar, ".grp", (from,to,after)=>setGroupOrder(orderAfterDrop(GROUPORDER||GROUPS, from, to, after)));
   bar.querySelectorAll(".gcoll").forEach(sp=>sp.addEventListener("click",()=>{ SBCOLL[sp.dataset.g]=!SBCOLL[sp.dataset.g]; buildSampleBar(); }));
   bar.querySelectorAll(".gren").forEach(sp=>sp.addEventListener("click",()=>{
     const g=sp.dataset.g, b=sp.previousElementSibling;
@@ -6546,7 +6564,8 @@ function renderSlotGroupEditor(k2){
   const d=DSETS[k2], box=el("slotge_"+k2);
   const ord=d.gorder||Object.keys(d.gi);
   box.innerHTML=`
-    <div class="controls" style="margin-bottom:6px">Group names and order: ${ord.map((g,i)=>`<span class="grp" style="padding:2px 6px">
+    <div class="controls" style="margin-bottom:6px">Group names and order: ${ord.map((g,i)=>`<span class="grp" data-g="${esc(g)}" style="padding:2px 6px">
+      <span class="ghandle" title="drag to move this group" aria-hidden="true">&#10303;</span>
       <span class="sgmv" data-g="${esc(g)}" data-d="-1" title="move group left" style="cursor:pointer;color:${i===0?'#d1d5db':'#64748b'}">&#9664;</span>
       <input type="text" class="sgren" data-g="${esc(g)}" value="${esc(g)}" title="Rename this group; press Enter to apply" style="width:${Math.max(70, 8*g.length)}px">
       <span class="footer-note">n = ${d.gi[g].length}</span>
@@ -6578,6 +6597,7 @@ function renderSlotGroupEditor(k2){
     const ap=()=>{ const r=renameDsGroup(d, inp.dataset.g, inp.value); if(r){ box.querySelector(".sgrenmsg").innerHTML='<span class="warnchip">'+esc(r)+'</span>'; inp.value=inp.dataset.g; } else if(inp.value.trim()!==inp.dataset.g) reopen(); };
     inp.addEventListener("change",ap); inp.addEventListener("keydown",e=>{ if(e.key==="Enter") ap(); }); });
   box.querySelectorAll(".sgmv").forEach(sp=>sp.addEventListener("click",()=>{ moveDsGroup(d, sp.dataset.g, +sp.dataset.d); reopen(); }));
+  makeGroupsDraggable(box, ".grp", (from,to,after)=>{ if(setDsGroupOrder(d, orderAfterDrop(d.gorder||Object.keys(d.gi), from, to, after))) reopen(); });
 }
 function renameDsGroup(d, oldG, newG){
   // renames a group of a comparison dataset; samples and grouping are unchanged
@@ -6594,8 +6614,35 @@ function renameDsGroup(d, oldG, newG){
 function moveDsGroup(d, g, dir){
   const o=(d.gorder||Object.keys(d.gi)).slice(), i=o.indexOf(g), j=i+dir;
   if(i<0||j<0||j>=o.length) return;
-  [o[i],o[j]]=[o[j],o[i]]; d.gorder=o;
-  const keep=[d.selA, d.selB]; reindexDataset(d); d.selA=keep[0]; d.selB=keep[1];
+  [o[i],o[j]]=[o[j],o[i]]; setDsGroupOrder(d, o);
+}
+function setDsGroupOrder(d, order){
+  const cur=(d.gorder||Object.keys(d.gi));
+  if(!(order.length===cur.length && cur.every(g=>order.includes(g)))) return false;
+  d.gorder=order.slice();
+  const keep=[d.selA, d.selB]; reindexDataset(d); d.selA=keep[0]; d.selB=keep[1]; return true;
+}
+// Drag-and-drop reordering of group boxes: each item (itemSel, with data-g) is dragged by its handle (.ghandle)
+// and dropped before or after another item, depending on which half of it the pointer is over.
+// The arrow buttons remain for keyboard and touch use.
+function makeGroupsDraggable(container, itemSel, onMove){
+  if(!container||typeof container.querySelectorAll!=="function") return;
+  const items=Array.from(container.querySelectorAll(itemSel)); let src=null;
+  const side=(it,e)=>{ const r=it.getBoundingClientRect(); return r.width>0? (e.clientX-r.left)>r.width/2 : false; };
+  const clear=()=>items.forEach(x=>{ x.classList.remove("dropbefore"); x.classList.remove("dropafter"); });
+  items.forEach(it=>{
+    const h=it.querySelector(".ghandle"); if(!h) return;
+    h.addEventListener("mousedown",()=>{ it.draggable=true; });
+    h.addEventListener("mouseup",()=>{ if(!src) it.draggable=false; });
+    it.addEventListener("dragstart",e=>{ if(!it.draggable){ e.preventDefault(); return; } src=it; it.classList.add("dragging");
+      if(e.dataTransfer){ e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain", it.dataset.g); }catch(_){} } });
+    it.addEventListener("dragend",()=>{ it.draggable=false; it.classList.remove("dragging"); clear(); src=null; });
+    it.addEventListener("dragover",e=>{ if(!src||src===it) return; e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="move";
+      const a=side(it,e); it.classList.toggle("dropafter",a); it.classList.toggle("dropbefore",!a); });
+    it.addEventListener("dragleave",()=>{ it.classList.remove("dropbefore"); it.classList.remove("dropafter"); });
+    it.addEventListener("drop",e=>{ if(!src||src===it) return; e.preventDefault(); const from=src.dataset.g, to=it.dataset.g, a=side(it,e);
+      clear(); src.draggable=false; src=null; onMove(from, to, a); });
+  });
 }
 function moveDataset(k, dir){
   // moves comparison dataset k up or down; results that refer to datasets by position are re-pointed
