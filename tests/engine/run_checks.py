@@ -944,6 +944,11 @@ def service_delivery():
   onServiceFiles([{text:MTX, name:"m.tsv"},{text:ROWS, name:"RUNX-mapping-stats-reads.csv"}]);
   tl.rows={how:readServiceSheet(ROWS).numbering, first:pending.matrix.sampleNames[0], last:pending.matrix.sampleNames[11], note:pending.service.notes.some(x=>/taken in order/.test(x))};
   R.trail=tl;
+  // design file that names the samples by the matrix's original columns, with the value suffix, samples as columns
+  const SUFD="\t"+Array.from({length:12},(_,i)=>"RUNX_"+(i+1)+"_count").join("\t")+"\nDay\t"+Array.from({length:12},(_,i)=>[0,2,4][i%3]).join("\t")+"\n";
+  el("svcsel").value="auto"; onMatrixLoaded(MTX, "m.tsv"); onDesignLoaded(SUFD, "d.tsv"); const sf={alone:[...new Set(pending.groups)]};
+  onServiceFiles([{text:MTX, name:"m.tsv"},{text:MAP, name:"RUNX-mapping-stats-reads.csv"}]); onDesignLoaded(SUFD, "d.tsv"); sf.withTable=[...new Set(pending.groups)]; sf.first=pending.matrix.sampleNames[0];
+  R.suffix=sf;
   el("svcsel").value="none"; let err=null; try{ onMatrixLoaded(MTX, "m.tsv"); onDesignLoaded(MAP, "map.csv"); }catch(e){ err=String(e); } R.off={err:!!err, svc:!!(pending&&pending.service)}; el("svcsel").value="auto";
   print("R " + JSON.stringify(R));
 """, timeout=1200)
@@ -961,7 +966,8 @@ def service_delivery():
           and all(v == "12 1_A-X 15000000" for v in r["variants"].values())
           and r["nolabel"] == {"names": ["RUNX_1", "RUNX_2"], "groups": ["RUNX"], "qc": 12, "after": ["P", "Q"]}
           and r["trail"] == {"how": "end", "names": ["animal1_1", "animal2_2", "animal3_3"], "groups": ["samples"], "warn": 1, "byLabel": ["P", "Q"],
-                             "rows": {"how": "rows", "first": "animalA", "last": "animalL", "note": True}})
+                             "rows": {"how": "rows", "first": "animalA", "last": "animalL", "note": True}}
+          and r["suffix"] == {"alone": ["0", "2", "4"], "withTable": ["0", "2", "4"], "first": "1_A-X"})
     r.pop("lib"); r["lib_matches_count_columns"] = libok
     return ok, r
 

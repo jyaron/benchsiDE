@@ -2325,6 +2325,11 @@ function parseDesignText(text, sampleNames){
   // repeated sample names in the design file are numbered in the same way as repeated matrix columns
   { const h=grid[0].slice(1); if(dupLabelCounts(h)){ const u=uniqueSampleNames(h); u.forEach((v,j)=>{ grid[0][j+1]=v; }); }
     const r=grid.slice(1).map(x=>x[0]); if(dupLabelCounts(r)){ const u=uniqueSampleNames(r); u.forEach((v,i)=>{ grid[i+1][0]=v; }); } }
+  // a design file may name the samples by the matrix's original column names, including a value-type suffix
+  // (RUN_1_count, RUN_1_cpm) that was removed when the matrix was read
+  { const strip=c=>{ if(sset.has(c)) return c; const m=String(c).match(VALCOL_RE); return m&&sset.has(m[1].trim())? m[1].trim() : c; };
+    for(let j=1;j<grid[0].length;j++) grid[0][j]=strip(grid[0][j]);
+    for(let i=1;i<grid.length;i++) if(grid[i].length) grid[i][0]=strip(grid[i][0]); }
   const headMatch=grid[0].slice(1).filter(c=>sset.has(c)).length;
   let colMatch=0; for(let i=1;i<grid.length;i++) if(sset.has(grid[i][0])) colMatch++;
   const factors={};
@@ -2683,7 +2688,7 @@ function onDesignLoaded(text, fname){
   // a service's summary table names the samples: the matrix is re-read with it
   if(fname!==true&&serviceAllowed()&&parseServiceSheet(text)&&PENDRAW){ onServiceFiles([{text, name:typeof fname==="string"? fname : "summary"}]); return; }
   if(fname!==true&&pending.service&&pending.service.alias){ const A=pending.service.alias;
-    text=String(text).replace(/\r\n?/g,"\n").split("\n").map(l=>{ const d=l.indexOf("\t")>=0? "\t" : ","; return l.split(d).map(c=>{ const t=c.trim().replace(/^"(.*)"$/,"$1"); return A[t]!==undefined&&A[t]!==t? A[t] : c; }).join(d); }).join("\n"); }
+    text=String(text).replace(/\r\n?/g,"\n").split("\n").map(l=>{ const d=l.indexOf("\t")>=0? "\t" : ","; return l.split(d).map(c=>{ let t=c.trim().replace(/^"(.*)"$/,"$1"); if(A[t]===undefined){ const m=t.match(VALCOL_RE); if(m&&A[m[1].trim()]!==undefined) t=m[1].trim(); } return A[t]!==undefined&&A[t]!==t? A[t] : c; }).join(d); }).join("\n"); }
   pending.factors=parseDesignText(text,pending.matrix.sampleNames);
   pending.factorNames=Object.keys(pending.factors);
   rebuildCombos();
