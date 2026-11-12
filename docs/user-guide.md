@@ -94,6 +94,18 @@ Rules:
 
 If you have no design file, benchsiDE infers groups from sample names: identical names form a group; otherwise sample-number and replicate parts are removed (`WT_1`, `WT_2` → `WT`; `S3_KO_rep1` → `KO`). Check the groups on the review step and correct them there if needed.
 
+### 2.2a Files from a sequencing service (Plasmidsaurus and similar)
+
+A Plasmidsaurus RNA-seq delivery has three files: the expression matrix (`<run>-expression-matrix.tsv`), the mapping statistics (`<run>-mapping-stats-reads.csv`) and the gene-biotype summary (`<run>-gene-biotype-5plus_reads-summary.csv`). The matrix has two columns per sample, `<run>_<n>_count` and `<run>_<n>_cpm`; the summary tables give each sample's label as `<n>_<label>` (for example `1_WT+Dox`).
+
+1. Drop the matrix and at least one of the two summary tables on card 1 together (select several files in the file dialog, or drag them at once). The tables can also be dropped on card 2 after the matrix.
+2. benchsiDE uses the count columns and ignores the CPM columns, names the samples by their labels, orders them by sample number, and builds a design from the labels. Labels such as `WT-Dox`, `WT+Dox`, `Dox-`, `Dox+` are also read as the absence or presence of an agent (here Dox), so you can group by the agent, by the rest of the label, or by both.
+3. Check the groups in card 3 before clicking **Analyze →**. The mapping statistics are listed per sample under **Sequencing service report**, and a sample with an unusually low fraction of uniquely mapped reads is flagged in the QC flags.
+
+Which files are needed: the matrix is required. One summary table is enough to name and group the samples; the mapping statistics add the per-sample mapping QC. With the matrix alone the samples load as `<run>_1`, `<run>_2`, … in one group; add a design file or enter the groups in card 3. The **Sequencing service** menu above card 1 recognises such files automatically; choose **none** if a matrix of your own happens to look like one.
+
+The same files can be added as a comparison dataset in the Compare tab: select the matrix and a summary table together under **Add dataset (matrix)**, or add the table afterwards with **Design for last added**.
+
 ### 2.3 Gene-set libraries (optional)
 
 Built-in libraries (from MSigDB v2024.1, CC BY 4.0): Hallmark, GO Biological Process, GO Cellular Component, GO Molecular Function and Reactome, each for human and mouse. You can also load any `.gmt` file.

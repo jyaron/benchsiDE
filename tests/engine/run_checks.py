@@ -870,6 +870,79 @@ def axes_cluster_enrichment():
     return ok, r
 
 
+def _service_files():
+    # synthetic delivery in the Plasmidsaurus layout (no user data): gene_id, gene_name, gene_biotype, then for each
+    # sample <run>_<n>_cpm and <run>_<n>_count, samples listed 10..12 before 1..9; summary tables named <n>_<label>
+    import random
+    rnd = random.Random(20261024)
+    labs = ["A-X", "A+X", "B-X", "B+X"] * 3
+    ng, ns = 1500, 12
+    mu = [rnd.lognormvariate(3, 1.5) for _ in range(ng)]
+    cnt = [[0.0] * ns for _ in range(ng)]
+    for g in range(ng):
+        for n in range(ns):
+            eff = 4.0 if ("+X" in labs[n] and g < 60) else 1.0
+            lam = mu[g] * eff * (0.8 + 0.4 * rnd.random())
+            cnt[g][n] = round(max(0.0, rnd.gauss(lam, (lam + lam * lam * 0.04) ** 0.5)) * 6) / 6
+    col = [sum(cnt[g][n] for g in range(ng)) for n in range(ns)]
+    order = list(range(9, 12)) + list(range(0, 9))
+    head = ["gene_id", "gene_name", "gene_biotype"] + [x for n in order for x in ("RUNX_%d_cpm" % (n + 1), "RUNX_%d_count" % (n + 1))]
+    rows = ["\t".join(head)]
+    for g in range(ng):
+        v = []
+        for n in order: v += [repr(cnt[g][n] / col[n] * 1e6), "%.2f" % cnt[g][n]]
+        rows.append("\t".join(["ENSG%011d" % (g + 1), "GENE%d" % (g + 1), "protein_coding"] + v))
+    mtx = "\n".join(rows) + "\n"
+    mapping = ",Uniquely Mapped,Multi-mapped,Unmapped\n" + "\n".join("%d_%s,%d,%d,%d" % (n + 1, labs[n], 15000000 + n, 1500000, (9000000 if n == 4 else 300000)) for n in range(ns)) + "\n"
+    biot = ",protein_coding,lncRNA\n" + "\n".join("%d_%s,%d,%d" % (n + 1, labs[n], 12000 + n, 3000) for n in range(ns)) + "\n"
+    plain = "gene_id\t" + "\t".join("%d_%s" % (n + 1, labs[n]) for n in range(ns)) + "\n" + "\n".join("ENSG%011d\t" % (g + 1) + "\t".join("%.2f" % cnt[g][n] for n in range(ns)) for g in range(ng)) + "\n"
+    design = "sample\tCondition\n" + "\n".join("%d_%s\t%s" % (n + 1, labs[n], labs[n]) for n in range(ns)) + "\n"
+    return mtx, mapping, biot, plain, design, [sum(float("%.2f" % cnt[g][n]) for g in range(ng)) for n in range(ns)]
+
+@check
+def service_delivery():
+    # a sequencing-service delivery (count + CPM columns per sample, summary tables naming the samples): count
+    # columns used, CPM ignored; samples named and ordered by number; design built from the labels; DE identical to
+    # the same counts loaded as a plain matrix with a design file; any one summary table suffices; the matrix alone
+    # loads with a warning; a summary table on the design zone re-reads the matrix; the same for comparison datasets
+    mtx, mapping, biot, plain, design, lib = _service_files()
+    o = run(APP, r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  const MTX=""" + J(mtx) + ", MAP=" + J(mapping) + ", BIO=" + J(biot) + r""";
+  const R={};
+  const de=()=>{ el("selA").value="A-X"; el("selB").value="A+X"; el("selFDR").value="0.05"; el("fcthr").value="0"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; return computeDE(); };
+  onServiceFiles([{text:MTX, name:"RUNX-expression-matrix.tsv"},{text:MAP, name:"RUNX-mapping-stats-reads.csv"},{text:BIO, name:"RUNX-gene-biotype-5plus_reads-summary.csv"}]);
+  R.names=pending.matrix.sampleNames.slice(); R.factors=pending.factorNames.slice(); R.svc=pending.service.service;
+  GROUPTYPE="auto"; GROUPORDER=firstAppearance(pending.groups); analyzeNow(); __drain();
+  R.groups=GROUPS.slice(); R.lib=S.map(x=>x.libsize); R.note=/cpm columns were ignored/.test(NORMNOTE); R.qc=qcFlags().filter(f=>/unique mapping/.test(f)).length;
+  const d1=de(); const ids1=IDS.slice(), l1=Array.from(d1.lfc), p1=Array.from(d1.p);
+  loadFromText(""" + J(plain) + ", " + J(design) + r"""); GROUPTYPE="auto"; GROUPORDER=["A-X","A+X","B-X","B+X"]; analyzeNow(); __drain();
+  const d2=de(); R.sameIds=JSON.stringify(IDS)===JSON.stringify(ids1); let mx=0; for(let g=0;g<nG;g++) mx=Math.max(mx, Math.abs(d2.lfc[g]-l1[g]), Math.abs(d2.p[g]-p1[g]));
+  R.deDiff=mx; R.nG=nG;
+  for(const [k,fl] of [["mapOnly",[MAP]],["bioOnly",[BIO]],["none",[]]]){ onServiceFiles([{text:MTX, name:"m.tsv"}].concat(fl.map((t,i)=>({text:t, name:"s"+i+".csv"})))); R[k]={g:[...new Set(pending.groups)], first:pending.matrix.sampleNames[0], warn:pending.service.warn.length}; }
+  onMatrixLoaded(MTX, "m.tsv"); const r0=pending.matrix.sampleNames[0]; onDesignLoaded(MAP, "map.csv"); R.designZone=[r0, pending.matrix.sampleNames[0], pending.factorNames.length];
+  el("cmpspecies").value="human"; CMPB_SHEETS=[Object.assign(parseServiceSheet(BIO),{fname:"b.csv"})]; CMPB_TXT=MTX; CMPB_NAME="cmp"; onAddDataset(); __drain();
+  let d=DSETS[DSETS.length-1]; R.cmp={gorder:d.gorder, n:d.nS, svc:!!d.svc};
+  CMPB_TXT=MTX; CMPB_NAME="cmp2"; onAddDataset(); __drain(); d=DSETS[DSETS.length-1]; const g0=Object.keys(d.gi);
+  applySheetToLastDataset(Object.assign(parseServiceSheet(MAP),{fname:"m.csv"})); d=DSETS[DSETS.length-1]; R.cmpLater={before:g0, after:d.gorder};
+  el("svcsel").value="none"; let err=null; try{ onMatrixLoaded(MTX, "m.tsv"); onDesignLoaded(MAP, "map.csv"); }catch(e){ err=String(e); } R.off={err:!!err, svc:!!(pending&&pending.service)}; el("svcsel").value="auto";
+  print("R " + JSON.stringify(R));
+""", timeout=1200)
+    X = lines_with(o, "R ")
+    if not X: return False, {"error": o[-600:]}
+    r = X[0]
+    order = ["A-X", "A+X", "B-X", "B+X"]
+    names = ["%d_%s" % (n + 1, (order * 3)[n]) for n in range(12)]
+    libok = max(abs(a - b) for a, b in zip(r["lib"], lib)) < 1e-6
+    ok = (r["names"] == names and r["groups"] == order and r["factors"][:3] == ["Condition", "X", "Label without X"] and r["svc"] == "Plasmidsaurus"
+          and libok and r["note"] and r["qc"] == 1 and r["sameIds"] and r["deDiff"] < 1e-12
+          and r["mapOnly"]["g"] == order and r["bioOnly"]["g"] == order and r["none"]["g"] == ["RUNX"] and r["none"]["first"] == "RUNX_1" and r["none"]["warn"] == 1
+          and r["designZone"] == ["RUNX_1", "1_A-X", 4] and r["cmp"]["gorder"] == order and r["cmp"]["n"] == 12
+          and r["cmpLater"]["before"] == ["RUNX"] and r["cmpLater"]["after"] == order and r["off"]["svc"] is False)
+    r.pop("lib"); r["lib_matches_count_columns"] = libok
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0

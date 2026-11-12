@@ -37,6 +37,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
   .warn { background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:8px 12px; font-size:12.5px; margin-bottom:12px; }
+  .svcbox { background:#eff6ff; border:1px solid #93c5fd; border-left:5px solid #2563eb; border-radius:6px; padding:6px 10px; margin:6px 0; font-size:12.5px; line-height:1.45; }
   .warnchip { display:inline-block; background:#fef3c7; color:#78350f; border:1px solid #f59e0b; border-radius:6px; padding:2px 8px; margin:2px 0; font-size:12.5px; line-height:1.45; }
   .alertbox { display:block; background:#fee2e2; color:#7f1d1d; border:1px solid #fca5a5; border-left:5px solid #dc2626; border-radius:6px; padding:6px 10px; margin:6px 0; font-size:12.5px; line-height:1.45; }
   .alertbox .alerthead { display:block; font-weight:700; font-size:13px; margin-bottom:2px; }
@@ -265,10 +266,11 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
   <div id="pane-upload">
     <div class="card">
       <h3>1 &middot; Expression matrix (required)</h3>
-      <div class="dropzone" id="dzmatrix">Drop a TSV/CSV here or click to browse.<br>
+      <div class="controls" style="margin:-2px 0 8px">Sequencing service <select id="svcsel" title="A delivery from a sequencing service (for example Plasmidsaurus) holds a raw-count and a CPM column per sample and names the samples in separate summary tables. Drop the expression matrix together with those tables."><option value="auto" selected>recognise automatically</option><option value="plasmidsaurus">Plasmidsaurus</option><option value="other">other service with the same file layout</option><option value="none">none (my own matrix)</option></select></div>
+    <div class="dropzone" id="dzmatrix">Drop a TSV/CSV here or click to browse. A sequencing-service delivery (for example Plasmidsaurus: expression matrix, mapping statistics, gene-biotype summary) can be dropped as several files at once.<br>
         <span style="font-size:12px">Rows = genes, columns = samples. Annotation columns (gene id / symbol / biotype) are auto-detected.
         Raw counts, CPM/TPM, or log-transformed values all accepted.</span></div>
-      <input type="file" id="fmatrix" style="display:none" accept=".tsv,.csv,.txt">
+      <input type="file" id="fmatrix" style="display:none" accept=".tsv,.csv,.txt" multiple>
     </div>
     <div class="card">
       <h3>2 &middot; Experimental design (optional)</h3>
@@ -842,7 +844,7 @@ The MGI, RGD and HGNC data are provided as is, without warranty. MGI data (c) Th
         <label class="act ghost" style="cursor:pointer;font-size:12px">Custom ID map <input type="file" id="fcustmap" style="display:none"></label>
         <span id="custmapinfo" class="footer-note"></span>
         species of next dataset: <select id="cmpspecies"><option value="same" selected>same as session</option><option value="mouse">mouse</option><option value="human">human</option></select>
-        <label class="act ghost" style="cursor:pointer">Add dataset (matrix) <input type="file" id="fmatB" style="display:none"></label>
+        <label class="act ghost" style="cursor:pointer">Add dataset (matrix) <input type="file" id="fmatB" style="display:none" multiple title="A sequencing-service delivery (for example Plasmidsaurus) can be selected as several files at once: the expression matrix with its mapping-statistics and gene-biotype tables."></label>
         <label class="act ghost" style="cursor:pointer">Design for last added (optional) <input type="file" id="fdesB" style="display:none"></label>
         <span id="cmpinfo" class="footer-note"></span>
       </div>
@@ -2274,6 +2276,12 @@ function parseMatrixText(text){
   let nameCol=annoCols.find(c=>/name|symbol/i.test(header[c])&&!/biotype/i.test(header[c]));
   if(nameCol===undefined) nameCol=annoCols.find(c=>c!==idCol&&c!==btCol) ?? idCol;
   if(sampleCols.length<3) throw "Fewer than 3 numeric sample columns detected. If the file uses a comma as the decimal separator (for example 12,5), re-save it with a point as the decimal separator.";
+  // a matrix with more than one value type per sample (sample_count and sample_cpm, as delivered by Plasmidsaurus
+  // and other services): only the raw-count columns are used, under the sample name without the suffix
+  const valuePairs=pairedValueColumns(sampleCols.map(c=>(header[c]||"").trim()));
+  if(valuePairs){ const keepSet=new Set(valuePairs.keepIdx.map(k=>sampleCols[k]));
+    const vp=valuePairs; sampleCols=sampleCols.filter(c=>keepSet.has(c));
+    sampleCols.forEach((c,k)=>{ header[c]=vp.stems[k]; }); }
   const origNames=sampleCols.map(c=>(header[c]||"").trim()||("S"+c));
   const sampleNames=uniqueSampleNames(origNames);
   const ids=[], names=[], bts=[], vals=[]; let nBad=0;
@@ -2288,7 +2296,7 @@ function parseMatrixText(text){
     vals.push(row);
   }
   const seenId=new Set(); let nDupIds=0; for(const id of ids){ if(seenId.has(id)) nDupIds++; else seenId.add(id); }
-  return {sampleNames, origNames, dupLabels:dupLabelCounts(origNames), ids, names, bts, vals, nBad, nDupIds};
+  return {sampleNames, origNames, dupLabels:dupLabelCounts(origNames), ids, names, bts, vals, nBad, nDupIds, delim, annoCols, sampleCols, valuePairs};
 }
 // Column names that occur more than once (for example m5, m5, m5, m5+baf, ...) are made unique by numbering
 // each occurrence in file order (m5_1, m5_2, m5_3); the same rule is applied to the sample names of a design
@@ -2390,9 +2398,18 @@ function hookDrop(dzId, inpId, cb){
   dz.addEventListener("click",()=>inp.click());
   dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over");});
   dz.addEventListener("dragleave",()=>dz.classList.remove("over"));
-  dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("over");
-    if(e.dataTransfer.files.length){ dz.__t0=performance.now(); readFileInput(e.dataTransfer.files[0],dz,cb); }});
-  inp.addEventListener("change",()=>{ if(inp.files.length){ dz.__t0=performance.now(); readFileInput(inp.files[0],dz,cb); } });
+  const take=files=>{ if(!files.length) return; dz.__t0=performance.now();
+    if(dzId==="dzmatrix"&&files.length>1) readServiceFiles([...files], dz); else readFileInput(files[0],dz,cb); };
+  dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("over"); take(e.dataTransfer.files); });
+  inp.addEventListener("change",()=>take(inp.files));
+}
+// several files at once (an expression matrix with a service's summary tables)
+function readServiceFiles(files, dz){
+  Promise.all(files.map(f=>new Promise((res,rej)=>{ const rd=new FileReader(); rd.onload=()=>res({text:String(rd.result), name:f.name, size:f.size}); rd.onerror=()=>rej("Could not read "+f.name); rd.readAsText(f); })))
+    .then(list=>{ try{ onServiceFiles(list); dz.classList.add("loaded");
+        dz.innerHTML=`Loaded ${list.map(x=>`<b>${esc(x.name)}</b>`).join(", ")} (${(list.reduce((a,x)=>a+x.size,0)/1e6).toFixed(1)} MB). Click to replace.`; }
+      catch(err){ dz.classList.remove("loaded"); dz.innerHTML=`<span style="color:#b91c1c">${err}</span><br>Click to try other files.`; } })
+    .catch(err=>{ dz.innerHTML=`<span style="color:#b91c1c">${err}</span>`; });
 }
 function readFileInput(file,dz,cb){
   const rd=new FileReader();
@@ -2405,8 +2422,154 @@ function readFileInput(file,dz,cb){
     catch(err){ dz.classList.remove("loaded"); dz.innerHTML=`<span style="color:#b91c1c">${err}</span><br>Click to try another file.`; } };
   rd.readAsText(file);
 }
-function onMatrixLoaded(text,fname){
+/* ================= sequencing-service files (Plasmidsaurus and services with the same layout) =================
+   A service delivery can hold, for each sample, a raw-count column and a derived column (for example
+   RUN_1_count and RUN_1_cpm), and the sample descriptions in separate summary tables whose rows are named
+   "<sample number>_<label>" (for example 1_WT+Dox). The counts are kept, the derived columns are dropped, the samples
+   are named and ordered by sample number, and a design is built from the labels. */
+const VALCOL_RE=/^(.*?)[_.\-\s](expected_counts?|raw_?counts?|counts?|reads|raw|cpm|tpm|fpkm|rpkm|normali[sz]ed|norm|vst|rlog|log2?cpm)$/i;
+const VALCOL_PREF=["count","counts","raw_count","raw_counts","rawcount","rawcounts","expected_count","expected_counts","reads","raw","cpm","tpm","fpkm","rpkm","normalized","normalised","norm","vst","rlog","logcpm","log2cpm"];
+// sample columns that hold more than one value type per sample: returns the columns to keep (one type)
+function pairedValueColumns(names){
+  const by={}, stemsOf={};
+  names.forEach((n,q)=>{ const m=String(n).trim().match(VALCOL_RE); if(!m) return; const t=m[2].toLowerCase();
+    (by[t]=by[t]||[]).push(q); (stemsOf[t]=stemsOf[t]||new Set()).add(m[1]); });
+  const types=Object.keys(by).filter(t=>by[t].length>=2);
+  if(types.length<2) return null;
+  // every column must carry a value-type suffix, and the stems of the types must coincide
+  if(types.reduce((a,t)=>a+by[t].length,0)!==names.length) return null;
+  const s0=[...stemsOf[types[0]]].sort().join("\u0001");
+  if(!types.every(t=>[...stemsOf[t]].sort().join("\u0001")===s0)) return null;
+  const keep=types.slice().sort((a,b)=>(VALCOL_PREF.indexOf(a)<0?99:VALCOL_PREF.indexOf(a))-(VALCOL_PREF.indexOf(b)<0?99:VALCOL_PREF.indexOf(b)))[0];
+  return {keep, dropped:types.filter(t=>t!==keep), keepIdx:by[keep], stems:by[keep].map(q=>String(names[q]).trim().match(VALCOL_RE)[1]), n:by[keep].length};
+}
+// a service summary table: first column "<number>_<label>", all other columns numeric
+function parseServiceSheet(text){
+  const lines=String(text).replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim());
+  if(lines.length<2) return null;
+  const delim=sniffDelim(lines[0]); const hdr=splitFields(lines[0], delim).map(x=>x.trim());
+  if(hdr.length<2 || !(hdr[0]===""||/^(samples?|sample[ _]?(id|name)s?|name|id)$/i.test(hdr[0]))) return null;
+  const ent=[];
+  for(const l of lines.slice(1)){ const r=splitFields(l, delim).map(x=>x.trim());
+    const m=String(r[0]||"").match(/^(\d+)[_\-. ]+(.+)$/); if(!m) return null;
+    const v=r.slice(1); if(!v.length||!v.every(x=>x!==""&&isFinite(Number(x)))) return null;
+    ent.push({num:+m[1], label:m[2].trim(), name:r[0], vals:v.map(Number)}); }
+  if(new Set(ent.map(e=>e.num)).size!==ent.length) return null;
+  const kind= hdr.some(h=>/uniquely mapped/i.test(h))? "mapping" : hdr.some(h=>/protein[_ ]coding/i.test(h))? "biotype" : "summary";
+  return {kind, cols:hdr.slice(1), entries:ent};
+}
+// trailing sample number of a matrix column stem (RUN_12 -> 12)
+// groups in the order of their first sample (the service numbers samples in the order they were submitted)
+function firstAppearance(groups){ return [...new Set(groups)]; }
+function stemNumber(stem){ const m=String(stem).match(/(?:^|[^0-9])(\d+)$/); return m? +m[1] : null; }
+// "WT-Dox" -> {agents:{Dox:"-"}, rest:"WT"}; "Dox+" -> {agents:{Dox:"+"}, rest:""}
+function signTokens(label){
+  const agents={}; let rest=String(label);
+  rest=rest.replace(/([+\-])([A-Za-z][A-Za-z0-9]*)/g,(m,sg,a)=>{ agents[a]=sg; return " "; });
+  rest=rest.replace(/([A-Za-z][A-Za-z0-9]*)([+\-])(?=$|[^A-Za-z0-9])/g,(m,a,sg)=>{ if(agents[a]===undefined){ agents[a]=sg; return " "; } return m; });
+  return {agents, rest:rest.replace(/[_\-.\s]+/g," ").trim()};
+}
+// design (samples as rows) from the labels: the label itself, and when every label carries the same agents with
+// + or -, one factor per agent (absence first) and the remainder of the label
+function serviceDesign(names, labels){
+  const st=labels.map(signTokens), agentSet=new Set(); st.forEach(x=>Object.keys(x.agents).forEach(a=>agentSet.add(a)));
+  const agents=[...agentSet].filter(a=>st.every(x=>x.agents[a]!==undefined) && new Set(st.map(x=>x.agents[a])).size===2);
+  // labels that carry a replicate number (WT-1, WT-2, ...) are all distinct: they are grouped as sample names are
+  const cond= new Set(labels).size===labels.length? inferGroups(labels) : labels;
+  const cols=[["Condition", cond]], order={Condition:[...new Set(cond)]};
+  agents.forEach(a=>{ const v=st.map(x=>a+(x.agents[a]==="+"? "+" : "-")); cols.push([a, v]); order[a]=[a+"-", a+"+"]; });
+  if(agents.length){ const rest=st.map(x=>{ let r=x.rest; return r||"none"; });
+    if(new Set(rest).size>=2){ const nm="Label without "+agents.join(", "); cols.push([nm, rest]); order[nm]=[...new Set(rest)]; } }
+  const txt=["sample\t"+cols.map(c=>c[0]).join("\t")].concat(names.map((n,q)=>n+"\t"+cols.map(c=>c[1][q]).join("\t"))).join("\n")+"\n";
+  return {text:txt, factors:cols.map(c=>c[0]), order, agents};
+}
+// Rewrites a delivered matrix with its summary tables: count columns only, named "<number>_<label>", ordered by
+// sample number; returns the new matrix text, the design text and the notes and per-sample QC for the report.
+function serviceBundle(matrixText, sheetTexts, service){
+  const mx=parseMatrixText(matrixText);
+  const sheets=(sheetTexts||[]).map(t=>typeof t==="string"? parseServiceSheet(t) : t).filter(Boolean);
+  const notes=[], warn=[];
+  const stems=mx.origNames, nums=stems.map(stemNumber);
+  let names=stems.slice(), labels=null, order=stems.map((_,q)=>q);
+  // samples in sample-number order (the service numbers them in submission order; files list 10-18 before 1-9)
+  if(nums.every(x=>x!==null) && new Set(nums).size===nums.length){ order=stems.map((_,q)=>q).sort((a,b)=>nums[a]-nums[b]); names=order.map(q=>stems[q]); }
+  if(sheets.length){
+    if(nums.some(x=>x===null) || new Set(nums).size!==nums.length) throw "The sample columns of the matrix do not end in distinct sample numbers, so they cannot be matched to the summary table rows ("+sheets[0].entries.slice(0,2).map(e=>e.name).join(", ")+", …).";
+    const ref=sheets[0], lab={}; ref.entries.forEach(e=>{ lab[e.num]=e; });
+    for(const sh of sheets.slice(1)) for(const e of sh.entries) if(lab[e.num]&&lab[e.num].label!==e.label) warn.push(`Sample ${e.num} is labelled "${lab[e.num].label}" in one summary table and "${e.label}" in another; the first is used.`);
+    const missing=nums.filter(n=>!lab[n]);
+    if(missing.length) throw `The summary table has no row for sample${missing.length>1?"s":""} ${missing.slice(0,8).join(", ")}${missing.length>8?", …":""} of the matrix.`;
+    const extra=ref.entries.filter(e=>!nums.includes(e.num)); if(extra.length) warn.push(`The summary table lists ${extra.length} sample${extra.length>1?"s":""} that ${extra.length>1?"are":"is"} not in the matrix (${extra.slice(0,4).map(e=>esc(e.name)).join(", ")}).`);
+    order=stems.map((_,q)=>q).sort((a,b)=>nums[a]-nums[b]);
+    names=order.map(q=>lab[nums[q]].name); labels=order.map(q=>lab[nums[q]].label);
+    notes.push(`Samples were named and grouped from ${sheets.map(s=>s.kind==="mapping"? "the mapping-statistics table" : s.kind==="biotype"? "the gene-biotype summary table" : "the summary table").join(" and ")}: matrix column ${esc(stems[order[0]])} is sample ${esc(names[0])}, and so on, in sample-number order.`);
+  }
+  // rewrite: annotation columns, then the kept sample columns in the new order under the new names
+  const lines=String(matrixText).replace(/\r\n?/g,"\n").split("\n");
+  const head=splitFields(lines[0], mx.delim).map(x=>x.trim());
+  const keepCols=mx.annoCols.concat(order.map(q=>mx.sampleCols[q]));
+  const out=[mx.annoCols.map(c=>head[c]).concat(names).map(csvTab).join("\t")];
+  for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const r=splitFields(lines[i], mx.delim); out.push(keepCols.map(c=>csvTab(r[c]===undefined? "" : r[c])).join("\t")); }
+  if(mx.valuePairs) notes.unshift(`The matrix has ${mx.valuePairs.dropped.length+1} columns per sample (${[mx.valuePairs.keep].concat(mx.valuePairs.dropped).join(", ")}); the ${mx.valuePairs.keep} columns are used and the ${mx.valuePairs.dropped.join(", ")} columns are ignored.`);
+  const design= labels? serviceDesign(names, labels) : null;
+  // per-sample QC from the summary tables
+  const qc=names.map(n=>({name:n}));
+  sheets.forEach(sh=>{ const byNum={}; sh.entries.forEach(e=>{ byNum[e.num]=e; });
+    order.forEach((q,k)=>{ const e=byNum[nums[q]]; if(!e) return;
+      if(sh.kind==="mapping"){ const ix=h=>sh.cols.findIndex(c=>h.test(c)); const u=e.vals[ix(/uniquely/i)], mm=e.vals[ix(/multi/i)], un=e.vals[ix(/unmapped/i)];
+        if(isFinite(u)){ qc[k].unique=u; qc[k].multi=mm; qc[k].unmapped=un; qc[k].pctUnique=100*u/((u||0)+(mm||0)+(un||0)); } }
+      if(sh.kind==="biotype"){ const j=sh.cols.findIndex(c=>/protein[_ ]coding/i.test(c)); if(j>=0) qc[k].pcGenes=e.vals[j]; } }); });
+  if(!sheets.length) warn.push(`No summary table names the samples, so they are listed as ${esc(names[0])} to ${esc(names[names.length-1])} in one group. Add the service's mapping-statistics or gene-biotype table (or a design file), or enter the groups below.`);
+  return {pairs:mx.valuePairs, matrixText:out.join("\n")+"\n", designText:design? design.text : null, order:design? design.order : null, design, notes, warn, qc:sheets.length? qc : null, service:service||null};
+}
+function csvTab(v){ return String(v).replace(/[\t\n\r]/g," "); }
+// QC flags from the service tables: fraction of reads mapped uniquely far below the other samples
+function serviceQCFlags(qc){
+  if(!qc) return [];
+  const p=qc.filter(x=>isFinite(x.pctUnique)).map(x=>x.pctUnique); if(p.length<3) return [];
+  const srt=p.slice().sort((a,b)=>a-b), med=srt[Math.floor(srt.length/2)];
+  const mad=1.4826*srt.map(x=>Math.abs(x-med)).sort((a,b)=>a-b)[Math.floor(srt.length/2)];
+  return qc.filter(x=>isFinite(x.pctUnique)&&(x.pctUnique<50||(x.pctUnique<med-3*mad&&x.pctUnique<med-5)))
+    .map(x=>`Low unique mapping: ${esc(x.name)} has ${x.pctUnique.toFixed(1)}% of reads mapped uniquely (median ${med.toFixed(1)}%), from the service's mapping statistics.`);
+}
+function serviceQCTable(qc){
+  if(!qc||!qc.some(x=>isFinite(x.pctUnique)||isFinite(x.pcGenes))) return "";
+  const hasM=qc.some(x=>isFinite(x.pctUnique)), hasB=qc.some(x=>isFinite(x.pcGenes));
+  return `<details style="margin-top:6px"><summary style="cursor:pointer">Sequencing service report (${qc.length} samples)</summary><table class="tbl" style="margin-top:4px"><tr><th>Sample</th>${hasM?"<th>uniquely mapped reads</th><th>multi-mapped</th><th>unmapped</th><th>% unique</th>":""}${hasB?"<th>protein-coding genes with ≥ 5 reads</th>":""}</tr>`+
+    qc.map(x=>`<tr><td>${esc(x.name)}</td>${hasM? `<td>${isFinite(x.unique)? (x.unique/1e6).toFixed(2)+" M":"–"}</td><td>${isFinite(x.multi)? (x.multi/1e6).toFixed(2)+" M":"–"}</td><td>${isFinite(x.unmapped)? (x.unmapped/1e6).toFixed(2)+" M":"–"}</td><td>${isFinite(x.pctUnique)? x.pctUnique.toFixed(1):"–"}</td>`:""}${hasB? `<td>${isFinite(x.pcGenes)? x.pcGenes.toLocaleString():"–"}</td>`:""}</tr>`).join("")+`</table></details>`;
+}
+// service declared by the user, or recognised from the file names
+function serviceName(fnames){
+  const v=(document.getElementById("svcsel")||{}).value||"auto";
+  if(v==="plasmidsaurus") return "Plasmidsaurus";
+  if(v==="other") return "sequencing service";
+  if((fnames||[]).some(f=>/expression-matrix|gene-biotype-5plus|mapping-stats-reads/i.test(f||""))) return "Plasmidsaurus";
+  return null;
+}
+let SERVICEQC=null;
+// onboarding: the matrix and any summary tables, in any order
+function onServiceFiles(files){
+  // files: [{text, name}]; one expression matrix and any number of summary tables
+  const sheets=[], mats=[];
+  files.forEach(f=>{ const sh=parseServiceSheet(f.text); if(sh) sheets.push(Object.assign(sh,{fname:f.name})); else mats.push(f); });
+  if(mats.length>1) throw `${mats.length} of the files are not summary tables (${mats.map(f=>esc(f.name)).join(", ")}); drop one expression matrix at a time.`;
+  if(mats.length===1){ PENDRAW={text:mats[0].text, name:mats[0].name, sheets:[]}; }
+  if(!PENDRAW) throw "Load the expression matrix as well: the summary tables only describe the samples.";
+  PENDRAW.sheets=PENDRAW.sheets.concat(sheets);
+  const svc=serviceName([PENDRAW.name].concat(PENDRAW.sheets.map(s=>s.fname)));
+  const B=serviceBundle(PENDRAW.text, PENDRAW.sheets, svc);
+  onMatrixLoaded(B.matrixText, PENDRAW.name, true);
+  pending.service=B; SERVICEQC=B.qc;
+  if(!B.design){ const pre=pending.matrix.sampleNames.map(n=>String(n).replace(/[_\-. ]*\d+$/,"")||"samples"); pending.groups=pre; }
+  if(B.designText){ onDesignLoaded(B.designText, true); }
+  renderSetup();
+}
+let PENDRAW=null;
+function onMatrixLoaded(text,fname,fromService){
+  if(!fromService&&serviceAllowed()&&parseServiceSheet(text)){ onServiceFiles([{text, name:fname}]); return; }
+  if(!fromService) PENDRAW={text, name:fname||"matrix", sheets:[]};
   const mx=parseMatrixText(text);
+  if(!fromService&&mx.valuePairs&&serviceAllowed()){ onServiceFiles([{text, name:fname||"matrix"}]); return; }
   pending={matrix:mx, factors:null, factorNames:[], matrixName:fname||"matrix"};
   pending.groups=inferGroups(mx.sampleNames, mx.origNames);
   renderSetup();
@@ -2457,8 +2620,11 @@ function defaultGroupFactor(factors, names){
   if(crossed.length===1){ const cn=names.find(n=>isCombo(n)&&n.split(COMBO_SEP).includes(tf)&&n.split(COMBO_SEP).includes(crossed[0])); if(cn) return cn; }
   return tf;
 }
-function onDesignLoaded(text){
+function serviceAllowed(){ return ((document.getElementById("svcsel")||{}).value||"auto")!=="none"; }
+function onDesignLoaded(text, fname){
   if(!pending){ throw "Load the expression matrix first."; }
+  // a service's summary table names the samples: the matrix is re-read with it
+  if(fname!==true&&serviceAllowed()&&parseServiceSheet(text)&&PENDRAW){ onServiceFiles([{text, name:typeof fname==="string"? fname : "summary"}]); return; }
   pending.factors=parseDesignText(text,pending.matrix.sampleNames);
   pending.factorNames=Object.keys(pending.factors);
   rebuildCombos();
@@ -2478,6 +2644,8 @@ function renderSetup(){
   if(maxv<=50) mode="log-scale values detected (max ≤ 50): used as-is";
   else { const dev=colsums.map(s=>Math.abs(s-1e6)/1e6); if(Math.max(...dev)<0.15) mode="column sums ≈ 10⁶: already CPM/TPM"; }
   el("parseinfo").innerHTML=`<b>${mx.ids.length.toLocaleString()}</b> genes × <b>${mx.sampleNames.length}</b> samples · normalization: <b>${mode}</b>`+
+    (mx.valuePairs&&!pending.service? `<div class="warn" style="margin:6px 0 0">The matrix has ${mx.valuePairs.dropped.length+1} columns per sample (${[mx.valuePairs.keep].concat(mx.valuePairs.dropped).map(esc).join(", ")}); the <b>${esc(mx.valuePairs.keep)}</b> columns are used and the ${mx.valuePairs.dropped.map(esc).join(", ")} columns are ignored. If the delivery includes a summary table that names the samples (for Plasmidsaurus: the mapping-statistics or gene-biotype CSV), add it with the matrix to name and group the samples.</div>` : "")+
+    (pending.service? `<div class="svcbox"><b>${esc(pending.service.service||"Sequencing service")} delivery.</b> ${pending.service.notes.join(" ")}${pending.service.design? ` A design was built from the sample labels: ${pending.service.design.factors.map(f=>`<b>${esc(f)}</b> (${[...new Set(pending.factors&&pending.factors[f]? Object.values(pending.factors[f]) : [])].map(esc).join(", ")})`).join("; ")}.${pending.service.design.agents.length? ` The labels were read as the presence (+) or absence (−) of ${pending.service.design.agents.map(esc).join(", ")}.` : ""} Check the groups below before analysing.` : ""}${pending.service.warn.length? `<div class="warnchip" style="display:block;margin-top:4px">${pending.service.warn.join(" ")}</div>` : ""}${serviceQCTable(pending.service.qc)}</div>` : "")+
     (pending.factors?` · design factors: <b>${pending.factorNames.join(", ")}</b>`:" · no design file; groups guessed from sample names (edit below)")+
     (mx.dupLabels? `<div class="warn" style="margin:6px 0 0">Column names occur more than once: ${Object.entries(mx.dupLabels).map(([k,v])=>`<b>${esc(k)}</b> (${v})`).join(", ")}. Each sample needs its own name, so the repeated names were numbered in file order (${esc(mx.sampleNames[mx.origNames.indexOf(Object.keys(mx.dupLabels)[0])])}, …)${pending.factors? "" : ", and samples with the same name were put in one group"}. Check the groups below. A design file may repeat the names in the same order, or use the numbered names.</div>` : "")+
     (pending.factors&&pending.factorNames.length>1? (()=>{ const tf=timeFactorOf(pending.factors, pending.factorNames), others=baseFactorNames().filter(f=>f!==FACTOR&&!(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(f)));
@@ -2812,7 +2980,7 @@ el("analyze").addEventListener("click",()=>{
   if(inputs.length===pending.matrix.sampleNames.length)
     inputs.forEach(inp=>{ pending.groups[+inp.dataset.q]=inp.value.trim()||"NA"; });
   GROUPTYPE=el("grouptype").value;
-  GROUPORDER=null;
+  GROUPORDER=pending.service&&pending.service.design? firstAppearance(pending.groups) : null;
   const tA=performance.now();
   Promise.resolve(runProgress("Analyzing "+pending.matrix.sampleNames.length+" samples \u00d7 "+pending.matrix.vals.length.toLocaleString()+" genes", analyzeGen()))
     .then(()=>nextFrame()).then(()=>{ LOADTIME.analyze={ms:performance.now()-tA, nS, nG}; renderLoadTiming(); });
@@ -2934,6 +3102,8 @@ function* analyzeGen(){
                                     :"Column sums ≈ 10⁶: input treated as CPM/TPM (no renormalization).")
     : "Input treated as raw counts; CPM = counts / column sum × 10⁶.";
   if(!DATALOG && !alreadyNorm && det.nonInteger) NORMNOTE += " Non-integer values detected; treated as counts (appropriate for estimated counts, e.g. from salmon or RSEM). If these are FPKM/TPM values, set the input units to CPM/TPM/FPKM.";
+  const vpN=mx.valuePairs||(pending&&pending.service&&pending.service.pairs);
+  if(vpN) NORMNOTE += ` The matrix holds ${vpN.dropped.length+1} values per sample; the ${vpN.keep} columns were used and the ${vpN.dropped.join(", ")} columns were ignored${pending&&pending.service&&pending.service.service? ` (${pending.service.service} delivery)` : ""}.`;
   if(mx.nBad) NORMNOTE += ` ${mx.nBad.toLocaleString()} missing or non-numeric cells (NA, empty, text) were read as 0.`;
   if(mx.nDupIds) NORMNOTE += ` ${mx.nDupIds.toLocaleString()} gene identifiers occur more than once and were kept as separate rows.`;
   // linear CPM per gene
@@ -5954,7 +6124,7 @@ function renderHeatEnrichment(){
   // genes (what distinguishes the clusters from one another)
   const allBg=HEATENRBG!=="clustered", nClu=heatClusters.length;
   const bg= allBg? Array.from({length:nG},(_,g)=>g) : heatClusters.map(r=>r.gidx);
-  let html=`<div style="margin:4px 0 2px"><b style="font-size:13px">Cluster enrichment</b> <select id="heatenrbg" title="Background of the hypergeometric test"><option value="all"${allBg?" selected":""}>against all filtered genes</option><option value="clustered"${allBg?"":" selected"}>against the clustered genes</option></select> <span class="footer-note">hypergeometric, genes annotated in ${esc(GMTname)}; ${allBg? `which sets each cluster is enriched for among the ${nG.toLocaleString()} filtered genes` : `which sets distinguish each cluster from the other clustered genes`}; BH-FDR within cluster</span> <button class="act ghost" id="heatenrexport" style="font-size:11px;padding:2px 8px">CSV</button></div>`;
+  let html=`<div style="margin:4px 0 2px"><b style="font-size:13px">Cluster enrichment</b> <select id="heatenrbg" title="Background of the hypergeometric test"><option value="all"${allBg?" selected":""}>against all filtered genes</option><option value="clustered"${allBg?"":" selected"}>against the clustered genes</option></select> <span class="footer-note">hypergeometric, genes annotated in ${esc(GMTname)}; ${allBg? `which sets each cluster is enriched for among the ${oraUniverse().size.toLocaleString()} filtered genes annotated in the library (as in the Enrichment tab)` : `which sets distinguish each cluster from the other clustered genes`}; BH-FDR within cluster</span> <button class="act ghost" id="heatenrexport" style="font-size:11px;padding:2px 8px">CSV</button></div>`;
   for(const cname of Object.keys(byC)){
     const frac=byC[cname].length/nClu;
     if(!allBg&&frac>=0.9){ html+=`<div style="margin:2px 0"><b>${cname}</b> (${byC[cname].length} genes): <span class="warnchip">this cluster holds ${Math.round(100*frac)}% of the clustered genes, so against the clustered genes no set can be enriched in it; choose "against all filtered genes", or another k</span></div>`; byC[cname+"__shown"]=[]; continue; }
@@ -5977,7 +6147,7 @@ function renderHeatEnrichment(){
   }));
   const eb2=div.querySelector("#heatenrexport");
   if(eb2) eb2.addEventListener("click",()=>{
-    const rows=["# background: "+(HEATENRBG==="clustered"? "the "+heatClusters.length+" clustered genes" : "all "+nG+" filtered genes")+"; library: "+GMTname, "cluster,gene_set,set_size,overlap,enrichment_ratio,p,FDR,overlap_genes"];
+    const rows=["# background: "+(HEATENRBG==="clustered"? "the "+heatClusters.length+" clustered genes (those annotated in the library)" : "the "+oraUniverse().size+" filtered genes annotated in the library")+"; library: "+GMTname, "cluster,gene_set,set_size,overlap,enrichment_ratio,p,FDR,overlap_genes"];
     heatEnr.forEach(r=>rows.push([r.cluster, r.name, r.m, r.k, r.ratio, r.p, r.q, r.ovIdx.map(g=>GENES[g]).join(";")].map(csvq).join(",")));
     downloadCSV(rows.join("\n"), "heatmap_cluster_enrichment.csv");
   });
@@ -6529,11 +6699,12 @@ function setDsFactor(d, f){
   if(!d.factors||!d.factors[f]) return;
   // regrouping changes filterByExpr's group sizes, so filter, TMM and log-CPM are recomputed from the original files
   if(d.srcText){
-    const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:(d.covSel||[]).filter(x=>x!==f), dupOf:d.dupOf};
+    const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:(d.covSel||[]).filter(x=>x!==f), dupOf:d.dupOf, svc:d.svc};
     let nd; try{ nd=analyzeDatasetB(d.srcText, d.srcDesign, d.label, f, d.species); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+'</span>'; return; }
     nd.srcText=d.srcText; nd.srcDesign=d.srcDesign;
     for(const k of Object.keys(d)) delete d[k];
     Object.assign(d, nd, keep); d.resKey="";
+    if(d.svc&&d.svc.design){ const o=firstAppearance(d.groups); setDsGroupOrder(d, o); }
     if(!d.gi[d.selA]) d.selA=null; if(!d.gi[d.selB]) d.selB=null;
     return;
   }
@@ -6698,7 +6869,7 @@ function refreshCmpUI(){
 }
 function onAddDataset(){
   if(!CMPB_TXT) return;
-
+  let svcB=null; try{ svcB=prepCmpService(); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+"</span>"; CMPB_TXT=null; CMPB_DES=null; CMPB_SHEETS=[]; return; }
   let d;
   try{ d=analyzeDatasetB(CMPB_TXT, CMPB_DES, uniqueDsLabel(defaultDsLabel(CMPB_NAME||("dataset "+(DSETS.length+1))), -1)); }
   catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+"</span>"; return; }
@@ -6718,7 +6889,8 @@ function onAddDataset(){
   DSETS.push(d);
   el("cmpinfo").innerHTML=esc(`${d.label}: ${d.nG.toLocaleString()} genes × ${d.nS} samples; groups ${Object.keys(d.gi).map(g=>g+"(n="+d.gi[g].length+")").join(", ")}. ${d.matched.toLocaleString()} of ${nG.toLocaleString()} session genes matched by symbol.`)
     + (d.dupOf? `<div class="alertbox"><span class="alerthead">\u26a0 Same data loaded twice</span>${d.dupN&&d.dupN<d.nS? `${d.dupN} of the ${d.nS} samples` : `All ${d.nS} samples`} of ${esc(d.label)} are also in ${esc(d.dupOf==="session"? (/session/i.test(dsLabel(0))? dsLabel(0) : dsLabel(0)+" (the session data)") : d.dupOf.label)}. See the dataset list below.</div>` : "");
-  CMPB_TXT=null; CMPB_DES=null; CMPB_NAME=null;
+  if(svcB){ serviceDatasetSetup(d, svcB); el("cmpinfo").innerHTML+=serviceDatasetNote(d); }
+  CMPB_TXT=null; CMPB_DES=null; CMPB_NAME=null; CMPB_RAW=null;
   refreshCmpUI();
 }
 let CMPB_NAME=null;
@@ -6728,12 +6900,49 @@ el("fcustmap").addEventListener("change",e=>{
   rd.onload=()=>{ try{ parseCustMap(String(rd.result), f.name); }catch(err){ el("custmapinfo").textContent=String(err); CUSTMAP=null; } };
   rd.readAsText(f);
 });
+// a service delivery for a comparison dataset: the matrix with its summary tables, selected together, or the
+// summary table added afterwards with "Design for last added"
+let CMPB_SHEETS=[], CMPB_RAW=null;
+function prepCmpService(){
+  if(!serviceAllowed()||!CMPB_TXT) return null;
+  const sheets=CMPB_SHEETS.slice(); CMPB_SHEETS=[];
+  if(CMPB_DES){ const sh=parseServiceSheet(CMPB_DES); if(sh){ sheets.push(sh); CMPB_DES=null; } }
+  const head=splitFields(CMPB_TXT.slice(0, CMPB_TXT.indexOf("\n")), sniffDelim(CMPB_TXT.slice(0, CMPB_TXT.indexOf("\n")))).map(x=>x.trim());
+  if(!sheets.length && !pairedValueColumns(head.filter(h=>VALCOL_RE.test(h)))) return null;
+  const B=serviceBundle(CMPB_TXT, sheets, serviceName([CMPB_NAME].concat(sheets.map(x=>x.fname||""))));
+  CMPB_RAW=CMPB_TXT; CMPB_TXT=B.matrixText;
+  if(!CMPB_DES) CMPB_DES= B.designText || ("sample\tgroup\n"+parseMatrixText(B.matrixText).sampleNames.map(n=>n+"\t"+(String(n).replace(/[_\-. ]*\d+$/,"")||"samples")).join("\n")+"\n");
+  B.sheets=sheets; return B;
+}
+function serviceDatasetSetup(d, B){
+  d.svc={service:B.service, notes:B.notes, warn:B.warn, qc:B.qc, raw:CMPB_RAW, sheets:B.sheets, design:!!B.design};
+  if(B.design){ const o=firstAppearance(d.groups); setDsGroupOrder(d, o); d.selA=o[0]; d.selB=o[1]||o[0]; d.resKey=""; }
+}
+function serviceDatasetNote(d){
+  if(!d.svc) return "";
+  return `<div class="svcbox"><b>${esc(d.svc.service||"Sequencing service")} delivery (${esc(d.label)}).</b> ${d.svc.notes.join(" ")}${d.svc.design? " Groups were built from the sample labels and ordered by sample number; check them in the dataset's group editor." : ""}${d.svc.warn.length? `<div class="warnchip" style="display:block;margin-top:4px">${d.svc.warn.join(" ")}</div>` : ""}${serviceQCTable(d.svc.qc)}${serviceQCFlags(d.svc.qc).map(f=>`<div class="warnchip" style="display:block;margin-top:4px">${f}</div>`).join("")}</div>`;
+}
+// summary table for the dataset added last: the dataset is re-read with it
+function applySheetToLastDataset(sheet){
+  const d=DSETS[DSETS.length-1]; const raw=(d.svc&&d.svc.raw)||d.srcText;
+  const sheets=((d.svc&&d.svc.sheets)||[]).concat([sheet]);
+  const B=serviceBundle(raw, sheets, serviceName([d.label, sheet.fname||""])); B.sheets=sheets;
+  const nd=analyzeDatasetB(B.matrixText, B.designText, d.label, null, d.species);
+  nd.srcText=B.matrixText; nd.srcDesign=B.designText;
+  const keep={label:d.label, dupOf:d.dupOf, dupN:d.dupN};
+  for(const k of Object.keys(d)) delete d[k]; Object.assign(d, nd, keep);
+  CMPB_RAW=raw; serviceDatasetSetup(d, B);
+  refreshCmpUI(); el("cmpinfo").innerHTML=serviceDatasetNote(d);
+}
 function hookCmpFile(inputId, isDesign){
   el(inputId).addEventListener("change",e=>{
-    const f=e.target.files[0]; if(!f) return;
-    const rd=new FileReader();
-    rd.onload=()=>{ const t=String(rd.result).replace(/\r\n?/g,"\n");
+    const fl=[...e.target.files]; if(!fl.length) return;
+    Promise.all(fl.map(f=>new Promise(res=>{ const rd=new FileReader(); rd.onload=()=>res({text:String(rd.result).replace(/\r\n?/g,"\n"), name:f.name}); rd.readAsText(f); }))).then(list=>{
       if(isDesign){
+        const t=list[0].text, sh=serviceAllowed()? parseServiceSheet(t) : null;
+        if(sh) sh.fname=list[0].name;
+        if(sh && !CMPB_TXT && DSETS.length){ try{ applySheetToLastDataset(sh); }catch(e2){ el("cmpinfo").innerHTML='<span class="warnchip">'+e2+"</span>"; } return; }
+        if(sh){ CMPB_SHEETS.push(sh); el("cmpinfo").textContent=`Summary table ${list[0].name} will be used with the next matrix added.`; return; }
         CMPB_DES=t;
         // applies to the LAST added dataset when one exists and matrix is not pending
         if(!CMPB_TXT && DSETS.length){
@@ -6747,8 +6956,13 @@ function hookCmpFile(inputId, isDesign){
           }catch(e2){ el("cmpinfo").innerHTML='<span class="warnchip">'+e2+"</span>"; }
           CMPB_DES=null;
         }
-      } else { CMPB_TXT=t; CMPB_NAME=f.name.replace(/\.[^.]+$/,""); onAddDataset(); } };
-    rd.readAsText(f);
+      } else {
+        const sheets=serviceAllowed()? list.map(x=>{ const sh=parseServiceSheet(x.text); if(sh) sh.fname=x.name; return sh; }) : list.map(()=>null);
+        const mats=list.filter((x,i)=>!sheets[i]);
+        if(mats.length!==1){ el("cmpinfo").innerHTML=`<span class="warnchip">${mats.length? `${mats.length} of the files are not summary tables (${mats.map(x=>esc(x.name)).join(", ")}); add one expression matrix at a time.` : "Add the expression matrix as well: the summary tables only describe the samples."}</span>`; return; }
+        CMPB_SHEETS=CMPB_SHEETS.concat(sheets.filter(Boolean));
+        CMPB_TXT=mats[0].text; CMPB_NAME=mats[0].name.replace(/\.[^.]+$/,""); onAddDataset();
+      } });
   });
 }
 hookCmpFile("fmatB", false); hookCmpFile("fdesB", true);
@@ -9019,6 +9233,7 @@ function drawDendro(){
 }
 function qcFlags(){
   const flags=[];
+  if(SERVICEQC&&typeof S!=="undefined"){ const inc=new Set(S.filter((s,i)=>included[i]).map(s=>s.id)); serviceQCFlags(SERVICEQC.filter(x=>inc.has(x.name))).forEach(f=>flags.push(f)); }
   const idx=S.map((s,i)=>i).filter(i=>included[i]);
   // depth
   const libs=idx.map(j=>S[j].libsize);
