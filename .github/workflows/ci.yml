@@ -41,7 +41,7 @@ jobs:
 
   engine:
     # Test engine on public GEO data (tests/engine/README.md). Uses the JavaScriptCore shell built into macOS.
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
