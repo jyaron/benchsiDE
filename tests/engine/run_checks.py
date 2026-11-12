@@ -934,6 +934,16 @@ def service_delivery():
   const nl={names:pending.matrix.sampleNames.slice(0,2), groups:[...new Set(pending.groups)], qc:!!SERVICEQC&&SERVICEQC.length};
   onDesignLoaded("sample\tgroup\n"+Array.from({length:12},(_,i)=>"sample_"+(i+1)+"\t"+(i<6?"P":"Q")).join("\n")+"\n", "d.tsv"); nl.after=[...new Set(pending.groups)];
   R.nolabel=nl;
+  // sample number at the end of the row name, and labels that name individual samples
+  const TRAIL=H+"\n"+RW.map(r=>{ const f=r.split(","), n=f[0].split("_")[0]; return "animal"+n+"_"+n+","+f.slice(1).join(","); }).join("\n")+"\n";
+  onServiceFiles([{text:MTX, name:"m.tsv"},{text:TRAIL, name:"RUNX-mapping-stats-reads.csv"}]);
+  const tl={how:readServiceSheet(TRAIL).numbering, names:pending.matrix.sampleNames.slice(0,3), groups:[...new Set(pending.groups)], warn:pending.service.warn.length};
+  onDesignLoaded("sample\tgroup\n"+Array.from({length:12},(_,i)=>"animal"+(i+1)+"\t"+(i<6?"P":"Q")).join("\n")+"\n", "d.tsv"); tl.byLabel=[...new Set(pending.groups)];
+  // no sample number in the row names: rows in order (shuffled table would be wrong, so the note says to check)
+  const ROWS=H+"\n"+RW.map(r=>{ const f=r.split(","), n=f[0].split("_")[0]; return "animal"+String.fromCharCode(64+(+n))+","+f.slice(1).join(","); }).join("\n")+"\n";
+  onServiceFiles([{text:MTX, name:"m.tsv"},{text:ROWS, name:"RUNX-mapping-stats-reads.csv"}]);
+  tl.rows={how:readServiceSheet(ROWS).numbering, first:pending.matrix.sampleNames[0], last:pending.matrix.sampleNames[11], note:pending.service.notes.some(x=>/taken in order/.test(x))};
+  R.trail=tl;
   el("svcsel").value="none"; let err=null; try{ onMatrixLoaded(MTX, "m.tsv"); onDesignLoaded(MAP, "map.csv"); }catch(e){ err=String(e); } R.off={err:!!err, svc:!!(pending&&pending.service)}; el("svcsel").value="auto";
   print("R " + JSON.stringify(R));
 """, timeout=1200)
@@ -949,7 +959,9 @@ def service_delivery():
           and r["designZone"] == ["RUNX_1", "1_A-X", 4] and r["cmp"]["gorder"] == order and r["cmp"]["n"] == 12
           and r["cmpLater"]["before"] == ["RUNX"] and r["cmpLater"]["after"] == order and r["off"]["svc"] is False
           and all(v == "12 1_A-X 15000000" for v in r["variants"].values())
-          and r["nolabel"] == {"names": ["RUNX_1", "RUNX_2"], "groups": ["RUNX"], "qc": 12, "after": ["P", "Q"]})
+          and r["nolabel"] == {"names": ["RUNX_1", "RUNX_2"], "groups": ["RUNX"], "qc": 12, "after": ["P", "Q"]}
+          and r["trail"] == {"how": "end", "names": ["animal1_1", "animal2_2", "animal3_3"], "groups": ["samples"], "warn": 1, "byLabel": ["P", "Q"],
+                             "rows": {"how": "rows", "first": "animalA", "last": "animalL", "note": True}})
     r.pop("lib"); r["lib_matches_count_columns"] = libok
     return ok, r
 

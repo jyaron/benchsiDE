@@ -2458,12 +2458,17 @@ function readServiceSheet(text){
   const delim=sniffDelim(lines[0]); const grid=lines.map(l=>splitFields(l, delim).map(x=>x.trim().replace(/^"(.*)"$/,"$1")));
   const fromRows=(g)=>{ // rows are samples
     const hdr=g[0]; if(hdr.length<2) return {why:"it has only one column"};
-    const ent=[];
-    for(const r of g.slice(1)){ if(/^(total|sum|mean|average|median|all samples)$/i.test(String(r[0]||"").trim())) continue; const m=svcSampleName(r[0]); if(!m) return {why:`the row name "${r[0]}" does not start with a sample number`};
-      const v=r.slice(1).map(svcNum); if(!v.length||v.some(x=>x===null)||v.every(x=>Number.isNaN(x))) return {why:`the row ${r[0]} has non-numeric values`};
-      ent.push({num:+m[1], label:m[2], name:String(r[0]).trim(), vals:v}); }
-    const dup=ent.map(e=>e.num).filter((x,i,a)=>a.indexOf(x)!==i); if(dup.length) return {why:`sample number ${dup[0]} occurs twice`};
-    return {cols:hdr.slice(1), entries:ent}; };
+    const body=g.slice(1).filter(r=>!/^(total|sum|mean|average|median|all samples)$/i.test(String(r[0]||"").trim()));
+    if(!body.length) return {why:"it has no sample rows"};
+    for(const r of body){ const v=r.slice(1).map(svcNum); if(!v.length||v.some(x=>x===null)||v.every(x=>Number.isNaN(x))) return {why:`the row ${r[0]} has non-numeric values`}; }
+    // the sample number is read from the start of the row name (1_WT, S1_WT, sample_1), else from its end (WT_1,
+    // M1_3), else the rows are taken in order as samples 1, 2, 3, ...
+    const names=body.map(r=>String(r[0]).trim()), distinct=a=>a.every(Boolean)&&new Set(a.map(x=>x[1])).size===a.length;
+    const lead=names.map(svcSampleName), trail=names.map(n=>{ const m=n.match(/^(.+?)[_\-. ]+(\d+)$/); return m? [n, m[2], m[1].trim()] : null; });
+    let how="start", P=lead;
+    if(!distinct(lead)){ if(distinct(trail)){ how="end"; P=trail; } else { how="rows"; P=names.map((n,i)=>[n, String(i+1), n]); } }
+    const ent=body.map((r,i)=>({num:+P[i][1], label:P[i][2], name:names[i], vals:r.slice(1).map(svcNum)}));
+    return {cols:hdr.slice(1), entries:ent, numbering:how}; };
   let r=fromRows(grid);
   if(r.why){ // transposed: samples as columns
     const w=Math.max(...grid.map(x=>x.length)), T=[];
@@ -2471,13 +2476,19 @@ function readServiceSheet(text){
     const r2= T[0]&&T.slice(1).every(x=>svcSampleName(x[0]))? fromRows(T) : null;
     if(r2&&!r2.why) r=r2;
   }
+  if(!r.why&&r.numbering==="rows"){ // the transposed reading may carry sample numbers where the rows did not
+    const w=Math.max(...grid.map(x=>x.length)), T=[];
+    for(let c=0;c<w;c++) T.push(grid.map(x=>x[c]===undefined? "" : x[c]));
+    const r2= T.slice(1).every(x=>svcSampleName(x[0]))? fromRows(T) : null;
+    if(r2&&!r2.why&&r2.numbering!=="rows") r=r2;
+  }
   if(r.why) return r;
   // only the service's metric tables are recognised (mapped reads, or genes per biotype), so that a design file
   // with numeric columns, or a small expression matrix, is never taken for one
   if(r.cols.length>60) return {why:"it has more columns than a per-sample summary table"};
   const kind= r.cols.some(h=>/uniquely|unique.*mapped|mapped.*unique/i.test(h))? "mapping" : r.cols.some(h=>/protein[_ ]coding/i.test(h))? "biotype" : null;
   if(!kind) return {why:"its columns are not mapping statistics (uniquely mapped, multi-mapped, unmapped reads) or gene-biotype counts (protein_coding, ...)"};
-  return {kind, cols:r.cols, entries:r.entries};
+  return {kind, cols:r.cols, entries:r.entries, numbering:r.numbering};
 }
 function parseServiceSheet(text){ const r=readServiceSheet(text); return r.why? null : r; }
 function serviceSheetWhy(text){ const r=readServiceSheet(text); return r.why||""; }
@@ -2505,13 +2516,19 @@ function serviceDesign(names, labels){
   const st=labels.map(signTokens), agentSet=new Set(); st.forEach(x=>Object.keys(x.agents).forEach(a=>agentSet.add(a)));
   const agents=[...agentSet].filter(a=>st.every(x=>x.agents[a]!==undefined) && new Set(st.map(x=>x.agents[a])).size===2);
   // labels that carry a replicate number (WT-1, WT-2, ...) are all distinct: they are grouped as sample names are
-  const cond= new Set(labels).size===labels.length? inferGroups(labels) : labels;
+  let cond= new Set(labels).size===labels.length? inferGroups(labels) : labels;
+  // labels that name individual samples (animal or donor IDs) do not define groups: when most samples would be
+  // alone in their group, all samples are put in one group and the groups are left to the user or a design file
+  const cnt={}; cond.forEach(c=>cnt[c]=(cnt[c]||0)+1); const single=cond.filter(c=>cnt[c]===1).length;
+  const perSample= single>cond.length/2;
+  if(perSample) cond=cond.map(()=>"samples");
   const cols=[["Condition", cond]], order={Condition:[...new Set(cond)]};
   agents.forEach(a=>{ const v=st.map(x=>a+(x.agents[a]==="+"? "+" : "-")); cols.push([a, v]); order[a]=[a+"-", a+"+"]; });
   if(agents.length){ const rest=st.map(x=>{ let r=x.rest; return r||"none"; });
     if(new Set(rest).size>=2){ const nm="Label without "+agents.join(", "); cols.push([nm, rest]); order[nm]=[...new Set(rest)]; } }
+  if(perSample) cols.push(["Label", labels]);
   const txt=["sample\t"+cols.map(c=>c[0]).join("\t")].concat(names.map((n,q)=>n+"\t"+cols.map(c=>c[1][q]).join("\t"))).join("\n")+"\n";
-  return {text:txt, factors:cols.map(c=>c[0]), order, agents};
+  return {text:txt, factors:cols.map(c=>c[0]), order, agents, perSample};
 }
 // Rewrites a delivered matrix with its summary tables: count columns only, named "<number>_<label>", ordered by
 // sample number; returns the new matrix text, the design text and the notes and per-sample QC for the report.
@@ -2535,6 +2552,8 @@ function serviceBundle(matrixText, sheetTexts, service){
     if(labels.every(x=>x==="")){ labels=null; names=order.map(q=>stems[q]);
       notes.push(`${sheets.map(s=>s.kind==="mapping"? "The mapping-statistics table" : s.kind==="biotype"? "The gene-biotype summary table" : "The summary table").join(" and ")} number${sheets.length>1?"":"s"} the samples (${esc(ref.entries[0].name)}, …) but give${sheets.length>1?"":"s"} no labels, so the samples keep their matrix names, in sample-number order (${esc(names[0])} is ${esc(lab[nums[order[0]]].name)}). Enter the groups below or load a design file.`); }
     else { names=order.map(q=>lab[nums[q]].name); labels=labels.map((x,k)=>x||"unlabelled"); }
+    if(ref.numbering==="end") notes.push(`The summary table gives the sample number at the end of each row name (${esc(ref.entries[0].name)} is sample ${ref.entries[0].num}).`);
+    if(ref.numbering==="rows") notes.push(`The row names of the summary table carry no sample number (${esc(ref.entries[0].name)}, …), so its rows are taken in order as samples 1 to ${ref.entries.length}. Check that the table lists the samples in the order in which they were numbered.`);
     if(labels) notes.push(`Samples were named and grouped from ${sheets.map(s=>s.kind==="mapping"? "the mapping-statistics table" : s.kind==="biotype"? "the gene-biotype summary table" : "the summary table").join(" and ")}: matrix column ${esc(stems[order[0]])} is sample ${esc(names[0])}, and so on, in sample-number order.`);
   }
   // rewrite: annotation columns, then the kept sample columns in the new order under the new names
@@ -2545,6 +2564,8 @@ function serviceBundle(matrixText, sheetTexts, service){
   for(let i=1;i<lines.length;i++){ if(!lines[i].trim()) continue; const r=splitFields(lines[i], mx.delim); out.push(keepCols.map(c=>csvTab(r[c]===undefined? "" : r[c])).join("\t")); }
   if(mx.valuePairs) notes.unshift(`The matrix has ${mx.valuePairs.dropped.length+1} columns per sample (${[mx.valuePairs.keep].concat(mx.valuePairs.dropped).join(", ")}); the ${mx.valuePairs.keep} columns are used and the ${mx.valuePairs.dropped.join(", ")} columns are ignored.`);
   const design= labels? serviceDesign(names, labels) : null;
+  if(design&&design.perSample) for(let i=0;i<notes.length;i++) notes[i]=notes[i].replace("Samples were named and grouped from", "Samples were named from");
+  if(design&&design.perSample) warn.push(`The labels in the summary table name individual samples (${esc(labels[0])}, ${esc(labels[1])}, …) rather than groups, so the samples are named from them but placed in one group. Enter the groups below or load a design file.`);
   // per-sample QC from the summary tables
   const qc=names.map(n=>({name:n}));
   sheets.forEach(sh=>{ const byNum={}; sh.entries.forEach(e=>{ byNum[e.num]=e; });
@@ -2555,6 +2576,7 @@ function serviceBundle(matrixText, sheetTexts, service){
   if(!sheets.length) warn.push(`No summary table names the samples, so they are listed as ${esc(names[0])} to ${esc(names[names.length-1])} in one group. Add the service's mapping-statistics or gene-biotype table (or a design file), or enter the groups below.`);
   // a design file may name the samples as the matrix does (RUN_1) or as the summary table does (sample_1, 1_label)
   const alias={}; order.forEach((q,k)=>{ alias[stems[q]]=names[k]; if(sheets.length){ const e=sheets[0].entries.find(x=>x.num===nums[q]); if(e) alias[e.name]=names[k]; } });
+  if(labels) labels.forEach((l,k)=>{ if(l&&labels.indexOf(l)===labels.lastIndexOf(l)&&alias[l]===undefined) alias[l]=names[k]; });
   return {alias, pairs:mx.valuePairs, matrixText:out.join("\n")+"\n", designText:design? design.text : null, order:design? design.order : null, design, notes, warn, qc:sheets.length? qc : null, service:service||null};
 }
 function csvTab(v){ return String(v).replace(/[\t\n\r]/g," "); }
