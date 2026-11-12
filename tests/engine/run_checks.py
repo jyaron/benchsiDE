@@ -925,6 +925,15 @@ def service_delivery():
   let d=DSETS[DSETS.length-1]; R.cmp={gorder:d.gorder, n:d.nS, svc:!!d.svc};
   CMPB_TXT=MTX; CMPB_NAME="cmp2"; onAddDataset(); __drain(); d=DSETS[DSETS.length-1]; const g0=Object.keys(d.gi);
   applySheetToLastDataset(Object.assign(parseServiceSheet(MAP),{fname:"m.csv"})); d=DSETS[DSETS.length-1]; R.cmpLater={before:g0, after:d.gorder};
+  const ML=MAP.trim().split("\n"), H=ML[0], RW=ML.slice(1);
+  const VAR={bom:"\ufeff"+MAP.replace(/\n/g,"\r\n"), named:"Sample"+MAP, quoted:H+"\n"+RW.map(r=>{ const f=r.split(","); return f[0]+","+f.slice(1).map(x=>'"'+Number(x).toLocaleString("en-US")+'"').join(","); }).join("\n"),
+    tab:MAP.replace(/,/g,"\t"), transposed:","+RW.map(r=>r.split(",")[0]).join(",")+"\n"+H.split(",").slice(1).map((h,i)=>h+","+RW.map(r=>r.split(",")[i+1]).join(",")).join("\n"), total:MAP+"Total,1,2,3\n"};
+  R.variants=Object.fromEntries(Object.entries(VAR).map(([k,t])=>{ const x=readServiceSheet(t); return [k, x.why? x.why : x.entries.length+" "+x.entries[0].name+" "+x.entries[0].vals[0]]; }));
+  const NOLAB=H+"\n"+RW.map(r=>"sample_"+r.split(",")[0].split("_")[0]+","+r.split(",").slice(1).join(",")).join("\n")+"\n";
+  onServiceFiles([{text:MTX, name:"m.tsv"},{text:NOLAB, name:"RUNX-mapping-stats-reads.csv"}]);
+  const nl={names:pending.matrix.sampleNames.slice(0,2), groups:[...new Set(pending.groups)], qc:!!SERVICEQC&&SERVICEQC.length};
+  onDesignLoaded("sample\tgroup\n"+Array.from({length:12},(_,i)=>"sample_"+(i+1)+"\t"+(i<6?"P":"Q")).join("\n")+"\n", "d.tsv"); nl.after=[...new Set(pending.groups)];
+  R.nolabel=nl;
   el("svcsel").value="none"; let err=null; try{ onMatrixLoaded(MTX, "m.tsv"); onDesignLoaded(MAP, "map.csv"); }catch(e){ err=String(e); } R.off={err:!!err, svc:!!(pending&&pending.service)}; el("svcsel").value="auto";
   print("R " + JSON.stringify(R));
 """, timeout=1200)
@@ -938,7 +947,9 @@ def service_delivery():
           and libok and r["note"] and r["qc"] == 1 and r["sameIds"] and r["deDiff"] < 1e-12
           and r["mapOnly"]["g"] == order and r["bioOnly"]["g"] == order and r["none"]["g"] == ["RUNX"] and r["none"]["first"] == "RUNX_1" and r["none"]["warn"] == 1
           and r["designZone"] == ["RUNX_1", "1_A-X", 4] and r["cmp"]["gorder"] == order and r["cmp"]["n"] == 12
-          and r["cmpLater"]["before"] == ["RUNX"] and r["cmpLater"]["after"] == order and r["off"]["svc"] is False)
+          and r["cmpLater"]["before"] == ["RUNX"] and r["cmpLater"]["after"] == order and r["off"]["svc"] is False
+          and all(v == "12 1_A-X 15000000" for v in r["variants"].values())
+          and r["nolabel"] == {"names": ["RUNX_1", "RUNX_2"], "groups": ["RUNX"], "qc": 12, "after": ["P", "Q"]})
     r.pop("lib"); r["lib_matches_count_columns"] = libok
     return ok, r
 

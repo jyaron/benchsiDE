@@ -102,6 +102,8 @@ A Plasmidsaurus RNA-seq delivery has three files: the expression matrix (`<run>-
 2. benchsiDE uses the count columns and ignores the CPM columns, names the samples by their labels, orders them by sample number, and builds a design from the labels. Labels such as `WT-Dox`, `WT+Dox`, `Dox-`, `Dox+` are also read as the absence or presence of an agent (here Dox), so you can group by the agent, by the rest of the label, or by both.
 3. Check the groups in card 3 before clicking **Analyze →**. The mapping statistics are listed per sample under **Sequencing service report**, and a sample with an unusually low fraction of uniquely mapped reads is flagged in the QC flags.
 
+If the samples were submitted without names, the tables list them as `sample_1`, `sample_2`, …; the samples then keep their matrix names (`<run>_1`, …), the mapping statistics are still reported, and you enter the groups or load a design file, which may use either name.
+
 Which files are needed: the matrix is required. One summary table is enough to name and group the samples; the mapping statistics add the per-sample mapping QC. With the matrix alone the samples load as `<run>_1`, `<run>_2`, … in one group; add a design file or enter the groups in card 3. The **Sequencing service** menu above card 1 recognises such files automatically; choose **none** if a matrix of your own happens to look like one.
 
 The same files can be added as a comparison dataset in the Compare tab: select the matrix and a summary table together under **Add dataset (matrix)**, or add the table afterwards with **Design for last added**.

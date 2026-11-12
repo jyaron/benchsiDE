@@ -2443,20 +2443,50 @@ function pairedValueColumns(names){
   const keep=types.slice().sort((a,b)=>(VALCOL_PREF.indexOf(a)<0?99:VALCOL_PREF.indexOf(a))-(VALCOL_PREF.indexOf(b)<0?99:VALCOL_PREF.indexOf(b)))[0];
   return {keep, dropped:types.filter(t=>t!==keep), keepIdx:by[keep], stems:by[keep].map(q=>String(names[q]).trim().match(VALCOL_RE)[1]), n:by[keep].length};
 }
-// a service summary table: first column "<number>_<label>", all other columns numeric
-function parseServiceSheet(text){
-  const lines=String(text).replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim());
-  if(lines.length<2) return null;
-  const delim=sniffDelim(lines[0]); const hdr=splitFields(lines[0], delim).map(x=>x.trim());
-  if(hdr.length<2 || !(hdr[0]===""||/^(samples?|sample[ _]?(id|name)s?|name|id)$/i.test(hdr[0]))) return null;
-  const ent=[];
-  for(const l of lines.slice(1)){ const r=splitFields(l, delim).map(x=>x.trim());
-    const m=String(r[0]||"").match(/^(\d+)[_\-. ]+(.+)$/); if(!m) return null;
-    const v=r.slice(1); if(!v.length||!v.every(x=>x!==""&&isFinite(Number(x)))) return null;
-    ent.push({num:+m[1], label:m[2].trim(), name:r[0], vals:v.map(Number)}); }
-  if(new Set(ent.map(e=>e.num)).size!==ent.length) return null;
-  const kind= hdr.some(h=>/uniquely mapped/i.test(h))? "mapping" : hdr.some(h=>/protein[_ ]coding/i.test(h))? "biotype" : "summary";
-  return {kind, cols:hdr.slice(1), entries:ent};
+// a service summary table: one row (or, transposed, one column) per sample named "<number>_<label>" (also
+// "S1_label", "Sample 1 - label"), the other cells numeric (thousands separators and % signs allowed); a byte-order
+// mark, quoted fields and Windows line ends are accepted. serviceSheetWhy(text) gives the reason a table is not read.
+const SVC_SAMPLE_RE=/^(?:s(?:ample)?[ _\-.]?)?(\d+)\s*[_\-. ]+\s*(.+)$/i;
+// a sample number without a label (sample_1, S1, 1): submitted without names
+const SVC_NUM_ONLY_RE=/^s(?:ample)?[ _\-.]?(\d+)$/i;
+function svcSampleName(x){ const t=String(x||"").trim(); let m=t.match(SVC_NUM_ONLY_RE); if(m) return [t, m[1], ""]; m=t.match(SVC_SAMPLE_RE); return m? [t, m[1], m[2].trim()] : null; }
+function svcNum(x){ const t=String(x).trim().replace(/^"|"$/g,"").replace(/[,\s%]/g,""); if(t===""||/^(na|nan|null|-)$/i.test(t)) return NaN; return isFinite(Number(t))? Number(t) : null; }
+function readServiceSheet(text){
+  const lines=String(text).replace(/^\ufeff/,"").replace(/\r\n?/g,"\n").split("\n").filter(l=>l.trim());
+  if(lines.length<2) return {why:"it has fewer than two lines"};
+  if(lines.length>2001) return {why:"it has more rows than a per-sample summary table"};
+  const delim=sniffDelim(lines[0]); const grid=lines.map(l=>splitFields(l, delim).map(x=>x.trim().replace(/^"(.*)"$/,"$1")));
+  const fromRows=(g)=>{ // rows are samples
+    const hdr=g[0]; if(hdr.length<2) return {why:"it has only one column"};
+    const ent=[];
+    for(const r of g.slice(1)){ if(/^(total|sum|mean|average|median|all samples)$/i.test(String(r[0]||"").trim())) continue; const m=svcSampleName(r[0]); if(!m) return {why:`the row name "${r[0]}" does not start with a sample number`};
+      const v=r.slice(1).map(svcNum); if(!v.length||v.some(x=>x===null)||v.every(x=>Number.isNaN(x))) return {why:`the row ${r[0]} has non-numeric values`};
+      ent.push({num:+m[1], label:m[2], name:String(r[0]).trim(), vals:v}); }
+    const dup=ent.map(e=>e.num).filter((x,i,a)=>a.indexOf(x)!==i); if(dup.length) return {why:`sample number ${dup[0]} occurs twice`};
+    return {cols:hdr.slice(1), entries:ent}; };
+  let r=fromRows(grid);
+  if(r.why){ // transposed: samples as columns
+    const w=Math.max(...grid.map(x=>x.length)), T=[];
+    for(let c=0;c<w;c++) T.push(grid.map(x=>x[c]===undefined? "" : x[c]));
+    const r2= T[0]&&T.slice(1).every(x=>svcSampleName(x[0]))? fromRows(T) : null;
+    if(r2&&!r2.why) r=r2;
+  }
+  if(r.why) return r;
+  // only the service's metric tables are recognised (mapped reads, or genes per biotype), so that a design file
+  // with numeric columns, or a small expression matrix, is never taken for one
+  if(r.cols.length>60) return {why:"it has more columns than a per-sample summary table"};
+  const kind= r.cols.some(h=>/uniquely|unique.*mapped|mapped.*unique/i.test(h))? "mapping" : r.cols.some(h=>/protein[_ ]coding/i.test(h))? "biotype" : null;
+  if(!kind) return {why:"its columns are not mapping statistics (uniquely mapped, multi-mapped, unmapped reads) or gene-biotype counts (protein_coding, ...)"};
+  return {kind, cols:r.cols, entries:r.entries};
+}
+function parseServiceSheet(text){ const r=readServiceSheet(text); return r.why? null : r; }
+function serviceSheetWhy(text){ const r=readServiceSheet(text); return r.why||""; }
+// file names of a Plasmidsaurus delivery's summary tables
+const SVC_SHEET_NAME=/mapping[-_ ]?stats|gene[-_ ]?biotype|reads[-_ ]?summary|summary\.csv$/i;
+function notSheetMessage(list){
+  const sus=list.filter(x=>SVC_SHEET_NAME.test(x.name||"")), mats=list.filter(x=>!SVC_SHEET_NAME.test(x.name||""));
+  if(sus.length) return sus.map(x=>`${esc(x.name)} looks like a summary table but could not be read: ${esc(serviceSheetWhy(x.text))}. Its first line is "${esc(String(x.text).replace(/^\ufeff/,"").split(/\r?\n/)[0].slice(0,120))}".`).join(" ")+(mats.length? ` Load ${esc(mats[0].name)} alone, then add a design file or enter the groups.` : "");
+  return `${list.length} of the files are not summary tables (${list.map(x=>esc(x.name)).join(", ")}); drop one expression matrix at a time.`;
 }
 // trailing sample number of a matrix column stem (RUN_12 -> 12)
 // groups in the order of their first sample (the service numbers samples in the order they were submitted)
@@ -2501,8 +2531,11 @@ function serviceBundle(matrixText, sheetTexts, service){
     if(missing.length) throw `The summary table has no row for sample${missing.length>1?"s":""} ${missing.slice(0,8).join(", ")}${missing.length>8?", …":""} of the matrix.`;
     const extra=ref.entries.filter(e=>!nums.includes(e.num)); if(extra.length) warn.push(`The summary table lists ${extra.length} sample${extra.length>1?"s":""} that ${extra.length>1?"are":"is"} not in the matrix (${extra.slice(0,4).map(e=>esc(e.name)).join(", ")}).`);
     order=stems.map((_,q)=>q).sort((a,b)=>nums[a]-nums[b]);
-    names=order.map(q=>lab[nums[q]].name); labels=order.map(q=>lab[nums[q]].label);
-    notes.push(`Samples were named and grouped from ${sheets.map(s=>s.kind==="mapping"? "the mapping-statistics table" : s.kind==="biotype"? "the gene-biotype summary table" : "the summary table").join(" and ")}: matrix column ${esc(stems[order[0]])} is sample ${esc(names[0])}, and so on, in sample-number order.`);
+    labels=order.map(q=>lab[nums[q]].label);
+    if(labels.every(x=>x==="")){ labels=null; names=order.map(q=>stems[q]);
+      notes.push(`${sheets.map(s=>s.kind==="mapping"? "The mapping-statistics table" : s.kind==="biotype"? "The gene-biotype summary table" : "The summary table").join(" and ")} number${sheets.length>1?"":"s"} the samples (${esc(ref.entries[0].name)}, …) but give${sheets.length>1?"":"s"} no labels, so the samples keep their matrix names, in sample-number order (${esc(names[0])} is ${esc(lab[nums[order[0]]].name)}). Enter the groups below or load a design file.`); }
+    else { names=order.map(q=>lab[nums[q]].name); labels=labels.map((x,k)=>x||"unlabelled"); }
+    if(labels) notes.push(`Samples were named and grouped from ${sheets.map(s=>s.kind==="mapping"? "the mapping-statistics table" : s.kind==="biotype"? "the gene-biotype summary table" : "the summary table").join(" and ")}: matrix column ${esc(stems[order[0]])} is sample ${esc(names[0])}, and so on, in sample-number order.`);
   }
   // rewrite: annotation columns, then the kept sample columns in the new order under the new names
   const lines=String(matrixText).replace(/\r\n?/g,"\n").split("\n");
@@ -2520,7 +2553,9 @@ function serviceBundle(matrixText, sheetTexts, service){
         if(isFinite(u)){ qc[k].unique=u; qc[k].multi=mm; qc[k].unmapped=un; qc[k].pctUnique=100*u/((u||0)+(mm||0)+(un||0)); } }
       if(sh.kind==="biotype"){ const j=sh.cols.findIndex(c=>/protein[_ ]coding/i.test(c)); if(j>=0) qc[k].pcGenes=e.vals[j]; } }); });
   if(!sheets.length) warn.push(`No summary table names the samples, so they are listed as ${esc(names[0])} to ${esc(names[names.length-1])} in one group. Add the service's mapping-statistics or gene-biotype table (or a design file), or enter the groups below.`);
-  return {pairs:mx.valuePairs, matrixText:out.join("\n")+"\n", designText:design? design.text : null, order:design? design.order : null, design, notes, warn, qc:sheets.length? qc : null, service:service||null};
+  // a design file may name the samples as the matrix does (RUN_1) or as the summary table does (sample_1, 1_label)
+  const alias={}; order.forEach((q,k)=>{ alias[stems[q]]=names[k]; if(sheets.length){ const e=sheets[0].entries.find(x=>x.num===nums[q]); if(e) alias[e.name]=names[k]; } });
+  return {alias, pairs:mx.valuePairs, matrixText:out.join("\n")+"\n", designText:design? design.text : null, order:design? design.order : null, design, notes, warn, qc:sheets.length? qc : null, service:service||null};
 }
 function csvTab(v){ return String(v).replace(/[\t\n\r]/g," "); }
 // QC flags from the service tables: fraction of reads mapped uniquely far below the other samples
@@ -2552,7 +2587,7 @@ function onServiceFiles(files){
   // files: [{text, name}]; one expression matrix and any number of summary tables
   const sheets=[], mats=[];
   files.forEach(f=>{ const sh=parseServiceSheet(f.text); if(sh) sheets.push(Object.assign(sh,{fname:f.name})); else mats.push(f); });
-  if(mats.length>1) throw `${mats.length} of the files are not summary tables (${mats.map(f=>esc(f.name)).join(", ")}); drop one expression matrix at a time.`;
+  if(mats.length>1) throw notSheetMessage(mats);
   if(mats.length===1){ PENDRAW={text:mats[0].text, name:mats[0].name, sheets:[]}; }
   if(!PENDRAW) throw "Load the expression matrix as well: the summary tables only describe the samples.";
   PENDRAW.sheets=PENDRAW.sheets.concat(sheets);
@@ -2625,6 +2660,8 @@ function onDesignLoaded(text, fname){
   if(!pending){ throw "Load the expression matrix first."; }
   // a service's summary table names the samples: the matrix is re-read with it
   if(fname!==true&&serviceAllowed()&&parseServiceSheet(text)&&PENDRAW){ onServiceFiles([{text, name:typeof fname==="string"? fname : "summary"}]); return; }
+  if(fname!==true&&pending.service&&pending.service.alias){ const A=pending.service.alias;
+    text=String(text).replace(/\r\n?/g,"\n").split("\n").map(l=>{ const d=l.indexOf("\t")>=0? "\t" : ","; return l.split(d).map(c=>{ const t=c.trim().replace(/^"(.*)"$/,"$1"); return A[t]!==undefined&&A[t]!==t? A[t] : c; }).join(d); }).join("\n"); }
   pending.factors=parseDesignText(text,pending.matrix.sampleNames);
   pending.factorNames=Object.keys(pending.factors);
   rebuildCombos();
@@ -6959,7 +6996,7 @@ function hookCmpFile(inputId, isDesign){
       } else {
         const sheets=serviceAllowed()? list.map(x=>{ const sh=parseServiceSheet(x.text); if(sh) sh.fname=x.name; return sh; }) : list.map(()=>null);
         const mats=list.filter((x,i)=>!sheets[i]);
-        if(mats.length!==1){ el("cmpinfo").innerHTML=`<span class="warnchip">${mats.length? `${mats.length} of the files are not summary tables (${mats.map(x=>esc(x.name)).join(", ")}); add one expression matrix at a time.` : "Add the expression matrix as well: the summary tables only describe the samples."}</span>`; return; }
+        if(mats.length!==1){ el("cmpinfo").innerHTML=`<span class="warnchip">${mats.length? notSheetMessage(mats) : "Add the expression matrix as well: the summary tables only describe the samples."}</span>`; return; }
         CMPB_SHEETS=CMPB_SHEETS.concat(sheets.filter(Boolean));
         CMPB_TXT=mats[0].text; CMPB_NAME=mats[0].name.replace(/\.[^.]+$/,""); onAddDataset();
       } });
