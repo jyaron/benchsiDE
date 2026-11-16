@@ -293,6 +293,8 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
         </select>
         <button class="act" id="usebuiltinanno">Use built-in annotation</button>
       </div>
+      <div class="controls"><label><input type="checkbox" id="acceptnames"> Use the gene names in the matrix as given</label></div>
+      <div class="footer-note" style="margin-bottom:6px">For rat, pig and mouse data whose matrix names some genes by human gene symbols that are not symbols of the species (as when a provider names genes by similarity to human proteins). Each such gene is then treated as that human gene for matching to datasets of another species, homology families and the built-in gene-set libraries. The assignment rests on the provider's annotation, not on recorded orthology; the notes and methods text say so. Can be changed after analysis.</div>
       <div class="dropzone" id="dzanno">Drop a gene-annotation file here to convert Ensembl (or other) gene IDs to official symbols.<br>
         <span style="font-size:12px" id="annohint"></span></div>
       <input type="file" id="fanno" style="display:none" accept=".tsv,.csv,.txt,.rpt">
@@ -848,7 +850,8 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
       <div class="controls">
         <label class="act ghost" style="cursor:pointer;font-size:12px">Custom ID map <input type="file" id="fcustmap" style="display:none"></label>
         <span id="custmapinfo" class="footer-note"></span>
-        species of next dataset: <select id="cmpspecies"><option value="same" selected>same as session</option><option value="human">human</option><option value="mouse">mouse</option><option value="rat">rat</option><option value="pig">pig</option></select>
+        <label title="For a matrix that names some genes by human gene symbols that are not symbols of its species (provider annotation by similarity): treat each such gene as that human gene for matching, homology families and signature replication. Not recorded orthology; marked wherever used."><input type="checkbox" id="cmpaccept"> use its gene names as given</label>
+          species of next dataset: <select id="cmpspecies"><option value="same" selected>same as session</option><option value="human">human</option><option value="mouse">mouse</option><option value="rat">rat</option><option value="pig">pig</option></select>
         <label class="act ghost" style="cursor:pointer">Add dataset (matrix) <input type="file" id="fmatB" style="display:none" multiple title="A sequencing-service delivery (for example Plasmidsaurus) can be selected as several files at once: the expression matrix with its mapping-statistics and gene-biotype tables."></label>
         <label class="act ghost" style="cursor:pointer">Design for last added (optional) <input type="file" id="fdesB" style="display:none"></label>
         <span id="cmpinfo" class="footer-note"></span>
@@ -981,7 +984,7 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
    are marked out of date until they are run again, so that no panel shows values from earlier inputs as current. */
 function sampleSig(){
   const v=id=>{ const e=document.getElementById(id); return e? e.value : ""; };
-  return [FACTOR, GROUPS.join("\u0001"), included.map(x=>x?1:0).join(""), v("normsel"), v("fmode"), v("fthr"), v("unitsel"), nG, nS].join("\u0002");
+  return [FACTOR, GROUPS.join("\u0001"), included.map(x=>x?1:0).join(""), v("normsel"), v("fmode"), v("fthr"), v("unitsel"), nG, nS, ACCEPTNAMES?"names":""].join("\u0002");
 }
 function deSig(){
   const v=id=>{ const e=document.getElementById(id); return e? e.value : ""; };
@@ -3291,8 +3294,12 @@ function* analyzeGen(){
         +(UNMAPPED.length?` <b>${UNMAPPED.length.toLocaleString()}</b> kept genes had no entry in the annotation file. <a href="#" id="dlunmapped">Download unmapped IDs</a> to check them.`:"")
       : `Gene annotation loaded (${ANNO.source}) but no IDs needed mapping; the matrix already carries symbols.`);
   }
+  // names in the matrix that are not gene symbols of this species (for example human symbols assigned by a
+  // sequencing provider's similarity search): reported, and used as given only when the user accepts them
+  if(aliasCount(sessAliasesAll())) warns.push(`<span id="acceptnote">${acceptNoteHTML()}</span>`);
   warns.push(NORMNOTE);
   el("qcwarn").innerHTML="<b>Notes:</b> "+warns.join(" ");
+  wireAcceptNow();
   el("qcwarn").style.display="block";
   { const qx=document.getElementById("qcexclude"); if(qx) qx.addEventListener("click",e=>{ e.preventDefault(); QCVLOW.forEach(i=>{ included[i]=false; }); buildSampleBar(); deKey=""; coKey=""; scorrKey=""; refreshTab(curTab); qx.outerHTML="<i>excluded</i>"; }); }
   const dl=document.getElementById("dlunmapped");
@@ -4168,6 +4175,41 @@ function drawGene(){
     `<table class="tbl"><tr><th>Comparison</th><th>log₂FC</th><th>fold</th><th>Welch p</th></tr>${fr||"<tr><td colspan=4>–</td></tr>"}</table>`;
   if(DSETS.length){ el("genebq").value=""; drawGeneB(); }
 }
+// how a gene is found in comparison dataset d: {r: row or -1, how: "match" | "query" | "name" | "none", note}
+// Between species, a gene without a one-to-one ortholog is not matched; the dataset's gene of the same name, if any,
+// is shown with a note that it is not a verified ortholog, and a homology family that contains either is named.
+function geneLookupInDataset(d, query){
+  const sym=(query||(curGene!==null? geneTitle(curGene) : "")).trim(), q=sym.toLowerCase();
+  const gs=query? nameToIdx[q] : curGene;
+  if(gs!==undefined&&gs!==null&&d.matchAtoB&&d.matchAtoB[gs]>=0){
+    const r0=d.matchAtoB[gs];
+    if(d.viaName&&d.viaName[gs]){ const sa0=sessAliases(), an=(sa0&&sa0[gs])? `the session's name ${esc(GENES[gs])}` : `this dataset's name ${esc(d.genes[r0].split(" (")[0])}`;
+      return {r:r0, how:"alias", note:`Matched through ${an}, a human gene symbol used as given (provider annotation by similarity), not through recorded orthology.`}; }
+    return {r:r0, how:"match", note:""}; }
+  let byName=-1;
+  for(let r=0;r<d.genes.length;r++) if(d.genes[r].split(" (")[0].toLowerCase()===q||String(d.ids[r]).toLowerCase()===q){ byName=r; break; }
+  if(!d.cross) return byName>=0? {r:byName, how:"query", note:""} : {r:-1, how:"none", note:`${esc(sym)} is not present or not matched in this dataset.`};
+  const sa=el("species").value, sb=d.species, la=famList(sa), lb=famList(sb);
+  const inSess=gs!==undefined&&gs!==null;
+  // homology family (for this pair of species) containing the gene in either species
+  let fam=null;
+  if(la&&lb) for(const f of ORTHO_FAM){ if(!famFor(f, la, lb)) continue;
+    if((f[la]||[]).some(x=>x.toLowerCase()===q)||(f[lb]||[]).some(x=>x.toLowerCase()===q)){ fam=f; break; } }
+  // is the session's name a gene symbol of the session species at all?
+  const ownSym= !inSess||sa==="other"||!SPKEY[sa]? true : (()=>{ const m=builtinMapFor(sa); return !!m&&Object.values(m.map).some(x=>String(x).toLowerCase()===q); })();
+  const famInSess= fam&&inSess? (fam[la]||[]).some(x=>x.toLowerCase()===q) : false;
+  const famTxt= !fam? "" : (famInSess||!inSess)
+    ? ` In ${sa} and ${sb} this gene belongs to the homology family ${esc(famMembersText(fam, [la, lb]))}, which has no one-to-one pairs; score it under Homology families on the Compare datasets tab.`
+    : ` The ${sa}–${sb} homology family of ${sb} ${esc(sym)} is ${esc(famMembersText(fam, [la, lb]))}; this matrix does not use those ${sa} names, so family scoring cannot include its ${esc(sym)} row.`;
+  if(!inSess&&byName>=0) return {r:byName, how:"query", note:""};
+  const why= !inSess? `${esc(sym)} is not a ${sb} gene name in this dataset.`
+    : !ownSym? `${esc(sym)} is not a ${sa} gene symbol in the built-in annotation (NCBI Gene, Ensembl); the name in this matrix probably comes from similarity to a human protein, so it has no ${sa} ortholog record and is not matched.`
+    : `${esc(sym)} has no one-to-one ${sb} ortholog in the built-in tables, so it is not matched.`;
+  const tip= !ownSym&&!ACCEPTNAMES? ` To treat it as the human gene it names in all analyses, tick "Use the gene names in the matrix as given" (step 2b on the data-loading page).` : "";
+  if(byName>=0) return {r:byName, how:"name", note:`${why} Shown: the ${sb} gene of the same name, which is not a verified ortholog.${famTxt}${tip}`};
+  const pres= fam? (fam[lb]||[]).filter(x=>d.genes.some(g=>g.split(" (")[0].toLowerCase()===x.toLowerCase())) : [];
+  return {r:-1, how:"none", note:`${why}${famTxt}${fam? (pres.length? ` Family members present in this dataset: ${pres.map(esc).join(", ")}; type one in the box above to show it.` : "") : ""}`};
+}
 function geneRowInDataset(d, query){
   if(query){
     const q=query.trim().toLowerCase();
@@ -4186,10 +4228,9 @@ function drawGeneB(){
   if(!query&&curGene===null){ el("genebout").innerHTML='<div class="footer-note">Select a gene above, or type a symbol.</div>'; return; }
   el("genebout").innerHTML=DSETS.map((d,i)=>`<div style="margin-top:8px"><div id="p_geneb_${i}" style="height:340px"></div><div id="genebst_${i}"></div></div>`).join("");
   DSETS.forEach((d,i)=>{
-    const r=geneRowInDataset(d, query);
-    const nm=query||(curGene!==null?geneTitle(curGene):"");
+    const LK=geneLookupInDataset(d, query), r=LK.r;
     if(r<0){ el(`p_geneb_${i}`).style.height="auto";
-      el(`p_geneb_${i}`).innerHTML=`<div class="footer-note"><b>${esc(d.label)}</b>: ${esc(nm)} is not present or not matched in this dataset.</div>`; return; }
+      el(`p_geneb_${i}`).innerHTML=`<div class="footer-note"><b>${esc(d.label)}</b>: ${LK.note}</div>`; return; }
     const gk=Object.keys(d.gi).filter(g=>d.gi[g].length);
     const vals=gk.map(g=>d.gi[g].map(q=>d.L[r*d.nS+q]));
     const bars=[], pts=[];
@@ -4206,7 +4247,7 @@ function drawGeneB(){
         hovertemplate:"%{text}<br>%{y:.3g}<extra>"+esc(g)+"</extra>"});
     });
     Plotly.react(el(`p_geneb_${i}`), bars.concat(pts), {margin:{t:40,b:45,l:60,r:10}, font:{size:12}, barmode:"overlay",
-      title:{text:`${esc(d.label)}: ${esc(d.genes[r].split(" (")[0])}`, font:{size:13}},
+      title:{text:`${esc(d.label)}: ${esc(d.genes[r].split(" (")[0])}${LK.how==="name"? " (same name; not a verified ortholog)" : LK.how==="alias"? " (matched by gene name used as given)" : ""}`, font:{size:13}},
       xaxis:{tickmode:"array", tickvals:gk.map((_,k)=>k), ticktext:gk, range:[-0.6, gk.length-0.4]},
       yaxis:{title:"log\u2082 expression", rangemode:"tozero"}}, PL);
     // statistics within this dataset only
@@ -4217,7 +4258,7 @@ function drawGeneB(){
     let de="";
     const rr=dsResult(i+1);
     if(rr&&!rr.err&&rr.lfc) de=` \u00b7 dataset contrast ${esc(d.selB)} vs ${esc(d.selA)}: log\u2082FC ${rr.lfc[r].toFixed(2)}, FDR ${fmtP(rr.q[r])}`;
-    el(`genebst_${i}`).innerHTML=`<div class="footer-note">ANOVA p ${an?fmtP(an.p):"\u2013"}${de}</div>`+
+    el(`genebst_${i}`).innerHTML=(LK.note? `<div class="warnchip">${LK.note}</div>` : "")+`<div class="footer-note">ANOVA p ${an?fmtP(an.p):"\u2013"}${de}</div>`+
       (pr.length?`<table class="tbl" style="width:auto"><tr><th>Comparison</th><th>log\u2082FC</th><th>Welch p</th><th>Holm-adj p</th></tr>`+
         pr.map(x=>`<tr${x.padj<0.05?' style="background:#f0fdf4"':""}><td>${esc(x.b)} vs ${esc(x.a)}</td><td>${x.d>=0?"+":""}${x.d.toFixed(2)}</td><td>${fmtP(x.p)}</td><td>${fmtP(x.padj)}</td></tr>`).join("")+`</table>`:"");
   });
@@ -5264,11 +5305,13 @@ function decodeBuiltin(key){
   return {label:lib.label, cite:lib.cite, sets};
 }
 // rat and pig libraries are the human MSigDB sets transferred to orthologs, not curated for those species
+let GMTALIAS=0;
 const LIBSP=key=>({hs:"human", mm:"mouse", rn:"rat", ss:"pig"})[String(key||"").split("_").pop()]||null;
+function libAliasNote(){ return GMTALIAS&&ACCEPTNAMES&&aliasCount(sessAliasesAll())? `<span class="warnchip">Gene names used as given: ${aliasCount(sessAliasesAll()).toLocaleString()} genes named by human symbols are assigned to the sets that hold that human gene in the human library (provider annotation, not recorded orthology).</span>` : ""; }
 function libMapNote(key){
   key=key===undefined? GMTBUILTIN : key; const sp=LIBSP(key);
   if(sp!=="rat"&&sp!=="pig") return "";
-  return `<span class="warnchip">Orthology-mapped library: the human MSigDB sets transferred to ${sp} orthologs (${sp==="rat"? "MGI vertebrate homology" : "Ensembl Compara"}; every ${sp} ortholog of each human member). They are not curated for ${sp}, and ${sp} genes without a human ortholog are in no set.</span>`;
+  return `<span class="warnchip">Orthology-mapped library: the human MSigDB sets transferred to ${sp} orthologs (${sp==="rat"? "MGI vertebrate homology" : "Ensembl Compara"}; every ${sp} ortholog of each human member). They are not curated for ${sp}, and ${sp} genes without a human ortholog are in no set${GMTALIAS&&key===GMTBUILTIN? `, except genes whose names in the matrix are used as given (human symbols assigned to the sets of that human gene)` : ""}.</span>`;
 }
 function libSpeciesNote(key){
   const sp=LIBSP(key), ds=el("species")? el("species").value : "";
@@ -5279,7 +5322,18 @@ function useBuiltin(key){
   if(!key){ return; }
   const lib=decodeBuiltin(key);
   if(!lib) return;
-  GMT=lib.sets; GMTname=lib.label; GMTCITE=lib.cite; GMTBUILTIN=key;
+  // accepted names (session data of a non-human species): genes named by human symbols are assigned to the sets that
+  // hold that human gene in the human version of the library. The added names are not symbols of the species, so they
+  // can match only genes named that way.
+  GMTALIAS=0; let sets=lib.sets; const spL=el("species").value;
+  if(ACCEPTNAMES&&!/_hs$/.test(key)&&spL!=="human"&&nativeSymSet(spL)){
+    const H=decodeBuiltin(key.replace(/_[a-z]+$/,"_hs")), own=nativeSymSet(spL);
+    if(H){ const hm={}; H.sets.forEach(x=>hm[x.name]=x.genes);
+      sets=sets.map(x=>{ const h=hm[x.name]; if(!h) return x; const have=new Set(x.genes.map(g=>g.toLowerCase()));
+        const extra=h.filter(g=>!own.has(g.toLowerCase())&&!have.has(g.toLowerCase())); GMTALIAS+=extra.length;
+        return extra.length? {name:x.name, genes:x.genes.concat(extra)} : x; }); }
+  }
+  GMT=sets; GMTname=lib.label; GMTCITE=lib.cite+(GMTALIAS? " Genes named in the matrix by human gene symbols that are not "+spL+" symbols (provider annotation) were assigned to the sets holding that human gene in the human library." : ""); GMTBUILTIN=key;
   el("gmtinfo").innerHTML=`${GMT.length} gene sets loaded (built-in: ${esc(lib.label)})`+(libMapNote(key)? "<br>"+libMapNote(key) : "")+libSpeciesNote(key);
 }
 
@@ -5295,6 +5349,7 @@ hookDrop("dzgmt","fgmt",(text,fname)=>{
   el("gmtinfo").textContent=`${sets.length} gene sets loaded from ${fname}`;
 });
 el("builtinsel").addEventListener("change",()=>useBuiltin(el("builtinsel").value));
+el("acceptnames").addEventListener("change",()=>setAcceptNames(el("acceptnames").checked));
 function refreshEnrSrc(){
   const sel=el("enrsrc"), cur=sel.value;
   sel.innerHTML="";
@@ -5645,7 +5700,7 @@ function* runGSEAGen(){
   const GQ= GSEAMODE==="samples"? 0.25 : -1;
   if(GSEAMODE!=="samples") rows.forEach(r=>{ r.qRank=r.q; r.q=NaN; });
   const nsig= GSEAMODE==="samples"? rows.filter(r=>r.q<=0.05).length : 0;
-  el("enrinfo").innerHTML=(libMapNote()? libMapNote()+"<br>" : "")+`<b>${enrResults.label}</b>: ${sets.length} testable sets from ${GMTname}. `+
+  el("enrinfo").innerHTML=(libMapNote()? libMapNote()+"<br>" : "")+(libAliasNote()&&!/rat|pig/.test(LIBSP(GMTBUILTIN)||"")? libAliasNote()+"<br>" : "")+`<b>${enrResults.label}</b>: ${sets.length} testable sets from ${GMTname}. `+
    (GSEAMODE==="samples"? `Sample labels permuted ${GSEAB} times (GSEA FDR from the pooled null NES). <b>${rows.filter(r=>r.q<=0.25).length}</b> sets at FDR ≤ 0.25 (shaded), the threshold the GSEA documentation uses; ${nsig} at FDR ≤ 0.05. Sample permutation keeps gene–gene correlation and is therefore conservative: on five psoriasis datasets no Hallmark set reached FDR ≤ 0.05. FRY (this tab) and CAMERA (Discovery tab) are the recommended inferential tests.`
    : `<span class="warnchip">Gene permutation (preranked): ${GSEANOTE}. This null ignores correlation between genes and reports false sets on data with no true difference, so no FDR is reported: the table is a ranking by NES and nominal p only. Use FRY (this tab) for inference.</span>`);
   el("enrgenes").style.display="none";
@@ -5787,7 +5842,7 @@ function* runFRYGen(){
   rows.sort((x,y)=>x.p-y.p || y.m-x.m || x.pm-y.pm);
   enrResults={rows, label:`FRY self-contained test, ${el("selB").value} vs ${el("selA").value}${res.covUsed&&res.covUsed.length?" adjusted for "+res.covUsed.join(" + "):""}${res.covOut&&res.covOut.length?" (⚠ "+res.covOut.join(", ")+" not estimable, left out of the model)":""}`, mode:"fry", covUsed:res.covUsed||[], covOut:res.covOut||[], nFit:res.nFit}; enrStampLib(mn, mx);
   const nsig=rows.filter(r=>r.q<=0.05).length;
-  el("enrinfo").innerHTML=(libMapNote()? libMapNote()+"<br>" : "")+`<b>${enrResults.label}</b>: ${rows.length} testable sets from ${GMTname} (residual df = ${res.dfres}). <b>${nsig}</b> sets at FDR ≤ 0.05 (directional). FRY asks whether the set's genes move together in this dataset (self-contained); CAMERA/GSEA ask whether they move MORE than other genes (competitive); self-contained tests are more sensitive and reject more, so read the two side by side.`;
+  el("enrinfo").innerHTML=(libMapNote()? libMapNote()+"<br>" : "")+(libAliasNote()&&!/rat|pig/.test(LIBSP(GMTBUILTIN)||"")? libAliasNote()+"<br>" : "")+`<b>${enrResults.label}</b>: ${rows.length} testable sets from ${GMTname} (residual df = ${res.dfres}). <b>${nsig}</b> sets at FDR ≤ 0.05 (directional). FRY asks whether the set's genes move together in this dataset (self-contained); CAMERA/GSEA ask whether they move MORE than other genes (competitive); self-contained tests are more sensitive and reject more, so read the two side by side.`;
   el("enrgenes").style.display="none";
   el("p_enrlolli").style.display="none";
   el("esplotwrap").style.display="none";
@@ -5857,7 +5912,7 @@ function runEnrichment(){
   enrResults={rows, q, label:qs.label};
   const nsig=rows.filter(r=>r.q<=0.05).length;
   enrResults.qAll=qAll; enrResults.N=N; enrResults.mode="ora"; enrStampLib(mn, mx);
-  el("enrinfo").innerHTML=(libMapNote()? libMapNote()+"<br>" : "")+`Query: <b>${qs.label}</b>, ${q} of ${qAll} genes annotated in the library, against a universe of the ${N.toLocaleString()} ${srcE==="meta"?"genes tested in the meta-analysis":patU?"pattern-analysis genes":"filtered genes"} annotated in ${GMTname}; ${rows.length} testable sets. <b>${nsig}</b> sets at FDR ≤ 0.05. <span class="footer-note">The hypergeometric test treats genes as independent; for lists of co-regulated genes (for example the top of a ranking) it is anti-conservative, and FRY or CAMERA (Discovery tab) are the appropriate tests.</span>`;
+  el("enrinfo").innerHTML=(libMapNote()? libMapNote()+"<br>" : "")+(libAliasNote()&&!/rat|pig/.test(LIBSP(GMTBUILTIN)||"")? libAliasNote()+"<br>" : "")+`Query: <b>${qs.label}</b>, ${q} of ${qAll} genes annotated in the library, against a universe of the ${N.toLocaleString()} ${srcE==="meta"?"genes tested in the meta-analysis":patU?"pattern-analysis genes":"filtered genes"} annotated in ${GMTname}; ${rows.length} testable sets. <b>${nsig}</b> sets at FDR ≤ 0.05. <span class="footer-note">The hypergeometric test treats genes as independent; for lists of co-regulated genes (for example the top of a ranking) it is anti-conservative, and FRY or CAMERA (Discovery tab) are the appropriate tests.</span>`;
   el("enrgenes").style.display="none";
   el("enrtable").innerHTML=`<table class="tbl"><tr><th>Gene set</th><th>size</th><th>overlap</th><th>ratio</th><th>p</th><th>FDR</th><th>leading genes (click for kinetics)</th></tr>`+
     rows.slice(0,60).map((r,ri)=>`<tr${r.q<=0.05?' style="background:#f0fdf4"':''}><td class="setlink" data-r="${ri}">${setNameHTML(r.name)}</td><td class="num">${r.m}</td><td class="num">${r.k}</td><td class="num">${r.ratio.toFixed(1)}×</td><td class="num">${fmtP(r.p)}</td><td class="num">${fmtP(r.q)}</td><td style="font-size:11px;text-align:left">${r.ovIdx.slice(0,12).map(g=>`<span class="glink" data-g="${g}">${GENES[g]}</span>`).join(", ")}${r.k>12?" …":""}</td></tr>`).join("")+`</table>`;
@@ -5951,7 +6006,7 @@ function renderEnrGenes(row){
 }
 // the library, size limits and time of the run are recorded with the result, so that an export made after the
 // library or the settings were changed still describes the run that produced it
-function enrStampLib(mn, mx){ if(!enrResults) return; enrResults.lib=GMTname; enrResults.libCite=GMTCITE; enrResults.sizeMin=mn; enrResults.sizeMax=mx; if(enrResults.mode==="gsea"){ enrResults.gseaMode=GSEAMODE; enrResults.gseaB=GSEAB; } enrResults.when=new Date().toISOString().slice(0,16).replace("T"," "); }
+function enrStampLib(mn, mx){ if(!enrResults) return; enrResults.lib=GMTname; enrResults.libCite=GMTCITE; enrResults.aliasN= GMTALIAS&&ACCEPTNAMES? aliasCount(sessAliasesAll()) : 0; enrResults.sizeMin=mn; enrResults.sizeMax=mx; if(enrResults.mode==="gsea"){ enrResults.gseaMode=GSEAMODE; enrResults.gseaB=GSEAB; } enrResults.when=new Date().toISOString().slice(0,16).replace("T"," "); }
 // all tested sets (the on-screen table shows the first 60), with every statistic at full precision and the genes behind each row
 function enrTableSheets(){
   const R=enrResults; if(!R||!R.rows) return null;
@@ -5977,7 +6032,7 @@ function enrTableSheets(){
     : mode==="fry"? "FRY self-contained rotation test (limma::fry; Wu et al., 2010); Benjamini–Hochberg FDR across tested sets, separately for the directional and mixed tests"
     : "one-sided hypergeometric test of the query–set overlap (Fisher exact); Benjamini–Hochberg FDR across tested sets";
   const notes=[["Field","Value"],["Analysis", R.label||""],["Test", test],
-    ["Gene-set library", (R.lib||GMTname||"")+((R.libCite||GMTCITE)? " ("+(R.libCite||GMTCITE)+")" : "")],
+    ["Gene-set library", (R.lib||GMTname||"")+((R.libCite||GMTCITE)? " ("+(R.libCite||GMTCITE)+")" : "")], ...(R.aliasN? [["Gene names", `${R.aliasN} genes named in the matrix by human gene symbols that are not symbols of the species were used as given and assigned to the sets holding that human gene (provider annotation, not recorded orthology)`]] : []),
     ["Set size limits", `${R.sizeMin??""}–${R.sizeMax??""} genes`], ["Sets tested", R.rows.length]];
   if(mode==="ora") notes.push(["Query genes annotated in the library", `${R.q} of ${R.qAll}`], ["Universe", `${R.N} genes (kept genes annotated in the library)`], ["Expected overlap", "query genes annotated × set size / universe"]);
   if(geneKind) notes.push(["Genes sheet", `${geneKind}s of ${gWhich} (all sets: last column of Results)`]);
@@ -6050,7 +6105,7 @@ function genMethods(){
   const nInc=included.filter(Boolean).length;
   const kGroups=GROUPS.filter(g=>S.filter((s,i)=>included[i]&&s.group===g).length>0).length;
   const txt=
-`Expression data (${FILTER.ng0.toLocaleString()} features × ${nS} samples) were analyzed with benchsiDE version ${APP_VERSION} (client-side, in-browser; https://www.benchside.org, source at https://github.com/jyaron/benchsiDE). ${NORMNOTE} ${FILTER.mode==="fbe"?`Genes were filtered with edgeR filterByExpr at default settings (Chen Y, Lun ATL & Smyth GK, F1000Research 5:1438, 2016), retaining ${nG.toLocaleString()} genes.`:`Genes with expression ≥ ${FILTER.thr} in at least ${FILTER.minS} samples were retained (${nG.toLocaleString()} genes).`} Expression values were ${HASCOUNTS?`log₂ counts per million with a library-size-scaled prior count of 2 (edgeR cpm, log = TRUE)`:DATALOG?`the supplied log₂ values`:`log₂(x + 1)-transformed values`}${HASCOUNTS&&deMethod==="voom"?` (voom used its own transform, below)`:``}. The design comprised ${nInc} included samples in ${kGroups} groups (factor: ${FACTOR}, treated as ${NUMERIC?"an ordered numeric variable (time course / dose–response)":"unordered categorical conditions"}).${nInc<nS?` Gene filtering and normalization used all ${nS} loaded samples; the ${nS-nInc} excluded sample${nS-nInc===1?"":"s"} (${S.filter((x,q)=>!included[q]).map(x=>x.id).join(", ")}) ${nS-nInc===1?"was":"were"} left out of every model fit and comparison.`:``} Principal component analysis used the 2,000 most variable genes, gene-centered. Multidimensional scaling used pairwise leading-logFC distances (root-mean of the top 500 per-pair squared log₂ differences) with classical scaling, as in limma plotMDS (Ritchie ME et al., Nucleic Acids Res 43:e47, 2015). ${deMethodsText()}${kGroups>2&&curGene!=null?`In Gene Explorer, differences across all groups for a single gene were assessed by one-way ANOVA and Kruskal–Wallis tests${NUMERIC?", and monotonic trends by Spearman correlation with the numeric group value":""}. `:``}${patState?`Group patterns were identified by k-means clustering (k-means++ initialization) of per-group mean z-score profiles of the most variable genes. `:``}${BATCHDISP?`For display, PCA/heatmap/gene plots show values adjusted for ${BATCHDISP} with the removeBatchEffect procedure (group effects retained; limma); all statistics were computed on unadjusted values. `:``}${MODF?`Genome-wide differences across all groups were tested per gene with a moderated one-way F-statistic (between-group mean square over the empirical-Bayes posterior variance; limma eBayes; Smyth GK, Stat Appl Genet Mol Biol 3:Article3, 2004), with BH correction. `:``}${DSETS.length?`${DSETS.length===1?`A second dataset was`:`${DSETS.length} additional datasets were`} analyzed with independent pipelines (filterByExpr, TMM, log₂ CPM as above, and a limma-trend moderated t for the chosen contrast${DEFIT==="all"?", fitted to all groups of that dataset":""}${DSETS.some(d=>(d.covSel||[]).length)?`, adjusted within each dataset for ${DSETS.filter(d=>(d.covSel||[]).length).map(d=>{ const r=d.res&&!d.res.err? d.res : null; const fit=r? (r.cov||"none") : d.covSel.join(" + "); const out=r&&r.covNotEstimable&&r.covNotEstimable.length? ` (${r.covNotEstimable.join(", ")} not estimable, left out)` : ""; return d.label+": "+fit+out; }).join("; ")}`:``}); raw expression values were never merged or renormalized across datasets. Cross-dataset comparisons used genes matched by case-normalized symbol (same-species) or ${orthoMethodsText()}${DSETS.some(d=>d.nCust)?`, supplemented by a user-supplied identifier mapping (${DSETS.filter(d=>d.nCust).map(d=>`${d.custName}: ${d.nCust.toLocaleString()} pairs for ${d.label}`).join("; ")}) applied before the built-in matching`:``} and operated on within-dataset statistics only, restricted to genes present in the session dataset${CMPLAST?`: Pearson correlation of log₂ fold changes and moderated t-statistics, one-sided hypergeometric tests of directional hit-set overlap, and rank-rank hypergeometric overlap maps computed as in the Bioconductor RRHO package (Plaisier SB, Taschereau R, Wong JA, Graeber TG, Nucleic Acids Res 38:e169, 2010; descriptive, as these p-values assume independent genes)`:``}${CONSENSUS?`${CMPLAST?"; ":": "}across all datasets, a consensus vote count of within-dataset significance (no pooled p-values)`:``}. ${FAMROWS&&FAMROWS.length?`Many-to-many homology families (MGI classes merged by shared membership${famLoadedPairs().has("hp")||famLoadedPairs().has("mp")||famLoadedPairs().has("rp")? ", and for pig connected components of the Ensembl 116 Compara ortholog graph" : ""}; the families the strict 1:1 table excludes) were analyzed as modules: each family scored as the mean z of its member genes within each dataset separately, group effects tested by Welch t within each dataset with BH correction across tested families, and cross-species agreement reported as direction concordance - no one-to-one gene assignment is made for these families. `:``}${SIGRAN&&SIGRES?`Signature transfer scored each sample of each comparison dataset as the mean, over the signature's genes, of the z-score computed entirely within that dataset${SIGRES.spec.sign.some(x=>x<0)? " (genes down-regulated in the session with reversed sign)" : ""}${SIGRES.useFam&&SIGRES.maps.some(m=>m.M.cross)? (SIGRES.maps.every(m=>!m.M.cross||[el("species").value, m.d.species].sort().join("|")==="human|mouse")? "; between human and mouse, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI human–mouse homology graph), each family scored once as the mean z of its members present in the dataset" : "; between species, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI homology graph, or of the Ensembl 116 Compara ortholog graph for pig), each family scored once as the mean z of its members present in the dataset") : ""}. Separation of each dataset's contrast groups was summarized by the Mann-Whitney AUC (descriptive) and by Hedges' g (bias-corrected standardized mean difference of the score), and tested in two ways: by the Welch t-test of the scores between the groups (self-contained), and by the Welch t statistic against ${SIGRES.NNULL} seeded random signatures (gene sets of the same size and numbers of up- and down-regulated genes drawn from the session's genes, transferred and scored in the same way, the same random gene set in every dataset) (empirical p; a competitive random-set null, cf. Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012); replication required both p-values ≤ 0.05 and the separation in the direction of the signature (the self-contained test alone is not calibrated when the contrast changes many genes, and the competitive test alone is not calibrated for a co-regulated signature when the groups do not differ). ${SIGRES.pooled? `Hedges' g was pooled over the ${SIGRES.pooled.k} independent comparison datasets (the discovery dataset excluded) with a ${({REML:"REML random-effects",REM:"DerSimonian-Laird random-effects",FEM:"fixed-effect"})[SIGRES.pooled.method]} model${SIGRES.pooled.hk? " and the Hartung-Knapp-Sidik-Jonkman test" : ""} (as metafor::rma on escalc(measure = "SMD") values; Viechtbauer W, J Stat Softw 36(3), 2010), and the pooled effect was also compared with the pooled effects of the random signatures, pooled the same way (empirical p); pooled replication likewise required both p-values ≤ 0.05. ` : ""}`:``}`:``}${ALLPAIRS?`All pairwise group contrasts were computed with the same per-contrast statistics as the primary comparison; no joint model was fitted, and FDR control is within-contrast. `:``}${HUBS?`Network hub genes were ranked by soft connectivity, defined as the sum over all gene pairs of ${HUBS.signed?"signed":"unsigned"} correlation adjacencies (|r| raised to β = ${HUBS.beta}) among the ${HUBS.M.toLocaleString()} most variable genes, following the WGCNA connectivity definition (Zhang B & Horvath S, Stat Appl Genet Mol Biol 4:Article17, 2005; Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008); connectivity rankings at small sample sizes were treated as screening output. ${HUBNET?`The network view showed the ${HUBNET.H} most connected genes${HUBNET.nb?` and their ${HUBNET.nb} most strongly correlated partners`:``}, with edges for gene pairs with |r| ≥ ${HUBNET.rmin}${HUBNET.m?`, each gene keeping its ${HUBNET.m} strongest`:``} (${HUBNET.layout==="circle"?"circular layout ordered by average-linkage clustering on 1 − |r|":"seeded force-directed layout (Fruchterman TMJ & Reingold EM, Softw Pract Exp 21:1129, 1991)"}). `:``}${HUBNB?`The neighbourhood of ${geneTitle(HUBNB.hub)} was defined as its ${HUBNB.N} most strongly correlated genes (largest |r|) among the same ${HUBNB.M.toLocaleString()} genes, using ${HUBNB.mode==="within"?`the partial correlation given group, computed as the Pearson correlation of the residuals after removing each group's mean (Baba K, Shibata R & Sibuya M, Aust N Z J Stat 46:657, 2004), so that correlation produced only by shared group differences was not counted as co-expression (cf. Parsana P et al., Genome Biol 20:94, 2019); p-values used a t test on n − G − 1 = ${HUBNB.df} degrees of freedom`:`Pearson correlation across all ${HUBNB.n} included samples; p-values used a t test on n − 2 = ${HUBNB.df} degrees of freedom`}. It was displayed as an ego network centred on the hub (Everett M & Borgatti SP, Soc Netw 27:31, 2005), as a heatmap of per-sample z-scores with samples grouped by condition (Eisen MB, Spellman PT, Brown PO & Botstein D, Proc Natl Acad Sci USA 95:14863, 1998), and as a per-sample neighbourhood score, the mean of the members' z-scores with negatively correlated members sign-reversed (cf. Lee E, Chuang HY, Kim JW, Ideker T & Lee D, PLoS Comput Biol 4:e1000217, 2008); the score was used descriptively because the members were selected from the same samples. Its gene-set enrichment was tested by the hypergeometric test against the screened genes annotated in the library, with BH correction, and the node and edge tables were exported for Cytoscape (Shannon P et al., Genome Res 13:2498, 2003). `:``}${HUBX?`Its preservation in each independent comparison dataset (contrast samples only) was quantified by the WGCNA module-preservation statistic Zsummary (Langfelder P, Luo R, Oldham MC & Horvath S, PLoS Comput Biol 7:e1001057, 2011), computed as in WGCNA 1.74 (unsigned adjacency |r|^6; Zdensity from the proportion of variance explained, mean sign-aware kME, mean sign-aware correlation and mean adjacency; Zconnectivity from the correlations of intramodular connectivity, kME and pairwise correlations), each Z against 100 random gene sets of the same size in the test dataset${HUBX.mode==="within"?", with correlations computed after removing each group's mean":""}. Because random gene sets, and random sets of differentially expressed genes, also exceeded the published thresholds in calibration on psoriasis datasets, Zsummary was compared empirically, in the same dataset, with 100 random gene sets of the same size, with 100 random sets whose members came from the same log₂FC deciles of the discovery contrast (DE-matched), and with 100 neighbourhoods of random seed genes built by the same procedure; preservation beyond its shared differential expression required an empirical p ≤ 0.05 against the DE-matched sets. Rewiring was tested per dataset by Fisher's z test of the hub–partner correlation between the two contrast groups (Fisher RA, Biometrika 10:507, 1915; cf. Fukushima A, Gene 518:209, 2013), calibrated against 1,000 random gene pairs from the same log₂FC deciles as the hub and the partner (two-sided empirical p), with BH correction across partners; datasets were not pooled, and replication was counted across the independent comparison datasets (the discovery dataset excluded). `:``}${HUBXCONS?`Consensus hubs were identified by robust rank aggregation (Kolde R, Laur S, Adler P & Vilo J, Bioinformatics 28:573, 2012; RRA score, BH-adjusted) of soft-connectivity ranks (|r|^${HUBXCONS.beta}) computed in each of ${HUBXCONS.nLists} datasets over one common universe of ${HUBXCONS.N.toLocaleString()} genes matched in every dataset, chosen by median variance rank. `:``}`:``}${META?`Effect sizes were combined across datasets (${META.idxs.map((i,a)=>dsLabel(i)+": "+META.clabels[a]+(META.nInfo?`, ${META.nInfo[a].nB} vs ${META.nInfo[a].nA} samples${META.nInfo[a].subj?` from ${META.nInfo[a].subj.n} ${META.nInfo[a].subj.col} levels`:""}`:"")).join("; ")}${META.nInfo?`; ${META.nInfo.reduce((x,m)=>x+m.n,0)} samples in total`:""}) by ${metaModelText(META,"adj")} meta-analysis of each dataset's own log₂ fold change and its standard error (${META.method==="REML"? "between-dataset variance by restricted maximum likelihood; Viechtbauer W, J Educ Behav Stat 30:261, 2005" : META.method==="REM"? "DerSimonian R & Laird N, Control Clin Trials 7:177, 1986" : "inverse-variance weights"}${META.hk? `; ${META.hk==="adhoc"?"truncated ":""}Hartung-Knapp-Sidik-Jonkman standard error and t test on k−1 degrees of freedom: Hartung J & Knapp G, Stat Med 20:3875, 2001; Sidik K & Jonkman JN, Stat Med 21:3153, 2002${META.hk==="adhoc"?"; Knapp G & Hartung J, Stat Med 22:2693, 2003":""}` : "; Wald z test"}; computed as metafor::rma, Viechtbauer W, J Stat Softw 36(3), 2010)${META_DFADJ?`; because each standard error is estimated from few residual degrees of freedom, it was replaced by |log₂FC|/|z|, where z is the normal quantile with the same two-sided tail probability as the dataset's moderated t on its own degrees of freedom`:``}, with Cochran's Q and I² as heterogeneity measures (Higgins JPT & Thompson SG, Stat Med 21:1539, 2002${META.method==="REML"?"; I² computed from the REML estimate of τ², as in metafor":""}), ${META.hk? `a Hartung-Knapp t test on k − 1 degrees of freedom` : `a Wald z test`} and Benjamini-Hochberg correction across the ${META.nTested.toLocaleString()} genes matched in at least ${META.minK} datasets; raw expression values were not combined. The shared signature comprised genes with meta FDR ≤ ${META.fdr}, |pooled log₂FC| ≥ ${META.lfcMin} and the same direction of change in every contributing dataset${META.usePI?`, whose 95% prediction interval for a new study (t distribution with k − 2 df; Riley RD, Higgins JPT & Deeks JJ, BMJ 342:d549, 2011) excluded 0`:``}${META.i2Max<100?`, and I² ≤ ${META.i2Max}%`:``} (${META.sig.length.toLocaleString()} genes)${META.loo.length?`; its robustness was assessed by recomputing it with each dataset omitted`:``}. `:``}${DISCO?`Discovery screening scored gene families (symbol-prefix heuristic) and library gene sets as modules (mean z-score of member genes per sample) and tested group effects with ${DISCO.rows.length&&DISCO.rows[0].camera?"the CAMERA competitive gene-set test accounting for inter-gene correlation (Wu MD & Smyth GK, Nucleic Acids Res 40:e133, 2012)":"a competitive null of "+DISCO.B+" size-matched random gene sets (seeded permutations)"}, BH-FDR across ${DISCO.rows.length} modules (overlapping modules: BH under positive dependence). This is a descriptive screen for coordinated regulation. `:``}${enrResults&&enrResults.mode==="fry"?`${ENRMAT?`The enrichment-across-contrasts matrix ran the same FRY test for each pairwise contrast${DEFIT==="all"?", each within the model fitted to all groups,":", each fitted on its two groups only,"} with BH correction within each contrast. `:``}Self-contained gene-set testing used the FRY fast-rotation test at default settings (posterior-sd standardization; Wu D et al., Bioinformatics 26:2176-2182, 2010 [ROAST], as implemented in limma), BH-corrected, on the unweighted log₂-CPM values${HASCOUNTS?"":" (the log₂ expression values used for differential expression)"} with the linear model of the differential-expression contrast (${DEFIT==="all"?"all groups":"the two compared groups"}${enrResults.covUsed&&enrResults.covUsed.length?", adjusted for "+enrResults.covUsed.join(", "):""}${enrResults.covOut&&enrResults.covOut.length?"; "+enrResults.covOut.join(", ")+" not estimable and left out":""}; ${enrResults.nFit||""} samples)${deMethod==="voom"?"; voom precision weights are not used by FRY":""}. `:``}${enrResults&&enrResults.mode==="gsea"?(GSEAMODE==="samples"?`Gene-set enrichment analysis (Subramanian A et al., PNAS 102:15545-15550, 2005) ranked genes by moderated t and assessed each set with ${GSEAB} sample-label permutations; FDR was estimated from the pooled normalized enrichment scores of the permutations. `:`Preranked gene-set enrichment analysis (gene-set permutation) was used for ranking only; its p-values do not account for correlation between genes. `):``}${enrResults&&(enrResults.mode==="fry"||enrResults.mode==="gsea")&&GMT?`Gene sets were taken from ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library (${enrResults.lib||GMTname})`}. `:``}${enrResults&&(!enrResults.mode||enrResults.mode==="ora")&&GMT?`Gene-set over-representation used one-sided hypergeometric tests against ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library`} with all retained genes as universe, BH-corrected.`:``}${heatClusters&&GMT?` Enrichment of k-means heatmap clusters uses the same test but is reported descriptively: the clusters are data-derived (selected from top DE or most-variable genes), so cluster-level FDR values should not be read as confirmatory hypothesis tests.`:``}${TRAITRES?` Association of gene expression with the sample trait ${TRAITRES.o.trait}${TRAITRES.o.transform!=="none"?` (${TRAITRES.D.trLab}-transformed)`:""} was tested with limma linear models (${traitModelText(TRAITRES).replace("log₂ expression","log₂-CPM")}; the trait standardized, effects reported per unit and per SD) and empirical Bayes moderation with an intensity trend (eBayes(trend = TRUE)) over ${TRAITRES.mode==="means"?`${TRAITRES.n} ${TRAITRES.o.block} means of ${TRAITRES.D.cols.length} samples: because the trait is constant within ${TRAITRES.o.block}, each ${TRAITRES.o.block} was summarized by the mean of its samples${TRAITRES.agg.withinG?", after removing the group effect estimated within blocks,":""} and the means were analysed as independent observations`:`${TRAITRES.n} samples${TRAITRES.blockMode==="dupcor"?`, with ${TRAITRES.o.block} as a random block: the intra-block correlation (${TRAITRES.rho.toFixed(3)}) was estimated by duplicateCorrelation and used in generalized least squares (lmFit with block and correlation; Smyth GK, Michaud J & Scott HS, Bioinformatics 21:2067, 2005)`:""}`}; BH-adjusted p-values. Influential observations were flagged by Cook's distance > 1 (Cook RD, Technometrics 19:15, 1977). `:``}${TRAITCAM?`Gene sets (${TRAITCAM.lib}, 5–500 genes) were tested against the trait coefficient by CAMERA with the inter-gene correlation estimated from the data (Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012). `:``}${TRAITMOD?`Module–trait relationships were tested as in WGCNA (Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008): the eigengene of each module (first principal component of its scaled genes) was tested in the same linear model, reported as the partial correlation t/√(t² + df), with BH correction over the module × trait matrix. `:``}${ANNO?` Gene identifiers were mapped to ${({human:"official HGNC", mouse:"official MGI", rat:"official RGD", pig:"NCBI Gene"})[el("species").value]||"official"} symbols using ${ANNO.source} (${ANNO.name}; ${ANNO.n.toLocaleString()} mappings). Reference: ${ANNO.citation}.`:""}${IXRES?" "+ixMethodsText():""}`;
+`Expression data (${FILTER.ng0.toLocaleString()} features × ${nS} samples) were analyzed with benchsiDE version ${APP_VERSION} (client-side, in-browser; https://www.benchside.org, source at https://github.com/jyaron/benchsiDE). ${NORMNOTE} ${FILTER.mode==="fbe"?`Genes were filtered with edgeR filterByExpr at default settings (Chen Y, Lun ATL & Smyth GK, F1000Research 5:1438, 2016), retaining ${nG.toLocaleString()} genes.`:`Genes with expression ≥ ${FILTER.thr} in at least ${FILTER.minS} samples were retained (${nG.toLocaleString()} genes).`} Expression values were ${HASCOUNTS?`log₂ counts per million with a library-size-scaled prior count of 2 (edgeR cpm, log = TRUE)`:DATALOG?`the supplied log₂ values`:`log₂(x + 1)-transformed values`}${HASCOUNTS&&deMethod==="voom"?` (voom used its own transform, below)`:``}. The design comprised ${nInc} included samples in ${kGroups} groups (factor: ${FACTOR}, treated as ${NUMERIC?"an ordered numeric variable (time course / dose–response)":"unordered categorical conditions"}).${nInc<nS?` Gene filtering and normalization used all ${nS} loaded samples; the ${nS-nInc} excluded sample${nS-nInc===1?"":"s"} (${S.filter((x,q)=>!included[q]).map(x=>x.id).join(", ")}) ${nS-nInc===1?"was":"were"} left out of every model fit and comparison.`:``} Principal component analysis used the 2,000 most variable genes, gene-centered. Multidimensional scaling used pairwise leading-logFC distances (root-mean of the top 500 per-pair squared log₂ differences) with classical scaling, as in limma plotMDS (Ritchie ME et al., Nucleic Acids Res 43:e47, 2015). ${deMethodsText()}${kGroups>2&&curGene!=null?`In Gene Explorer, differences across all groups for a single gene were assessed by one-way ANOVA and Kruskal–Wallis tests${NUMERIC?", and monotonic trends by Spearman correlation with the numeric group value":""}. `:``}${patState?`Group patterns were identified by k-means clustering (k-means++ initialization) of per-group mean z-score profiles of the most variable genes. `:``}${BATCHDISP?`For display, PCA/heatmap/gene plots show values adjusted for ${BATCHDISP} with the removeBatchEffect procedure (group effects retained; limma); all statistics were computed on unadjusted values. `:``}${MODF?`Genome-wide differences across all groups were tested per gene with a moderated one-way F-statistic (between-group mean square over the empirical-Bayes posterior variance; limma eBayes; Smyth GK, Stat Appl Genet Mol Biol 3:Article3, 2004), with BH correction. `:``}${DSETS.length?`${DSETS.length===1?`A second dataset was`:`${DSETS.length} additional datasets were`} analyzed with independent pipelines (filterByExpr, TMM, log₂ CPM as above, and a limma-trend moderated t for the chosen contrast${DEFIT==="all"?", fitted to all groups of that dataset":""}${DSETS.some(d=>(d.covSel||[]).length)?`, adjusted within each dataset for ${DSETS.filter(d=>(d.covSel||[]).length).map(d=>{ const r=d.res&&!d.res.err? d.res : null; const fit=r? (r.cov||"none") : d.covSel.join(" + "); const out=r&&r.covNotEstimable&&r.covNotEstimable.length? ` (${r.covNotEstimable.join(", ")} not estimable, left out)` : ""; return d.label+": "+fit+out; }).join("; ")}`:``}); raw expression values were never merged or renormalized across datasets. Cross-dataset comparisons used genes matched by case-normalized symbol (same-species) or ${orthoMethodsText()}${DSETS.some(d=>d.nCust)?`, supplemented by a user-supplied identifier mapping (${DSETS.filter(d=>d.nCust).map(d=>`${d.custName}: ${d.nCust.toLocaleString()} pairs for ${d.label}`).join("; ")}) applied before the built-in matching`:``}${DSETS.some(d=>d.nViaName)?`; in addition, ${DSETS.filter(d=>d.nViaName).map(d=>`${d.nViaName.toLocaleString()} genes for ${d.label}`).join(" and ")} were matched one to one through gene names used as given, that is, names in a matrix that are human gene symbols but not symbols of that dataset's species (provider annotation by sequence similarity), each treated as that human gene; these pairings are not recorded orthology`:``} and operated on within-dataset statistics only, restricted to genes present in the session dataset${CMPLAST?`: Pearson correlation of log₂ fold changes and moderated t-statistics, one-sided hypergeometric tests of directional hit-set overlap, and rank-rank hypergeometric overlap maps computed as in the Bioconductor RRHO package (Plaisier SB, Taschereau R, Wong JA, Graeber TG, Nucleic Acids Res 38:e169, 2010; descriptive, as these p-values assume independent genes)`:``}${CONSENSUS?`${CMPLAST?"; ":": "}across all datasets, a consensus vote count of within-dataset significance (no pooled p-values)`:``}. ${FAMROWS&&FAMROWS.length?`Many-to-many homology families (MGI classes merged by shared membership${famLoadedPairs().has("hp")||famLoadedPairs().has("mp")||famLoadedPairs().has("rp")? ", and for pig connected components of the Ensembl 116 Compara ortholog graph" : ""}; the families the strict 1:1 table excludes) were analyzed as modules: each family scored as the mean z of its member genes within each dataset separately, group effects tested by Welch t within each dataset with BH correction across tested families, and cross-species agreement reported as direction concordance - no one-to-one gene assignment is made for these families. `:``}${SIGRAN&&SIGRES?`Signature transfer scored each sample of each comparison dataset as the mean, over the signature's genes, of the z-score computed entirely within that dataset${SIGRES.spec.sign.some(x=>x<0)? " (genes down-regulated in the session with reversed sign)" : ""}${SIGRES.useFam&&SIGRES.maps.some(m=>m.M.cross)? (SIGRES.maps.every(m=>!m.M.cross||[el("species").value, m.d.species].sort().join("|")==="human|mouse")? "; between human and mouse, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI human–mouse homology graph), each family scored once as the mean z of its members present in the dataset" : "; between species, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI homology graph, or of the Ensembl 116 Compara ortholog graph for pig), each family scored once as the mean z of its members present in the dataset") : ""}. Separation of each dataset's contrast groups was summarized by the Mann-Whitney AUC (descriptive) and by Hedges' g (bias-corrected standardized mean difference of the score), and tested in two ways: by the Welch t-test of the scores between the groups (self-contained), and by the Welch t statistic against ${SIGRES.NNULL} seeded random signatures (gene sets of the same size and numbers of up- and down-regulated genes drawn from the session's genes, transferred and scored in the same way, the same random gene set in every dataset) (empirical p; a competitive random-set null, cf. Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012); replication required both p-values ≤ 0.05 and the separation in the direction of the signature (the self-contained test alone is not calibrated when the contrast changes many genes, and the competitive test alone is not calibrated for a co-regulated signature when the groups do not differ). ${SIGRES.pooled? `Hedges' g was pooled over the ${SIGRES.pooled.k} independent comparison datasets (the discovery dataset excluded) with a ${({REML:"REML random-effects",REM:"DerSimonian-Laird random-effects",FEM:"fixed-effect"})[SIGRES.pooled.method]} model${SIGRES.pooled.hk? " and the Hartung-Knapp-Sidik-Jonkman test" : ""} (as metafor::rma on escalc(measure = "SMD") values; Viechtbauer W, J Stat Softw 36(3), 2010), and the pooled effect was also compared with the pooled effects of the random signatures, pooled the same way (empirical p); pooled replication likewise required both p-values ≤ 0.05. ` : ""}`:``}`:``}${ALLPAIRS?`All pairwise group contrasts were computed with the same per-contrast statistics as the primary comparison; no joint model was fitted, and FDR control is within-contrast. `:``}${HUBS?`Network hub genes were ranked by soft connectivity, defined as the sum over all gene pairs of ${HUBS.signed?"signed":"unsigned"} correlation adjacencies (|r| raised to β = ${HUBS.beta}) among the ${HUBS.M.toLocaleString()} most variable genes, following the WGCNA connectivity definition (Zhang B & Horvath S, Stat Appl Genet Mol Biol 4:Article17, 2005; Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008); connectivity rankings at small sample sizes were treated as screening output. ${HUBNET?`The network view showed the ${HUBNET.H} most connected genes${HUBNET.nb?` and their ${HUBNET.nb} most strongly correlated partners`:``}, with edges for gene pairs with |r| ≥ ${HUBNET.rmin}${HUBNET.m?`, each gene keeping its ${HUBNET.m} strongest`:``} (${HUBNET.layout==="circle"?"circular layout ordered by average-linkage clustering on 1 − |r|":"seeded force-directed layout (Fruchterman TMJ & Reingold EM, Softw Pract Exp 21:1129, 1991)"}). `:``}${HUBNB?`The neighbourhood of ${geneTitle(HUBNB.hub)} was defined as its ${HUBNB.N} most strongly correlated genes (largest |r|) among the same ${HUBNB.M.toLocaleString()} genes, using ${HUBNB.mode==="within"?`the partial correlation given group, computed as the Pearson correlation of the residuals after removing each group's mean (Baba K, Shibata R & Sibuya M, Aust N Z J Stat 46:657, 2004), so that correlation produced only by shared group differences was not counted as co-expression (cf. Parsana P et al., Genome Biol 20:94, 2019); p-values used a t test on n − G − 1 = ${HUBNB.df} degrees of freedom`:`Pearson correlation across all ${HUBNB.n} included samples; p-values used a t test on n − 2 = ${HUBNB.df} degrees of freedom`}. It was displayed as an ego network centred on the hub (Everett M & Borgatti SP, Soc Netw 27:31, 2005), as a heatmap of per-sample z-scores with samples grouped by condition (Eisen MB, Spellman PT, Brown PO & Botstein D, Proc Natl Acad Sci USA 95:14863, 1998), and as a per-sample neighbourhood score, the mean of the members' z-scores with negatively correlated members sign-reversed (cf. Lee E, Chuang HY, Kim JW, Ideker T & Lee D, PLoS Comput Biol 4:e1000217, 2008); the score was used descriptively because the members were selected from the same samples. Its gene-set enrichment was tested by the hypergeometric test against the screened genes annotated in the library, with BH correction, and the node and edge tables were exported for Cytoscape (Shannon P et al., Genome Res 13:2498, 2003). `:``}${HUBX?`Its preservation in each independent comparison dataset (contrast samples only) was quantified by the WGCNA module-preservation statistic Zsummary (Langfelder P, Luo R, Oldham MC & Horvath S, PLoS Comput Biol 7:e1001057, 2011), computed as in WGCNA 1.74 (unsigned adjacency |r|^6; Zdensity from the proportion of variance explained, mean sign-aware kME, mean sign-aware correlation and mean adjacency; Zconnectivity from the correlations of intramodular connectivity, kME and pairwise correlations), each Z against 100 random gene sets of the same size in the test dataset${HUBX.mode==="within"?", with correlations computed after removing each group's mean":""}. Because random gene sets, and random sets of differentially expressed genes, also exceeded the published thresholds in calibration on psoriasis datasets, Zsummary was compared empirically, in the same dataset, with 100 random gene sets of the same size, with 100 random sets whose members came from the same log₂FC deciles of the discovery contrast (DE-matched), and with 100 neighbourhoods of random seed genes built by the same procedure; preservation beyond its shared differential expression required an empirical p ≤ 0.05 against the DE-matched sets. Rewiring was tested per dataset by Fisher's z test of the hub–partner correlation between the two contrast groups (Fisher RA, Biometrika 10:507, 1915; cf. Fukushima A, Gene 518:209, 2013), calibrated against 1,000 random gene pairs from the same log₂FC deciles as the hub and the partner (two-sided empirical p), with BH correction across partners; datasets were not pooled, and replication was counted across the independent comparison datasets (the discovery dataset excluded). `:``}${HUBXCONS?`Consensus hubs were identified by robust rank aggregation (Kolde R, Laur S, Adler P & Vilo J, Bioinformatics 28:573, 2012; RRA score, BH-adjusted) of soft-connectivity ranks (|r|^${HUBXCONS.beta}) computed in each of ${HUBXCONS.nLists} datasets over one common universe of ${HUBXCONS.N.toLocaleString()} genes matched in every dataset, chosen by median variance rank. `:``}`:``}${META?`Effect sizes were combined across datasets (${META.idxs.map((i,a)=>dsLabel(i)+": "+META.clabels[a]+(META.nInfo?`, ${META.nInfo[a].nB} vs ${META.nInfo[a].nA} samples${META.nInfo[a].subj?` from ${META.nInfo[a].subj.n} ${META.nInfo[a].subj.col} levels`:""}`:"")).join("; ")}${META.nInfo?`; ${META.nInfo.reduce((x,m)=>x+m.n,0)} samples in total`:""}) by ${metaModelText(META,"adj")} meta-analysis of each dataset's own log₂ fold change and its standard error (${META.method==="REML"? "between-dataset variance by restricted maximum likelihood; Viechtbauer W, J Educ Behav Stat 30:261, 2005" : META.method==="REM"? "DerSimonian R & Laird N, Control Clin Trials 7:177, 1986" : "inverse-variance weights"}${META.hk? `; ${META.hk==="adhoc"?"truncated ":""}Hartung-Knapp-Sidik-Jonkman standard error and t test on k−1 degrees of freedom: Hartung J & Knapp G, Stat Med 20:3875, 2001; Sidik K & Jonkman JN, Stat Med 21:3153, 2002${META.hk==="adhoc"?"; Knapp G & Hartung J, Stat Med 22:2693, 2003":""}` : "; Wald z test"}; computed as metafor::rma, Viechtbauer W, J Stat Softw 36(3), 2010)${META_DFADJ?`; because each standard error is estimated from few residual degrees of freedom, it was replaced by |log₂FC|/|z|, where z is the normal quantile with the same two-sided tail probability as the dataset's moderated t on its own degrees of freedom`:``}, with Cochran's Q and I² as heterogeneity measures (Higgins JPT & Thompson SG, Stat Med 21:1539, 2002${META.method==="REML"?"; I² computed from the REML estimate of τ², as in metafor":""}), ${META.hk? `a Hartung-Knapp t test on k − 1 degrees of freedom` : `a Wald z test`} and Benjamini-Hochberg correction across the ${META.nTested.toLocaleString()} genes matched in at least ${META.minK} datasets; raw expression values were not combined. The shared signature comprised genes with meta FDR ≤ ${META.fdr}, |pooled log₂FC| ≥ ${META.lfcMin} and the same direction of change in every contributing dataset${META.usePI?`, whose 95% prediction interval for a new study (t distribution with k − 2 df; Riley RD, Higgins JPT & Deeks JJ, BMJ 342:d549, 2011) excluded 0`:``}${META.i2Max<100?`, and I² ≤ ${META.i2Max}%`:``} (${META.sig.length.toLocaleString()} genes)${META.loo.length?`; its robustness was assessed by recomputing it with each dataset omitted`:``}. `:``}${DISCO?`Discovery screening scored gene families (symbol-prefix heuristic) and library gene sets as modules (mean z-score of member genes per sample) and tested group effects with ${DISCO.rows.length&&DISCO.rows[0].camera?"the CAMERA competitive gene-set test accounting for inter-gene correlation (Wu MD & Smyth GK, Nucleic Acids Res 40:e133, 2012)":"a competitive null of "+DISCO.B+" size-matched random gene sets (seeded permutations)"}, BH-FDR across ${DISCO.rows.length} modules (overlapping modules: BH under positive dependence). This is a descriptive screen for coordinated regulation. `:``}${enrResults&&enrResults.mode==="fry"?`${ENRMAT?`The enrichment-across-contrasts matrix ran the same FRY test for each pairwise contrast${DEFIT==="all"?", each within the model fitted to all groups,":", each fitted on its two groups only,"} with BH correction within each contrast. `:``}Self-contained gene-set testing used the FRY fast-rotation test at default settings (posterior-sd standardization; Wu D et al., Bioinformatics 26:2176-2182, 2010 [ROAST], as implemented in limma), BH-corrected, on the unweighted log₂-CPM values${HASCOUNTS?"":" (the log₂ expression values used for differential expression)"} with the linear model of the differential-expression contrast (${DEFIT==="all"?"all groups":"the two compared groups"}${enrResults.covUsed&&enrResults.covUsed.length?", adjusted for "+enrResults.covUsed.join(", "):""}${enrResults.covOut&&enrResults.covOut.length?"; "+enrResults.covOut.join(", ")+" not estimable and left out":""}; ${enrResults.nFit||""} samples)${deMethod==="voom"?"; voom precision weights are not used by FRY":""}. `:``}${enrResults&&enrResults.mode==="gsea"?(GSEAMODE==="samples"?`Gene-set enrichment analysis (Subramanian A et al., PNAS 102:15545-15550, 2005) ranked genes by moderated t and assessed each set with ${GSEAB} sample-label permutations; FDR was estimated from the pooled normalized enrichment scores of the permutations. `:`Preranked gene-set enrichment analysis (gene-set permutation) was used for ranking only; its p-values do not account for correlation between genes. `):``}${enrResults&&(enrResults.mode==="fry"||enrResults.mode==="gsea")&&GMT?`Gene sets were taken from ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library (${enrResults.lib||GMTname})`}. `:``}${enrResults&&(!enrResults.mode||enrResults.mode==="ora")&&GMT?`Gene-set over-representation used one-sided hypergeometric tests against ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library`} with all retained genes as universe, BH-corrected.`:``}${heatClusters&&GMT?` Enrichment of k-means heatmap clusters uses the same test but is reported descriptively: the clusters are data-derived (selected from top DE or most-variable genes), so cluster-level FDR values should not be read as confirmatory hypothesis tests.`:``}${TRAITRES?` Association of gene expression with the sample trait ${TRAITRES.o.trait}${TRAITRES.o.transform!=="none"?` (${TRAITRES.D.trLab}-transformed)`:""} was tested with limma linear models (${traitModelText(TRAITRES).replace("log₂ expression","log₂-CPM")}; the trait standardized, effects reported per unit and per SD) and empirical Bayes moderation with an intensity trend (eBayes(trend = TRUE)) over ${TRAITRES.mode==="means"?`${TRAITRES.n} ${TRAITRES.o.block} means of ${TRAITRES.D.cols.length} samples: because the trait is constant within ${TRAITRES.o.block}, each ${TRAITRES.o.block} was summarized by the mean of its samples${TRAITRES.agg.withinG?", after removing the group effect estimated within blocks,":""} and the means were analysed as independent observations`:`${TRAITRES.n} samples${TRAITRES.blockMode==="dupcor"?`, with ${TRAITRES.o.block} as a random block: the intra-block correlation (${TRAITRES.rho.toFixed(3)}) was estimated by duplicateCorrelation and used in generalized least squares (lmFit with block and correlation; Smyth GK, Michaud J & Scott HS, Bioinformatics 21:2067, 2005)`:""}`}; BH-adjusted p-values. Influential observations were flagged by Cook's distance > 1 (Cook RD, Technometrics 19:15, 1977). `:``}${TRAITCAM?`Gene sets (${TRAITCAM.lib}, 5–500 genes) were tested against the trait coefficient by CAMERA with the inter-gene correlation estimated from the data (Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012). `:``}${TRAITMOD?`Module–trait relationships were tested as in WGCNA (Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008): the eigengene of each module (first principal component of its scaled genes) was tested in the same linear model, reported as the partial correlation t/√(t² + df), with BH correction over the module × trait matrix. `:``}${ANNO?` ${ACCEPTNAMES&&aliasCount(sessAliasesAll())? `Gene names in the expression matrix were used as given: ${acceptNamesNote(aliasCount(sessAliasesAll()), el("species").value)}, and each was treated as that human gene for cross-dataset matching, homology families and built-in gene-set libraries; these assignments rest on the provider's annotation, not on recorded orthology. ` : ``}Gene identifiers were mapped to ${({human:"official HGNC", mouse:"official MGI", rat:"official RGD", pig:"NCBI Gene"})[el("species").value]||"official"} symbols using ${ANNO.source} (${ANNO.name}; ${ANNO.n.toLocaleString()} mappings). Reference: ${ANNO.citation}.`:""}${IXRES?" "+ixMethodsText():""}`;
   el("methodstext").textContent=txt;
 }
 el("copymethods").addEventListener("click",()=>{
@@ -6552,7 +6607,7 @@ function decodeNames(ids, sp){
   if(!m && sp){ m=(ANNO&&ANNO.map)||null; }   // unknown species: last-resort session map
   return ids.map(id=>{ const k=m? (m[id.split(".")[0]]||m[id]) : null; return k||id; });
 }
-function analyzeDatasetB(matrixText, designText, label, groupFactor, speciesOverride){
+function analyzeDatasetB(matrixText, designText, label, groupFactor, speciesOverride, acceptB){
   // speciesOverride: the dataset's own species when it is re-analysed (regrouping, session restore), so the
   // current setting of the species selector does not change how its genes are decoded and matched
   const mx=parseMatrixText(matrixText);
@@ -6637,6 +6692,27 @@ function analyzeDatasetB(matrixText, designText, label, groupFactor, speciesOver
       const key=GENES[g].split(" (")[0].toLowerCase();
       const hit=bByName[key]; if(hit!==undefined){ matchAtoB[g]=hit; matched++; } }
   }
+  // gene names accepted as given (session and/or this dataset): a gene named by a human symbol that is not a symbol of
+  // its species is matched through that human gene; one-to-one only, and only where the ortholog tables gave no match
+  const aliasAll=providerAliases(genes, slotSp), aliasB=acceptB? aliasAll : null, sessAl=cross? sessAliases() : null;
+  const viaName=new Uint8Array(nG); let nViaName=0;
+  if(cross&&(sessAl||aliasB)){
+    const hs=humanSymMap(), sH=sessSp==="human"? null : orthoMap(sessSp,"human"), bH=slotSp==="human"? null : orthoMap(slotSp,"human");
+    const usedB=new Set(); for(let g=0;g<nG;g++) if(matchAtoB[g]>=0) usedB.add(matchAtoB[g]);
+    const idxB={};
+    for(let r=0;r<genes.length;r++){ if(usedB.has(r)) continue;
+      const n=genes[r].split(" (")[0].toLowerCase(), al=aliasB&&aliasB[r];
+      const k2= al? al.toLowerCase() : slotSp==="human"? (hs[n]? n : null) : (bH&&bH[n]? String(bH[n]).toLowerCase() : null);
+      if(k2) (idxB[k2]=idxB[k2]||[]).push({r, al:!!al}); }
+    const cand={};
+    for(let g=0;g<nG;g++){ if(matchAtoB[g]>=0) continue;
+      const n=GENES[g].split(" (")[0].toLowerCase(), al=sessAl&&sessAl[g];
+      const k2= al? al.toLowerCase() : sessSp==="human"? (hs[n]? n : null) : (sH&&sH[n]? String(sH[n]).toLowerCase() : null);
+      if(!k2) continue; const L2=idxB[k2]; if(!L2||L2.length!==1) continue;
+      if(!al&&!L2[0].al) continue;
+      (cand[L2[0].r]=cand[L2[0].r]||[]).push(g); }
+    for(const r in cand){ if(cand[r].length!==1) continue; const g=cand[r][0]; matchAtoB[g]=+r; viaName[g]=1; matched++; nViaName++; }
+  }
   // low-match diagnostic: name the identifier spaces instead of failing silently
   let matchWarn="";
   if(matched < Math.max(50, nG*0.01)){
@@ -6659,6 +6735,7 @@ function analyzeDatasetB(matrixText, designText, label, groupFactor, speciesOver
   const gk0=Object.keys(gi).filter(g=>gi[g].length>=2);
   return {L:Lb, factors, factorNames, libRaw:colsums.slice(), gfactor:(groupFactor&&factors&&factors[groupFactor])? groupFactor : (factors? defaultGroupFactor(factors, factorNames) : null), covSel:[], nG:nGb, nS:ns, ids, genes, groups, sampleNames:mx.sampleNames, gi,
        matchAtoB, matched, nCust, custName:nCust?CUSTMAPNAME:"", matchWarn, hasCounts, species:slotSp, cross, label:label||"dataset",
+       acceptNames:!!acceptB, alias:aliasB, nAliasNames:aliasCount(aliasAll), viaName, nViaName, sessAccept:!!sessAl,
        selA:gk0[0]||"", selB:gk0[1]||gk0[0]||"", res:null, resKey:""};
 }
 function reindexDataset(d){
@@ -6802,12 +6879,35 @@ function matchedGenes(list){
   }
   return out;
 }
+// re-read a comparison dataset from its files with the current matching settings (accepted gene names)
+function rematchDataset(d){
+  if(!d.srcText) return false;
+  const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:d.covSel||[], dupOf:d.dupOf, dupN:d.dupN, svc:d.svc, acceptNames:d.acceptNames};
+  let nd; try{ nd=analyzeDatasetB(d.srcText, d.srcDesign, d.label, d.gfactor, d.species, d.acceptNames); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+'</span>'; return false; }
+  nd.srcText=d.srcText; nd.srcDesign=d.srcDesign;
+  const order=d.groups? firstAppearance(d.groups) : null;
+  for(const k of Object.keys(d)) delete d[k];
+  Object.assign(d, nd, keep); d.resKey="";
+  if(d.svc&&d.svc.design) setDsGroupOrder(d, firstAppearance(d.groups));
+  if(!d.gi[d.selA]) d.selA=null; if(!d.gi[d.selB]) d.selB=null;
+  return true;
+}
+// session setting changed: re-match every comparison dataset, reload the gene-set library, mark results out of date
+function setAcceptNames(on){
+  ACCEPTNAMES=!!on; if(el("acceptnames")) el("acceptnames").checked=ACCEPTNAMES;
+  DSETS.forEach(d=>rematchDataset(d));
+  if(GMTBUILTIN) useBuiltin(GMTBUILTIN);
+  if(typeof FAMALLCACHE!=="undefined") for(const k in FAMALLCACHE) delete FAMALLCACHE[k];
+  SIGFAMIDX=null; FAMHIDX={};
+  if(typeof renderCmpSlots==="function"&&DSETS.length) renderCmpSlots();
+  if(typeof nG!=="undefined"&&nG){ deKey=""; renderAcceptNote(); refreshTab(curTab); }
+}
 function setDsFactor(d, f){
   if(!d.factors||!d.factors[f]) return;
   // regrouping changes filterByExpr's group sizes, so filter, TMM and log-CPM are recomputed from the original files
   if(d.srcText){
-    const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:(d.covSel||[]).filter(x=>x!==f), dupOf:d.dupOf, svc:d.svc};
-    let nd; try{ nd=analyzeDatasetB(d.srcText, d.srcDesign, d.label, f, d.species); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+'</span>'; return; }
+    const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:(d.covSel||[]).filter(x=>x!==f), dupOf:d.dupOf, svc:d.svc, acceptNames:d.acceptNames};
+    let nd; try{ nd=analyzeDatasetB(d.srcText, d.srcDesign, d.label, f, d.species, d.acceptNames); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+'</span>'; return; }
     nd.srcText=d.srcText; nd.srcDesign=d.srcDesign;
     for(const k of Object.keys(d)) delete d[k];
     Object.assign(d, nd, keep); d.resKey="";
@@ -6830,7 +6930,7 @@ function renderCmpSlots(){
     const gk=(d.gorder||Object.keys(d.gi)).filter(g=>d.gi[g]&&d.gi[g].length>=2);
     const slot=document.createElement("div");
     slot.className="grp"; slot.style.cssText="display:block;margin:6px 0;padding:8px 10px";
-    slot.innerHTML=`<input type="text" class="slotlab" data-k="${k2}" value="${esc(d.label)}" title="Name used for this dataset in every plot, table, export and the methods text. Press Enter to apply." style="width:170px;font-weight:600">: ${d.nG.toLocaleString()} genes × ${d.nS} samples · ${d.nCust?`custom map (${d.nCust.toLocaleString()}) + `:``}${d.cross? orthoSource(el("species").value, d.species).label : "symbol"} match ${(100*d.matched/nG).toFixed(1)}%${d.hasCounts?" · TMM":""}${d.cross?" · "+d.species:""}${d.matchWarn?`<br><span class="warnchip">\u26a0 ${d.matchWarn}</span>`:""}${d.dupOf?`<div class="alertbox"><span class="alerthead">\u26a0 Same data loaded twice</span>${d.dupN&&d.dupN<d.nS? `${d.dupN} of the ${d.nS} samples` : `All ${d.nS} samples`} are also in ${esc(d.dupOf==="session"? (/session/i.test(dsLabel(0))? dsLabel(0) : dsLabel(0)+" (the session data)") : d.dupOf.label)}, matched by sample ID or identical library size. Analysed together, the same samples would be counted as independent evidence. It is left out of the meta-analysis by default, and of the pooled signature replication and the across-dataset family and hub analyses; remove it, or it is counted twice in the consensus table.</div>`:""}
+    slot.innerHTML=`<input type="text" class="slotlab" data-k="${k2}" value="${esc(d.label)}" title="Name used for this dataset in every plot, table, export and the methods text. Press Enter to apply." style="width:170px;font-weight:600">: ${d.nG.toLocaleString()} genes × ${d.nS} samples · ${d.nCust?`custom map (${d.nCust.toLocaleString()}) + `:``}${d.cross? orthoSource(el("species").value, d.species).label : "symbol"} match ${(100*d.matched/nG).toFixed(1)}%${d.hasCounts?" · TMM":""}${d.cross?" · "+d.species:""}${d.nViaName? ` · ${d.nViaName.toLocaleString()} matched through gene names used as given` : ""}${(d.nAliasNames||d.acceptNames)? `<br><label class="footer-note" title="This matrix names ${(d.nAliasNames||0).toLocaleString()} genes by human gene symbols that are not ${esc(d.species)} symbols (provider annotation by similarity). Ticked: each is treated as that human gene for matching, homology families and signature replication; not recorded orthology."><input type="checkbox" class="slotAcc" data-k="${k2}"${d.acceptNames?" checked":""}> use this dataset's gene names as given (${(d.nAliasNames||0).toLocaleString()} named by human symbols)</label>` : ""}${d.matchWarn?`<br><span class="warnchip">\u26a0 ${d.matchWarn}</span>`:""}${d.dupOf?`<div class="alertbox"><span class="alerthead">\u26a0 Same data loaded twice</span>${d.dupN&&d.dupN<d.nS? `${d.dupN} of the ${d.nS} samples` : `All ${d.nS} samples`} are also in ${esc(d.dupOf==="session"? (/session/i.test(dsLabel(0))? dsLabel(0) : dsLabel(0)+" (the session data)") : d.dupOf.label)}, matched by sample ID or identical library size. Analysed together, the same samples would be counted as independent evidence. It is left out of the meta-analysis by default, and of the pooled signature replication and the across-dataset family and hub analyses; remove it, or it is counted twice in the consensus table.</div>`:""}
       &nbsp; contrast: <select class="slotA" data-k="${k2}">${gk.map(g=>`<option${g===d.selA?" selected":""}>${g}</option>`).join("")}</select>
       vs <select class="slotB" data-k="${k2}">${gk.map(g=>`<option${g===d.selB?" selected":""}>${g}</option>`).join("")}</select>
       ${d.factorNames&&d.factorNames.length>1? `&nbsp; groups from <select class="slotF" data-k="${k2}">${d.factorNames.map(f=>`<option${f===d.gfactor?" selected":""}>${esc(f)}</option>`).join("")}</select>
@@ -6844,6 +6944,7 @@ function renderCmpSlots(){
   div.querySelectorAll(".slotA").forEach(s=>s.addEventListener("change",()=>{ const d=DSETS[+s.dataset.k]; d.selA=s.value; d.resKey=""; }));
   div.querySelectorAll(".slotB").forEach(s=>s.addEventListener("change",()=>{ const d=DSETS[+s.dataset.k]; d.selB=s.value; d.resKey=""; }));
   div.querySelectorAll(".slotrm").forEach(b=>b.addEventListener("click",()=>{ DSETS.splice(+b.dataset.k,1); refreshCmpUI(); }));
+  div.querySelectorAll(".slotAcc").forEach(c=>c.addEventListener("change",()=>{ const d=DSETS[+c.dataset.k]; d.acceptNames=c.checked; rematchDataset(d); SIGFAMIDX=null; for(const k of Object.keys(FAMALLCACHE)) delete FAMALLCACHE[k]; refreshCmpUI(); }));
   div.querySelectorAll(".slotmv").forEach(b=>b.addEventListener("click",()=>moveDataset(+b.dataset.k, +b.dataset.d)));
   div.querySelectorAll(".slotF").forEach(s=>s.addEventListener("change",()=>{ const d=DSETS[+s.dataset.k]; setDsFactor(d, s.value); refreshCmpUI(); }));
   div.querySelectorAll(".slotC").forEach(c=>c.addEventListener("change",()=>{ const d=DSETS[+c.dataset.k], f=c.dataset.f;
@@ -6978,7 +7079,7 @@ function onAddDataset(){
   if(!CMPB_TXT) return;
   let svcB=null; try{ svcB=prepCmpService(); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+"</span>"; CMPB_TXT=null; CMPB_DES=null; CMPB_SHEETS=[]; return; }
   let d;
-  try{ d=analyzeDatasetB(CMPB_TXT, CMPB_DES, uniqueDsLabel(defaultDsLabel(CMPB_NAME||("dataset "+(DSETS.length+1))), -1)); }
+  try{ d=analyzeDatasetB(CMPB_TXT, CMPB_DES, uniqueDsLabel(defaultDsLabel(CMPB_NAME||("dataset "+(DSETS.length+1))), -1), null, null, !!(el("cmpaccept")&&el("cmpaccept").checked)); }
   catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+"</span>"; return; }
   d.srcText=CMPB_TXT; d.srcDesign=CMPB_DES;
   // the same data loaded twice (for example the session's own file), in full or in part, under the same or
@@ -7034,9 +7135,9 @@ function applySheetToLastDataset(sheet){
   const d=DSETS[DSETS.length-1]; const raw=(d.svc&&d.svc.raw)||d.srcText;
   const sheets=((d.svc&&d.svc.sheets)||[]).concat([sheet]);
   const B=serviceBundle(raw, sheets, serviceName([d.label, sheet.fname||""])); B.sheets=sheets;
-  const nd=analyzeDatasetB(B.matrixText, B.designText, d.label, null, d.species);
+  const nd=analyzeDatasetB(B.matrixText, B.designText, d.label, null, d.species, d.acceptNames);
   nd.srcText=B.matrixText; nd.srcDesign=B.designText;
-  const keep={label:d.label, dupOf:d.dupOf, dupN:d.dupN};
+  const keep={label:d.label, dupOf:d.dupOf, dupN:d.dupN, acceptNames:d.acceptNames};
   for(const k of Object.keys(d)) delete d[k]; Object.assign(d, nd, keep);
   CMPB_RAW=raw; serviceDatasetSetup(d, B);
   refreshCmpUI(); el("cmpinfo").innerHTML=serviceDatasetNote(d);
@@ -7242,6 +7343,7 @@ function famSide(v){
     const gi=groupsIdx();
     return {key:"s", label:dsLabel(0), sp:el("species").value, isSession:true,
       byName:n=>nameToIdx[n.toLowerCase()], name:r=>GENES[r].split(" (")[0],
+      aIdx:sessAliases()? aliasIndex(sessAliases()) : null, famRows(f, lk){ return famRowsFor(f, lk, this.byName, this.aIdx); },
       A:el("selA").value, B:el("selB").value,
       groupsList:GROUPS.filter(g=>gi[g]&&gi[g].length), color:g=>GCOL[g],
       scoreGroups(rows){ const {sc, idx}=scoreSessionRows(rows); const pos={}; idx.forEach((q,k)=>pos[q]=k);
@@ -7252,9 +7354,61 @@ function famSide(v){
   const gl=Object.keys(d.gi).filter(g=>d.gi[g].length);
   return {key:String(v), label:d.label, sp:d.species, isSession:false, d,
     byName:n=>by[n.toLowerCase()], name:r=>d.genes[r].split(" (")[0],
+    aIdx:d.alias? aliasIndex(d.alias) : null, famRows(f, lk){ return famRowsFor(f, lk, this.byName, this.aIdx); },
     A:d.selA, B:d.selB, groupsList:gl, color:g=>PAL[gl.indexOf(g)%PAL.length],
     scoreGroups(rows){ const sc=sigScoreInB(d, rows); const out={}; gl.forEach(g=>{ out[g]=d.gi[g].map(q=>sc[q]); }); return out; }};
 }
+// Gene names supplied with a matrix that are human gene symbols but not symbols of the dataset's species, as when
+// a sequencing provider names pig or rat genes by similarity to human proteins. When the user accepts the matrix's
+// names (session: ACCEPTNAMES; comparison dataset: d.acceptNames), such a gene is treated as that human gene for
+// cross-species matching, homology families and the built-in gene-set libraries. This is provider annotation, not
+// recorded orthology, and is reported as such.
+let ACCEPTNAMES=false;
+const NATIVESYM={}; let HUMANSYM=null, SESSALIAS=null;
+function nativeSymSet(sp){
+  if(NATIVESYM[sp]!==undefined) return NATIVESYM[sp];
+  const m=builtinMapFor(sp); NATIVESYM[sp]= m? new Set(Object.values(m.map).map(x=>String(x).toLowerCase())) : null; return NATIVESYM[sp];
+}
+function humanSymMap(){
+  if(!HUMANSYM){ HUMANSYM={}; const m=builtinMapFor("human"); if(m) for(const k in m.map){ const v=String(m.map[k]); HUMANSYM[v.toLowerCase()]=v; } }
+  return HUMANSYM;
+}
+// per gene: the human symbol its name stands for, or null (native symbol, identifier, unknown, or a name used twice)
+function providerAliases(names, sp){
+  if(!names||!sp||sp==="human"||!SPKEY[sp]) return null;
+  const own=nativeSymSet(sp), hs=humanSymMap(); if(!own) return null;
+  const base=names.map(n=>String(n).split(" (")[0]), cnt={};
+  base.forEach(b=>{ const l=b.toLowerCase(); cnt[l]=(cnt[l]||0)+1; });
+  return base.map(b=>{ const l=b.toLowerCase(); if(cnt[l]>1||own.has(l)||/^ENS[A-Z]*G\d{6,}/.test(b)) return null; return hs[l]||null; });
+}
+function sessAliasesAll(){
+  const sp=el("species")? el("species").value : "";
+  if(!SESSALIAS||SESSALIAS.genes!==GENES||SESSALIAS.sp!==sp) SESSALIAS={genes:GENES, sp, a:providerAliases(GENES||[], sp)};
+  return SESSALIAS.a;
+}
+function sessAliases(){ return ACCEPTNAMES? sessAliasesAll() : null; }
+function aliasCount(a){ return a? a.reduce((n,x)=>n+(x?1:0),0) : 0; }
+// human symbol (lower case) -> rows carrying it as an accepted name
+function aliasIndex(a){ const ix={}; if(a) a.forEach((x,r)=>{ if(x) (ix[x.toLowerCase()]=ix[x.toLowerCase()]||[]).push(r); }); return ix; }
+// rows of a homology family on one side: the family's members of that species by name, plus (names accepted) rows
+// whose name is a human member of the family
+function famRowsFor(f, lk, byName, aIdx){
+  const rows=(f[lk]||[]).map(n=>byName(n)).filter(g=>g!==undefined);
+  if(aIdx&&lk!=="h") (f.h||[]).forEach(n=>(aIdx[n.toLowerCase()]||[]).forEach(r=>{ if(!rows.includes(r)) rows.push(r); }));
+  return rows;
+}
+function acceptNamesNote(n, sp){
+  return `${n.toLocaleString()} gene name${n===1?"":"s"} in the ${sp} matrix ${n===1?"is a human gene symbol":"are human gene symbols"}, not ${sp} symbols (provider annotation by similarity)`;
+}
+function acceptNoteHTML(){
+  const sp=el("species").value, a=sessAliasesAll(), n=aliasCount(a); if(!n) return "";
+  const ex=[]; a.forEach((x,g)=>{ if(x&&ex.length<4) ex.push(GENES[g]); });
+  return ACCEPTNAMES
+    ? `<b>Gene names used as given:</b> ${acceptNamesNote(n, sp)}, for example ${ex.map(esc).join(", ")}. As chosen in step 2b, each is treated as that human gene for matching to datasets of another species, homology families and the built-in gene-set libraries. These assignments rest on the provider's annotation, not on recorded orthology, and the methods text says so.`
+    : `${acceptNamesNote(n, sp).replace(/^./, c=>c.toUpperCase())}, for example ${ex.map(esc).join(", ")}. They are analysed as named, but have no ${sp} ortholog record, so they are not matched to datasets of another species and are in no ${sp} gene set. <a href="#" id="acceptnow">Use these names as given</a> (step 2b) to treat each as the human gene it names.`;
+}
+function renderAcceptNote(){ const e=document.getElementById("acceptnote"); if(e) e.innerHTML=acceptNoteHTML(); wireAcceptNow(); }
+function wireAcceptNow(){ const a=document.getElementById("acceptnow"); if(a&&!a._w){ a._w=1; a.addEventListener("click",ev=>{ ev.preventDefault(); setAcceptNames(true); }); } }
 function famList(sp){ return SPKEY[sp]||null; }
 function runFamilies(){
   famReset();   // never leave a previous run's table under a failed or different run
@@ -7271,8 +7425,8 @@ function runFamilies(){
   const rowsOut=[];
   ORTHO_FAM.forEach((f,fk)=>{
     if(!famFor(f, lx, ly)) return;
-    const xRows=f[lx].map(n=>X.byName(n)).filter(g=>g!==undefined);
-    const yRows=f[ly].map(n=>Y.byName(n)).filter(g=>g!==undefined);
+    const xRows=X.famRows(f, lx);
+    const yRows=Y.famRows(f, ly);
     if(xRows.length<1||yRows.length<1) return;
     const sx=X.scoreGroups(xRows), sy=Y.scoreGroups(yRows);
     const wA=welch(sx[X.A]||[], sx[X.B]||[]), wB=welch(sy[Y.A]||[], sy[Y.B]||[]);
@@ -7383,7 +7537,7 @@ function famAllScore(Z){
   let nA=0, nB=0;
   ORTHO_FAM.forEach((f,k)=>{
     if(!famActive(f, P)) return;
-    const rows=f[Z.lk].map(n=>Z.byName(n)).filter(g=>g!==undefined); if(!rows.length) return;
+    const rows=Z.famRows(f, Z.lk); if(!rows.length) return;
     const sc=Z.scoreGroups(rows), a=sc[Z.A]||[], b=sc[Z.B]||[]; nA=a.length; nB=b.length;
     const w=welch(a, b); if(!w||!isFinite(w.p)) return;
     res[k]={d:w.d, p:w.p, k:rows.length, t:f[Z.lk].length}; ps.push(w.p); ix.push(k);
@@ -7445,7 +7599,7 @@ function drawFamDot(){
 }
 function drawFamDetailAll(k){
   if(!FAMDOT) return; const f=ORTHO_FAM[k], sides=FAMDOT.sides, nD=sides.length, traces=[], annos=[];
-  sides.forEach((Z,j)=>{ const rows=f[Z.lk].map(n=>Z.byName(n)).filter(g=>g!==undefined); const ax=j? String(j+1) : "";
+  sides.forEach((Z,j)=>{ const rows=Z.famRows(f, Z.lk); const ax=j? String(j+1) : "";
     if(!rows.length){ annos.push({text:`${esc(Z.label)}: no members`, xref:`x${ax} domain`, yref:"paper", x:0.5, y:1, yanchor:"bottom", showarrow:false, font:{size:10}}); return; }
     const sc=Z.scoreGroups(rows), r=FAMDOT.sc[j].res[k];
     [Z.A, Z.B].forEach(g=>traces.push({y:sc[g]||[], type:"box", name:g, boxpoints:"all", jitter:0.5, pointpos:0, marker:{color:Z.color(g), size:5}, line:{color:Z.color(g)}, xaxis:"x"+ax, yaxis:"y"+ax, showlegend:false}));
@@ -8011,6 +8165,13 @@ function sigSpec(){
 }
 // session-species symbol -> index of its homology family
 let SIGFAMIDX=null;
+// family index keyed by the family's human members, for families applicable to the species pair
+let FAMHIDX={};
+function famHIndex(la, lb){
+  const id=la+"|"+lb; if(FAMHIDX[id]) return FAMHIDX[id];
+  const map={}; ORTHO_FAM.forEach((f,k)=>{ if(!famFor(f, la, lb)) return; (f.h||[]).forEach(n=>{ const key=n.toLowerCase(); if(map[key]===undefined) map[key]=k; }); });
+  return (FAMHIDX[id]=map);
+}
 function sigFamIndex(lk, lb){
   const id=lk+"|"+lb; if(SIGFAMIDX&&SIGFAMIDX.lk===id) return SIGFAMIDX.map;
   const map={}; ORTHO_FAM.forEach((f,k)=>{ if(!famFor(f, lk, lb)) return; f[lk].forEach(n=>{ const key=n.toLowerCase(); if(map[key]===undefined) map[key]=k; }); });
@@ -8024,6 +8185,9 @@ function sigMapper(d, useFam){
   const sessSp=el("species").value, la=famList(sessSp), lb=famList(d.species), cross=!!(la&&lb&&la!==lb);
   const byB={}; if(cross&&useFam) d.genes.forEach((nm,k2)=>{ const key=nm.split(" (")[0].toLowerCase(); if(byB[key]===undefined) byB[key]=k2; });
   const fidx= cross&&useFam? sigFamIndex(la, lb) : null;
+  // accepted names: a session gene named by a human symbol finds its family through the family's human members, and
+  // the dataset's rows named by a human member join that family's rows
+  const sAl=sessAliases(), hfidx= fidx&&(sAl||d.alias)&&la!=="h"? famHIndex(la, lb) : null, bAIdx= fidx&&d.alias&&lb!=="h"? aliasIndex(d.alias) : null;
   const famRows={};   // family index -> member rows of d
   const sym=GENES.map(n=>n.split(" (")[0].toLowerCase());
   return function(spec){
@@ -8032,11 +8196,12 @@ function sigMapper(d, useFam){
       const g=spec.genes[i], sg=spec.sign[i], b=d.matchAtoB[g];
       if(b>=0&&!used.has(b)){ used.add(b); units.push({rows:[b], kind:cross?"ortholog":"same", src:[g], sign:sg}); continue; }
       if(fidx){
-        const k=fidx[sym[g]];
+        let k=fidx[sym[g]];
+        if(k===undefined&&hfidx&&sAl&&sAl[g]) k=hfidx[sAl[g].toLowerCase()];
         if(k!==undefined){
           const key=k+"|"+sg;
           if(famUnit[key]){ famUnit[key].src.push(g); continue; }
-          if(!famRows[k]) famRows[k]=ORTHO_FAM[k][lb].map(n=>byB[n.toLowerCase()]).filter(r=>r!==undefined);
+          if(!famRows[k]) famRows[k]=famRowsFor(ORTHO_FAM[k], lb, n=>byB[n.toLowerCase()], bAIdx);
           const rows=famRows[k].filter(r=>!used.has(r));
           if(rows.length){ rows.forEach(r=>used.add(r)); const u={rows, kind:"family", fam:k, src:[g], sign:sg}; units.push(u); famUnit[key]=u; continue; }
         }
@@ -11971,7 +12136,7 @@ function sessionState(){
     de:{A:el("selA").value, B:el("selB").value, fdr:el("selFDR").value, thr:el("fcthr").value, method:deMethod},
     gene:curGene!==null?GENES[curGene]:null, compare:compareList.map(g=>GENES[g]),
     gmt:GMT?(GMTBUILTIN?{builtin:GMTBUILTIN}:{name:GMTname, sets:GMT}):null, enrMethod,
-    anno:ANNO?(ANNO.builtin?{builtin:ANNO.builtin}:ANNO):null, species:el("species").value,
+    anno:ANNO?(ANNO.builtin?{builtin:ANNO.builtin}:ANNO):null, species:el("species").value, acceptNames:ACCEPTNAMES,
     pat:{N:el("patN").value, K:el("patK").value}, heatN:el("heatN").value, heat:{ord:el("heatord").value, K:el("heatK").value}, ix:{A1:el("ixA1").value, B1:el("ixB1").value, A2:el("ixA2").value, B2:el("ixB2").value, meth:el("ixmeth").value, fit:el("ixfit").value, fdr:el("ixfdr").value, lfc:el("ixlfc").value, cov:[...el("ixcov").querySelectorAll("input:checked")].map(x=>x.dataset.c)}, sig:{fam:el("sigfam").checked}, meta:{method:el("metamethod").value, hk:el("metahk").value, mink:el("metamink").value, fdr:el("metafdr").value, lfc:el("metalfc").value, pi:el("metapi").checked}};
 }
 el("savesess").addEventListener("click",()=>{
@@ -12124,6 +12289,7 @@ function applySession(ss){
     else { GMT=ss.gmt.sets; GMTname=ss.gmt.name; GMTCITE=""; GMTBUILTIN=""; el("gmtinfo").textContent=`${GMT.length} gene sets restored from session (${GMTname})`; }
   }
   if(ss.species) el("species").value=ss.species;
+  ACCEPTNAMES=!!ss.acceptNames; if(el("acceptnames")) el("acceptnames").checked=ACCEPTNAMES; if(GMTBUILTIN) useBuiltin(GMTBUILTIN);
   if(ss.anno){
     if(ss.anno.builtin){ el("species").value=ss.anno.builtin; useBuiltinAnno(); }
     else {

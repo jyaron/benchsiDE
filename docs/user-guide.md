@@ -494,6 +494,10 @@ Under **Signature transfer and replication**, choose a signature from the sessio
 3. Read the forest plot: Hedges' g of the score in each dataset, the discovery dataset for reference, and the pooled estimate over the comparison datasets (model and test as chosen in the meta-analysis card). With two comparison datasets the pooled Hartung–Knapp test has 1 degree of freedom; rely on the per-dataset results.
 4. **Export results (CSV)** and **Export gene mapping (CSV)** save the tables; the forest plot's data button saves an Excel sheet in Prism layout.
 
+A gene with no one-to-one ortholog is not matched between species. Some providers name pig or rat genes by similarity to human proteins (for example SERPINB3 for a gene that NCBI and Ensembl list as LOC110261633, "serpin B3-like"); such names are not symbols of the species, have no ortholog record and are reported at loading. In the Gene Explorer panel for comparison datasets, the other dataset's gene of the same name is then shown, marked as not a verified ortholog, with the reason and the gene's homology family. Cross-dataset statistics (concordance, meta-analysis, signature replication) use verified orthologs and families only.
+
+To use such names in all analyses, tick **Use the gene names in the matrix as given** in step 2b (it can also be changed after analysis), or **use its gene names as given** when adding a comparison dataset (and on the dataset's row). Each gene named by a human symbol that is not a symbol of its species is then treated as that human gene: it is matched one to one to datasets of another species where the ortholog tables give no match, joins that human gene's homology family, and is placed in the gene sets that hold that human gene in the human library. A name used for more than one gene is not used. The assignment rests on the provider's annotation, not on recorded orthology; the notes, the dataset row, the Gene Explorer, the enrichment results and the methods text say where it was used.
+
 ---
 
 ## 10. Tutorial G: figures, reports, sessions and methods text

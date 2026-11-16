@@ -1076,6 +1076,91 @@ def gene_sets_rat_pig():
     return ok, r
 
 
+NAMED_XSP_JS = r"""
+  // a pig matrix named by symbols, built from a human dataset through the pig-human one-to-one table, with one extra
+  // row named by a human symbol that is not a pig symbol (SERPINB3), as delivered by some providers
+  const lines=@MAT@.trim().split("\n"), hm=builtinMapFor("human").map, OM=orthoMap("human","pig");
+  const out=[lines[0]], seen=new Set(); let sb3=null;
+  for(const l of lines.slice(1)){ const t=l.indexOf("\t"), hs=hm[l.slice(0,t)]; if(!hs) continue;
+    if(hs==="SERPINB3") sb3=l.slice(t);
+    const p=OM[hs.toLowerCase()]; if(!p||seen.has(p)) continue; seen.add(p); out.push(p+l.slice(t)); }
+  out.push("SERPINB3"+sb3);
+  el("species").value="pig"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(out.join("\n")+"\n", @DES@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  el("cmpspecies").value="human"; CMPB_TXT=@MAT@; CMPB_DES=@DES@; CMPB_NAME="H"; onAddDataset(); __drain();
+  const d=DSETS[0], R={cross:d.cross, warn:/gene names? in the pig matrix (is a human gene symbol|are human gene symbols), not pig symbols/.test(el("qcwarn")._c||"")};
+  for(const g of ["SERPINB3","S100A8"]){ curGene=nameToIdx[g.toLowerCase()]; el("genebq").value=""; drawGeneB();
+    const LK=geneLookupInDataset(d, ""); const c=plotlyCalls.filter(x=>x.id==="p_geneb_0").pop();
+    R[g]={how:LK.how, row:LK.r>=0? d.genes[LK.r] : null, note:LK.note, title:c&&c.layout.title.text}; }
+  print("R " + JSON.stringify(R));
+"""
+
+
+@check
+def cross_species_named_genes():
+    # a session gene whose name is not a symbol of the session species has no ortholog: the comparison dataset's gene
+    # of the same name is shown, marked as not a verified ortholog, with the reason and the homology family
+    o = run(APP, NAMED_XSP_JS.replace("@MAT@", J(mat("GSE54456"))).replace("@DES@", J(des("GSE54456"))), timeout=1800)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-800:]}
+    r = R[0]; a, b = r.get("SERPINB3") or {}, r.get("S100A8") or {}
+    ok = (r["cross"] and r["warn"] and a.get("how") == "name" and a.get("row") == "SERPINB3" and "not a pig gene symbol" in a.get("note", "")
+          and "not a verified ortholog" in (a.get("title") or "") and "LOC110261633" in a.get("note", "")
+          and b.get("how") == "match" and b.get("row") == "S100A8" and b.get("note") == "" and "verified" not in (b.get("title") or ""))
+    return ok, r
+
+
+ACCEPT_JS = r"""
+  const lines=@MAT@.trim().split("\n"), hm=builtinMapFor("human").map, OM=orthoMap("human","pig");
+  const out=[lines[0]], seen=new Set(); let sb3=null;
+  for(const l of lines.slice(1)){ const t=l.indexOf("\t"), hs=hm[l.slice(0,t)]; if(!hs) continue;
+    if(hs==="SERPINB3") sb3=l.slice(t);
+    const p=OM[hs.toLowerCase()]; if(!p||seen.has(p)) continue; seen.add(p); out.push(p+l.slice(t)); }
+  out.push("SERPINB3"+sb3); const PIG=out.join("\n")+"\n";
+  const R={};
+  // session pig, comparison human; option off, then switched on after analysis
+  el("species").value="pig"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe"; ACCEPTNAMES=false; el("acceptnames").checked=false;
+  loadFromText(PIG, @DES@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  el("cmpspecies").value="human"; el("cmpaccept").checked=false; CMPB_TXT=@MAT@; CMPB_DES=@DES@; CMPB_NAME="H"; onAddDataset(); __drain();
+  useBuiltin("gobp_ss");
+  const g=nameToIdx["serpinb3"], d=DSETS[0], fk=ORTHO_FAM.findIndex(f=>f.h.includes("SERPINB3"));
+  const inSets=()=>GMT.filter(x=>x.genes.some(y=>y.toLowerCase()==="serpinb3")).length;
+  const before={m:Array.from(d.matchAtoB), how:geneLookupInDataset(d,"SERPINB3").how, fam:famSide("s").famRows(ORTHO_FAM[fk],"p").length, sets:inSets(), note:/Use these names as given/.test(el("qcwarn")._c||"")};
+  setAcceptNames(true);
+  const d2=DSETS[0], after={via:d2.nViaName, viaSb3:!!d2.viaName[g], how:geneLookupInDataset(d2,"SERPINB3").how, fam:famSide("s").famRows(ORTHO_FAM[fk],"p").map(r=>GENES[r]), sets:inSets(), gmtAlias:GMTALIAS};
+  let changed=0; for(let i=0;i<nG;i++) if(!d2.viaName[i]&&d2.matchAtoB[i]!==before.m[i]) changed++;
+  after.otherChanged=changed;
+  genMethods(); const mt=el("methodstext").textContent; after.methods=[/Gene names in the expression matrix were used as given/.test(mt), /matched one to one through gene names used as given/.test(mt)];
+  after.session=sessionState().acceptNames===true;
+  delete before.m; R.session={before, after};
+  // session human, comparison pig with its names accepted
+  ACCEPTNAMES=false; el("acceptnames").checked=false; DSETS.length=0;
+  el("species").value="human"; useBuiltinAnno(); loadFromText(@MAT@, @DES@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("cmpspecies").value="pig"; el("cmpaccept").checked=true; CMPB_TXT=PIG; CMPB_DES=@DES@; CMPB_NAME="P"; onAddDataset(); __drain();
+  const e=DSETS[0], h=nameToIdx["serpinb3"]; const Z=famSide("0");
+  R.dataset={acc:e.acceptNames, via:e.nViaName, row:e.matchAtoB[h]>=0? e.genes[e.matchAtoB[h]] : null, how:(curGene=h, geneLookupInDataset(e,"").how), fam:Z.famRows(ORTHO_FAM[fk],"p").map(r=>e.genes[r])};
+  print("R " + JSON.stringify(R));
+"""
+
+
+@check
+def accept_gene_names():
+    # names in a matrix that are human symbols but not symbols of its species (provider annotation): off by default;
+    # when accepted (session, after analysis, or for one comparison dataset) such a gene is matched one to one to the
+    # human gene, joins its homology family and its gene sets, and is reported as such; other matches are unchanged
+    o = run(APP, ACCEPT_JS.replace("@MAT@", J(mat("GSE54456"))).replace("@DES@", J(des("GSE54456"))), timeout=2400)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-800:]}
+    r = R[0]; b, a, d = r["session"]["before"], r["session"]["after"], r["dataset"]
+    ok = (b["how"] == "name" and b["fam"] == 0 and b["sets"] == 0 and b["note"]
+          and a["viaSb3"] and a["via"] >= 1 and a["how"] == "alias" and a["fam"] == ["SERPINB3"] and a["sets"] > 0 and a["gmtAlias"] > 0
+          and a["otherChanged"] == 0 and a["methods"] == [True, True] and a["session"]
+          and d["acc"] and d["via"] >= 1 and d["row"] == "SERPINB3" and d["how"] == "alias" and d["fam"] == ["SERPINB3"])
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0
