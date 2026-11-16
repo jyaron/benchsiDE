@@ -110,11 +110,11 @@ The same files can be added as a comparison dataset in the Compare tab: select t
 
 ### 2.3 Gene-set libraries (optional)
 
-Built-in libraries (from MSigDB v2024.1, CC BY 4.0): Hallmark, GO Biological Process, GO Cellular Component, GO Molecular Function and Reactome, each for human and mouse. You can also load any `.gmt` file.
+Built-in libraries (from MSigDB v2024.1, CC BY 4.0): Hallmark, GO Biological Process, GO Cellular Component, GO Molecular Function and Reactome, each for human and mouse. The same five libraries are offered for rat and pig. MSigDB has no rat or pig collections, so these are the human sets with each gene replaced by its rat orthologs (MGI) or pig orthologs (Ensembl Compara). They are not curated for those species, rat or pig genes without a human ortholog are in no set, and the app says so wherever such a library is used. Choose the library of your data's species; a warning appears if they differ. You can also load any `.gmt` file.
 
 ### 2.4 Annotation and identifier maps (optional)
 
-For mouse, human and rat, built-in annotation converts Ensembl and Entrez IDs to gene symbols. For other species, or for probe IDs, supply a two-column TSV (identifier, symbol).
+For human, mouse, rat and pig, built-in annotation converts Ensembl and Entrez IDs to gene symbols. For pig this includes the Ensembl IDs of the breed assemblies (for example Large White, ENSSSCG00025...). A placeholder in the matrix's gene-name column ("--", "NA", empty) is ignored and the gene is named from its identifier. For other species, or for probe IDs, supply a two-column TSV (identifier, symbol).
 
 ---
 
@@ -407,7 +407,7 @@ Each dataset has a name field. A GEO file such as `GSE54456_raw_counts_GRCh38.p1
 ### Step 2. How genes are matched
 
 - Same species: by gene symbol, case-insensitive.
-- Mouse and human: by MGI strict one-to-one orthologs, which handles renamed genes (for example Trp53 and TP53).
+- Different species (human, mouse, rat, pig): by strict one-to-one orthologs, which handles renamed genes (for example Trp53 and TP53). Human, mouse and rat use MGI vertebrate homology; pig uses Ensembl Compara. Set the dataset's species in the **species** menu before adding it.
 - **Custom ID map**: a two-column file that overrides both, for other species or special cases.
 
 ### Step 3. Compare a pair
@@ -489,7 +489,7 @@ A neighbourhood found in one dataset should be judged by its preservation in the
 
 Under **Signature transfer and replication**, choose a signature from the session (up-regulated, down-regulated, or up and down with signs; a hub neighbourhood; or a Discovery module) and click **Score**.
 
-1. For human–mouse comparisons, leave **use homology families** ticked: genes without a one-to-one ortholog (for example *Serpinb3a/b/c*) are then scored through their family instead of being dropped. Open **Gene mapping in each dataset** to see how each gene was matched.
+1. For comparisons between species, leave **use homology families** ticked: genes without a one-to-one ortholog (for example *Serpinb3a/b/c*) are then scored through their family instead of being dropped. Open **Gene mapping in each dataset** to see how each gene was matched.
 2. Read each dataset's line. *Replicates* means the score differs between that dataset's groups (Welch t-test) and differs more than for 1,000 random signatures transferred the same way, both at p ≤ 0.05, in the expected direction. *The score differs, but no more than for random genes* means the contrast changes so many genes that this signature is not distinguishable from a random one.
 3. Read the forest plot: Hedges' g of the score in each dataset, the discovery dataset for reference, and the pooled estimate over the comparison datasets (model and test as chosen in the meta-analysis card). With two comparison datasets the pooled Hartung–Knapp test has 1 degree of freedom; rely on the per-dataset results.
 4. **Export results (CSV)** and **Export gene mapping (CSV)** save the tables; the forest plot's data button saves an Excel sheet in Prism layout.

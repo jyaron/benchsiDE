@@ -11,3 +11,4 @@ bench-results/
 tests/engine/data/
 validation/fuzz/work/
 validation/fuzz/work_seed1/
+build/

@@ -5,10 +5,12 @@ benchsiDE application code is released under the MIT License (`LICENSE`). The ap
 | Resource | Use in benchsiDE | License | Modification | Terms verified |
 |---|---|---|---|---|
 | Plotly.js 2.32.0 | Plotting. Loaded from the Plotly CDN by `index.html`; embedded in the offline build. | [MIT](https://github.com/plotly/plotly.js/blob/master/LICENSE) | Unmodified | Bundle header |
-| MSigDB v2024.1: Hallmark, GO BP, GO CC, GO MF and Reactome collections (human and mouse) | Built-in gene-set libraries | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Re-encoded; set membership unchanged | <https://www.gsea-msigdb.org/gsea/license_terms_list.jsp> and <https://www.gsea-msigdb.org/gsea/msigdb_license_terms.jsp> (2026-10-01): CC BY 4.0 for v6.0–v7.5.1 and v2022.1 and later. Sets with additional terms (KEGG MEDICUS, CC BY-SA 4.0; other KEGG, licensed to the Broad Institute; BioCarta) are not embedded; the embedded libraries were checked to contain no KEGG or BioCarta sets. |
-| MGI (The Jackson Laboratory): MRK_ENSEMBL.rpt, MGI_EntrezGene.rpt, HOM_MouseHumanSequence.rpt | Mouse identifier-to-symbol mapping, accession links, mouse–human orthologs, homology families | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Subset: selected columns; re-encoded | <https://www.informatics.jax.org/mgihome/other/copyright.shtml> (2026-09-24) |
+| MSigDB v2024.1: Hallmark, GO BP, GO CC, GO MF and Reactome collections (human and mouse) | Built-in gene-set libraries | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Re-encoded; set membership unchanged. Rat and pig versions are derived from the human sets: each member replaced by all its rat orthologs (MGI vertebrate homology) or pig orthologs (Ensembl 116 Compara), human symbols renamed since MSigDB v2024.1 updated through NCBI Gene; sets left with no member removed (CC BY 4.0 permits adaptation with attribution) | <https://www.gsea-msigdb.org/gsea/license_terms_list.jsp> and <https://www.gsea-msigdb.org/gsea/msigdb_license_terms.jsp> (2026-10-01): CC BY 4.0 for v6.0–v7.5.1 and v2022.1 and later. Sets with additional terms (KEGG MEDICUS, CC BY-SA 4.0; other KEGG, licensed to the Broad Institute; BioCarta) are not embedded; the embedded libraries were checked to contain no KEGG or BioCarta sets. |
+| MGI (The Jackson Laboratory): MRK_ENSEMBL.rpt, MGI_EntrezGene.rpt, HOM_MouseHumanSequence.rpt, HOM_AllOrganism.rpt | Mouse identifier-to-symbol mapping, accession links, human–mouse–rat orthologs, homology families | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Subset: selected columns; re-encoded | <https://www.informatics.jax.org/mgihome/other/copyright.shtml> (2026-09-24) |
 | RGD (Medical College of Wisconsin): GENES_RAT | Rat identifier-to-symbol mapping, accession links | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Subset: selected columns; re-encoded | <https://rgd.mcw.edu/wg/disclaimer/> (2026-09-24) |
 | HGNC (HUGO Gene Nomenclature Committee at the University of Cambridge): complete set and gene groups | Human identifier-to-symbol mapping; curated discovery modules | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Subset: selected columns; re-encoded | <https://www.genenames.org/about/license/> (2026-09-24) |
+| NCBI Gene (National Center for Biotechnology Information): Sus_scrofa.gene_info | Pig identifier-to-symbol mapping | NCBI places no restrictions on the use or distribution of the data ([policies](https://www.ncbi.nlm.nih.gov/home/about/policies/)) | Subset: selected columns; re-encoded | <https://www.ncbi.nlm.nih.gov/home/about/policies/> (2026-11-16) |
+| Ensembl 116 (EMBL-EBI): pig gene names and cross-references (Sscrofa11.1 and 12 breed assemblies), Compara orthologs of pig with human, mouse and rat | Pig identifier-to-symbol mapping, pig orthologs and homology families | No restrictions on access or use ([disclaimer](https://www.ensembl.org/info/about/legal/disclaimer.html)) | Subset: selected columns; re-encoded | <https://www.ensembl.org/info/about/legal/disclaimer.html> (2026-11-16) |
 | GEO GSE63310 (demo dataset, `demo/`) | Demonstration and tests; not embedded in the application | Public GEO data | Unmodified counts assembled per the published workflow | Cite the original study |
 
 ## Attribution
@@ -17,7 +19,7 @@ Each resource is credited in the application: in the annotation and library labe
 
 ## Warranty
 
-The MGI, RGD and HGNC data are provided by their sources "as is", without warranty of any kind.
+The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided by their sources "as is", without warranty of any kind.
 
 ## Statistical methods
 

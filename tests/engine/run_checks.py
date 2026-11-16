@@ -297,7 +297,7 @@ def signature_transfer():
     verdicts:R.rows.map(r=>r.verdict), pEmp:R.rows.map(r=>r.pEmp), fams:R.rows.map(r=>r.M.nFamUnits), rep:R.pooled.replicates};
   { const c=plotlyCalls.filter(x=>x.id==="p_sigforest").pop(); out.leg=c.layout.legend; out.mt=c.layout.margin.t; }
   runSigTransfer(); out.det=SIGRES.rows.map(r=>r.pEmp);
-  const fidx=sigFamIndex("m"); const g=[]; for(let i=0;i<nG;i++) if(deCache.q[i]<=0.05&&deCache.lfc[i]>=1&&DSETS[0].matchAtoB[i]<0&&fidx[GENES[i].split(" (")[0].toLowerCase()]!==undefined) g.push(i);
+  const fidx=sigFamIndex("m", "h"); const g=[]; for(let i=0;i<nG;i++) if(deCache.q[i]<=0.05&&deCache.lfc[i]>=1&&DSETS[0].matchAtoB[i]<0&&fidx[GENES[i].split(" (")[0].toLowerCase()]!==undefined) g.push(i);
   sigSpec=()=>({genes:g, sign:g.map(()=>1), expect:1}); SIGLABELS.x="x"; el("sigsel").value="x";
   runSigTransfer(); out.famOn=SIGRES.rows.map(r=>r.verdict); el("sigfam").checked=false; runSigTransfer(); out.famOff=SIGRES.rows.length;
   print("RES " + JSON.stringify(out));""", timeout=1800)
@@ -969,6 +969,110 @@ def service_delivery():
                              "rows": {"how": "rows", "first": "animalA", "last": "animalL", "note": True}}
           and r["suffix"] == {"alone": ["0", "2", "4"], "withTable": ["0", "2", "4"], "first": "1_A-X"})
     r.pop("lib"); r["lib_matches_count_columns"] = libok
+    return ok, r
+
+
+XSP_JS = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(@MAT@, @DES@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  const R={};
+  // built-in pig annotation: reference Ensembl, breed-assembly Ensembl and Entrez identifiers
+  const pm=builtinMapFor("pig").map; R.pigIds=[pm["ENSSSCG00000018065"], pm["102165344"], Object.keys(pm).some(k=>/^ENSSSCG00025/.test(k))];
+  // the session's counts relabelled as pig (reference Ensembl IDs) and rat (Entrez IDs) through the one-to-one tables
+  const lines=@MAT@.trim().split("\n"), hdr=lines[0];
+  const inv=(sp, re)=>{ const m=builtinMapFor(sp).map, o={}, n={}; for(const id in m){ if(!re.test(id)) continue; const s=m[id]; n[s]=(n[s]||0)+1; o[s]=id; } for(const s in n) if(n[s]>1) delete o[s]; return o; };
+  const hsym=builtinMapFor("human").map;
+  for(const [sp, re] of [["pig", /^ENSSSCG000000/], ["rat", /^\d+$/]]){
+    const OM=orthoMap("human", sp), I=inv(sp, re), out=[hdr];
+    for(const l of lines.slice(1)){ const t=l.indexOf("\t"), id=l.slice(0,t), hs=hsym[id]; if(!hs) continue; const o=OM[hs.toLowerCase()]; if(!o||!I[o]) continue; out.push(I[o]+l.slice(t)); }
+    el("cmpspecies").value=sp; CMPB_TXT=out.join("\n")+"\n"; CMPB_DES=@DES@; CMPB_NAME=sp+"_copy"; onAddDataset(); __drain();
+    const di=DSETS.length, d=DSETS[di-1]; d.selA="normal_skin"; d.selB="Psoriasis_skin"; const rb=dsResult(di);
+    let bad=0, n=0, mx=0; for(let g=0;g<nG;g++){ const b=d.matchAtoB[g]; if(b<0) continue; n++;
+      if((OM[GENES[g].split(" (")[0].toLowerCase()]||"").toLowerCase()!==d.genes[b].split(" (")[0].toLowerCase()) bad++;
+      mx=Math.max(mx, Math.abs(deCache.lfc[g]-rb.lfc[b])); }
+    el("famx").value="s"; el("famds").value=String(di-1); runFamilies(); __drain();
+    const fr=FAMROWS||[];
+    R[sp]={cross:d.cross, matched:n, wrongPairs:bad, rows:out.length-1, maxLfcDiff:mx, families:fr.length,
+      famPairOk:fr.every(r=>famFor(ORTHO_FAM[r.fk], "h", famList(sp))), src:orthoSource("human", sp).label};
+  }
+  R.methods=(()=>{ genMethods(); const t=el("methodstext").textContent; return [/Ensembl 116 Compara/.test(t), /HOM_AllOrganism/.test(t)]; })();
+  // placeholder names in a matrix's name column are replaced by the annotation
+  el("species").value="pig"; useBuiltinAnno();
+  const ph="gene_id\tgene_name\ta1\ta2\ta3\tb1\tb2\tb3\n"+Object.keys(pm).filter(k=>/^ENSSSCG000000/.test(k)).slice(0,400).map((id,i)=>id+"\t"+(i%2? "--" : "")+"\t"+[10,12,11,30,33,31].map(v=>v+(i%17)).join("\t")).join("\n")+"\n";
+  loadFromText(ph, null); analyzeNow(); __drain();
+  R.placeholder={dash:GENES.filter(g=>/^--|^ \(/.test(g)).length, named:GENES.filter((g,i)=>g.split(" (")[0]!==IDS[i]).length, nG};
+  print("R " + JSON.stringify(R));
+"""
+
+
+@check
+def cross_species_pig_rat():
+    # built-in pig annotation decodes reference, breed-assembly and Entrez IDs; comparison datasets of rat and pig
+    # are matched to a human session only through one-to-one orthologs (session counts relabelled, so fold changes
+    # agree); homology families are used only for the pair of species compared; placeholder names are decoded
+    o = run(APP, XSP_JS.replace("@MAT@", J(mat("GSE54456"))).replace("@DES@", J(des("GSE54456"))), timeout=2400)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-800:]}
+    r = R[0]
+    ok = (r["pigIds"] == ["ND1", "XIST", True] and r["methods"] == [True, True]
+          and all(r[sp]["cross"] and r[sp]["wrongPairs"] == 0 and r[sp]["matched"] > 12000 and r[sp]["maxLfcDiff"] < 0.1
+                  and r[sp]["families"] > 100 and r[sp]["famPairOk"] for sp in ("pig", "rat"))
+          and r["pig"]["src"] == "Ensembl 1:1 ortholog" and r["rat"]["src"] == "MGI 1:1 ortholog"
+          and r["placeholder"]["dash"] == 0 and r["placeholder"]["named"] == r["placeholder"]["nG"])
+    return ok, r
+
+
+LIB_RP_JS = r"""
+  const R={libs:{}};
+  for(const sx of ["rn","ss"]){ const sp= sx==="rn"? "rat" : "pig", OM=orthoMap("human", sp);
+    for(const b of ["hallmark","gobp","gocc","gomf","react"]){
+      const H=decodeBuiltin(b+"_hs"), X=decodeBuiltin(b+"_"+sx), hm={}; H.sets.forEach(s=>hm[s.name]=s.genes);
+      let miss=0, checked=0, extra=0; X.sets.forEach(s=>{ const g=new Set(s.genes); const h=hm[s.name]; if(!h){ extra++; return; }
+        h.forEach(x=>{ const o=OM[x.toLowerCase()]; if(o){ checked++; if(!g.has(o)) miss++; } }); });
+      R.libs[b+"_"+sx]={n:X.sets.length, nH:H.sets.length, extra, checked, miss, label:/mapped to (rat|pig) orthologs/.test(X.label), cite:/not curated for/.test(X.cite)}; } }
+  // the session's counts relabelled as rat (Entrez IDs): over-representation with the rat Hallmark library against
+  // the human session with the human library
+  const ora=()=>{ el("enrsrc").value="de_up"; el("enrmin").value="5"; el("enrmax").value="2000"; enrMethod="ora"; switchTab("enrich"); __drain(); runEnrichment(); __drain();
+    const o={}; enrResults.rows.forEach(r=>o[r.name]=r.p); return o; };
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(@MAT@, @DES@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; deCache=computeDE();
+  useBuiltin("hallmark_rn"); R.wrongSpecies=/This is the rat library; the data are human/.test(el("gmtinfo")._c||"");
+  useBuiltin("hallmark_hs"); R.noteOnHuman=/Orthology-mapped/.test(el("gmtinfo")._c||""); const pH=ora();
+  const lines=@MAT@.trim().split("\n"), hsym=builtinMapFor("human").map, OM=orthoMap("human","rat"), rm=builtinMapFor("rat").map, inv={}, cnt={};
+  for(const id in rm){ if(!/^\d+$/.test(id)) continue; const s=rm[id]; cnt[s]=(cnt[s]||0)+1; inv[s]=id; }
+  const out=[lines[0]]; for(const l of lines.slice(1)){ const t=l.indexOf("\t"), hs=hsym[l.slice(0,t)]; if(!hs) continue; const o=OM[hs.toLowerCase()]; if(!o||cnt[o]!==1) continue; out.push(inv[o]+l.slice(t)); }
+  el("species").value="rat"; useBuiltinAnno(); loadFromText(out.join("\n")+"\n", @DES@); GROUPTYPE="auto"; analyzeNow(); __drain();
+  el("selA").value="normal_skin"; el("selB").value="Psoriasis_skin"; deKey=""; deCache=computeDE();
+  useBuiltin("hallmark_rn"); R.noteOnRat=/Orthology-mapped library/.test(el("gmtinfo")._c||""); R.noSpeciesWarn=!/This is the/.test(el("gmtinfo")._c||"");
+  const pR=ora(); R.enrNote=/Orthology-mapped library/.test(el("enrinfo")._c||"");
+  const both=Object.keys(pH).filter(k=>pR[k]!==undefined); R.shared=both.length;
+  const lh=both.map(k=>-Math.log10(pH[k])), lr=both.map(k=>-Math.log10(pR[k])); const m=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const mh=m(lh), mr=m(lr); let sxy=0,sxx=0,syy=0; lh.forEach((x,i)=>{ sxy+=(x-mh)*(lr[i]-mr); sxx+=(x-mh)**2; syy+=(lr[i]-mr)**2; }); R.r=sxy/Math.sqrt(sxx*syy);
+  R.topH=Object.keys(pH).sort((a,b)=>pH[a]-pH[b]).slice(0,5); R.topR=Object.keys(pR).sort((a,b)=>pR[a]-pR[b]).slice(0,5);
+  genMethods(); R.methods=/over-representation used one-sided hypergeometric tests against the built-in Hallmark \(human MSigDB mapped to rat orthologs, 50 sets\) library \(.*Mapped from the human sets to rat orthologs/.test(el("methodstext").textContent);
+  const sh=enrTableSheets(); const notes=sh.notes.map(r=>r.join(" ")).join(" "); R.sheetNote=/not curated for rat/.test(notes);
+  enrMethod="fry"; runSync(runFRYGen()); __drain(); genMethods(); R.methodsFry=/Gene sets were taken from the built-in Hallmark \(human MSigDB mapped to rat orthologs/.test(el("methodstext").textContent);
+  print("R " + JSON.stringify(R));
+"""
+
+
+@check
+def gene_sets_rat_pig():
+    # rat and pig libraries are the human MSigDB sets mapped to orthologs: same set names, every one-to-one ortholog
+    # of a human member is in the mapped set, the mapping is stated where the library is loaded, in the results line,
+    # the methods text and the table notes; on a human dataset relabelled as rat, enrichment with the rat Hallmark
+    # library reproduces the human result
+    o = run(APP, LIB_RP_JS.replace("@MAT@", J(mat("GSE54456"))).replace("@DES@", J(des("GSE54456"))), timeout=2400)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-800:]}
+    r = R[0]
+    libs_ok = all(v["miss"] == 0 and v["extra"] == 0 and v["checked"] > 0 and v["label"] and v["cite"] and v["nH"] - v["n"] <= 5
+                  for v in r["libs"].values())
+    ok = (libs_ok and len(r["libs"]) == 10 and r["wrongSpecies"] and not r["noteOnHuman"] and r["noteOnRat"] and r["noSpeciesWarn"]
+          and r["enrNote"] and r["methods"] and r["methodsFry"] and r["sheetNote"] and r["shared"] >= 40 and r["r"] > 0.95
+          and set(r["topH"][:3]) == set(r["topR"][:3]))
     return ok, r
 
 
