@@ -25,7 +25,8 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
 <style>
   :root { --accent:#2563eb; --bg:#f6f7fb; --card:#fff; --border:#e3e6ee; --txt:#1e293b; --muted:#64748b; }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--txt); }
+  button, input, select, textarea, optgroup { font-family:inherit; }
+  body { margin:0; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--txt); }
   
   
   
@@ -39,6 +40,8 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
   .warn { background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:8px 12px; font-size:12.5px; margin-bottom:12px; }
+  .synbox { background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:6px 10px; margin:0 0 10px; font-size:13px; }
+  .synbox summary { cursor:pointer; }
   .svcbox { background:#eff6ff; border:1px solid #93c5fd; border-left:5px solid #2563eb; border-radius:6px; padding:6px 10px; margin:6px 0; font-size:12.5px; line-height:1.45; }
   .warnchip { display:inline-block; background:#fef3c7; color:#78350f; border:1px solid #f59e0b; border-radius:6px; padding:2px 8px; margin:2px 0; font-size:12.5px; line-height:1.45; }
   .alertbox { display:block; background:#fee2e2; color:#7f1d1d; border:1px solid #fca5a5; border-left:5px solid #dc2626; border-radius:6px; padding:6px 10px; margin:6px 0; font-size:12.5px; line-height:1.45; }
@@ -141,7 +144,7 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
   table.sttbl { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12.5px; }
   table.sttbl th { position:sticky; top:0; background:#f8fafc; color:#475569; font-weight:600; text-align:left; padding:7px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
   table.sttbl td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
-  table.sttbl .num { text-align:right; font-variant-numeric:tabular-nums; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; white-space:nowrap; }
+  table.sttbl .num { text-align:right; font-variant-numeric:tabular-nums; font-size:12px; white-space:nowrap; }
   table.sttbl th.num { font-family:inherit; font-size:12.5px; }
   table.sttbl .res { text-align:center; white-space:nowrap; }
   .stpill { display:inline-block; min-width:42px; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; }
@@ -178,7 +181,10 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
 <div id="figprev" role="dialog" aria-modal="true" aria-labelledby="fptitle"><div class="fpcard">
   <div class="fphead"><span id="fptitle">Figure preview</span><span id="fpdim" class="footer-note" style="font-weight:400"></span><button class="x" id="fpclose" title="Close without saving (Esc)">&times;</button></div>
   <div class="fpbody"><img id="fpimg" alt="figure preview"></div>
-  <div class="fpfoot"><span id="fpfmtwrap">format <select id="fpfmt"><option value="svg">SVG (vector, for publication)</option><option value="png">PNG (300 dpi equivalent)</option></select></span>
+  <div class="fpfoot"><span id="fpsizewrap" style="display:none">size <select id="fpsize" title="Size of the exported figure. Print sizes lay the figure out at its size on the page, with the type in points."></select>
+      <span id="fpptwrap">type <select id="fppt"><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>12</option></select> pt</span>
+      <span id="fpcustwrap"><input type="number" id="fpw" min="20" max="400" step="1" style="width:58px" title="Width in millimetres"> &times; <input type="number" id="fph" min="20" max="400" step="1" placeholder="auto" style="width:58px" title="Height in millimetres; leave empty for an automatic height"> mm</span></span>
+    <span id="fpfmtwrap">format <select id="fpfmt"><option value="svg">SVG (vector, for publication)</option><option value="png">PNG (raster)</option></select></span>
     file name <input type="text" id="fpname"> <button class="act" id="fpsave">Save</button> <button class="act ghost" id="fpcancel">Close</button>
     <span id="fpnote" class="footer-note"></span></div>
 </div></div>
@@ -194,12 +200,26 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
       <div id="figsetpop" class="hdrpop" style="display:none">
         <table class="poptbl">
           <tr><td><label for="expsize">Export size</label></td><td><select id="expsize" style="display:none">
-            <option value="" selected>as shown</option>
+            <option value="" selected>as shown on screen</option>
+            <optgroup label="Print size (type in points)">
+            <option value="fit">panel fitted to the data</option>
+            <option value="mm85">single column, 85 mm</option>
+            <option value="mm114">1.5 columns, 114 mm</option>
+            <option value="mm174">double column, 174 mm</option>
+            <option value="custom">custom width and height</option>
+            </optgroup>
+            <optgroup label="Screen proportions (pixels)">
             <option value="1050x788">single column 4:3</option>
             <option value="1050x1050">single column 1:1</option>
             <option value="2100x1200">double column 7:4</option>
             <option value="2100x788">double column wide</option>
+            </optgroup>
           </select></td></tr>
+          <tr id="expptrow" style="display:none"><td><label for="exppt">Type size</label></td><td><select id="exppt" title="Base type size of print-size exports, in points at the printed size. Tick labels are slightly smaller and titles slightly larger, in the proportions shown on screen."><option>6</option><option>7</option><option selected>8</option><option>9</option><option>10</option><option>12</option></select> pt
+            &nbsp; PNG at <select id="expdpi" title="Resolution of PNG files of print-size exports. The resolution is recorded in the file, so it is placed at its print size."><option selected>300</option><option>600</option></select> dpi</td></tr>
+          <tr id="expcustrow" style="display:none"><td><label for="expw">Custom size</label></td><td><input type="number" id="expw" min="20" max="400" step="1" value="85" style="width:62px" title="Width in millimetres"> &times; <input type="number" id="exph" min="20" max="400" step="1" placeholder="auto" style="width:62px" title="Height in millimetres; leave empty for an automatic height"> mm</td></tr>
+          <tr><td><label for="brstyle">Significance</label></td><td><select id="brstyle" title="How a significant comparison is marked above two groups: a straight line, or a line with a tick at each end."><option value="line" selected>straight lines</option><option value="staple">lines with end ticks</option></select></td></tr>
+          <tr><td><label for="axstyle">Axes</label></td><td><select id="axstyle" title="How axes are drawn in every plot and export."><option value="grid" selected>grid lines</option><option value="classic">axis lines and ticks, no grid</option></select></td></tr>
           <tr><td><label for="fontsel">Fonts</label></td><td><select id="fontsel" style="display:none">
             <option value="1" selected>screen</option>
             <option value="1.5">paper (1.5&times;)</option>
@@ -303,6 +323,7 @@ The MGI, RGD, HGNC, NCBI Gene and Ensembl data are provided as is, without warra
     <div class="card" id="setupcard" style="display:none">
       <h3>3 &middot; Review &amp; analyze</h3>
       <div id="parseinfo" style="font-size:13px;margin-bottom:10px"></div>
+      <div id="synbox"></div>
       <div class="controls">
         <span id="factorwrap" style="display:none">Group by factor: <select id="factorsel"></select></span>
         Normalization: <select id="normsel">
@@ -1179,10 +1200,19 @@ el("coexp").addEventListener("click",()=>{
   downloadCSV(rows.join("\n"), "coexpression_"+GENES[coGene].split(" (")[0]+".csv");
 });
 function applyExpSize(){
-  const v=el("expsize").value;
-  if(v){ const [w,h]=v.split("x").map(Number);
-    PL.toImageButtonOptions.width=w; PL.toImageButtonOptions.height=h; }
+  const C=expMode();
+  if(C.mode==="px"){ PL.toImageButtonOptions.width=C.w; PL.toImageButtonOptions.height=C.h; }
   else { delete PL.toImageButtonOptions.width; delete PL.toImageButtonOptions.height; }
+  syncExpUI();
+}
+// the export-size controls under Figure settings and in the preview window show the same setting
+function syncExpUI(){
+  const C=expMode(), pr=C.mode==="print", cu=pr&&C.kind==="custom";
+  const set=(id, k, v)=>{ const e=el(id); if(e) e[k]=v; }, disp=(id, on, d)=>{ const e=el(id); if(e&&e.style) e.style.display= on? (d||"") : "none"; };
+  const fo=el("fpsize"); if(fo&&!(fo.options&&fo.options.length)&&el("expsize").innerHTML) fo.innerHTML=el("expsize").innerHTML;
+  set("fpsize","value",el("expsize").value); set("exppt","value",String(EXPCFG.pt)); set("fppt","value",String(EXPCFG.pt)); set("expdpi","value",String(EXPCFG.dpi));
+  set("expw","value",String(EXPCFG.w)); set("fpw","value",String(EXPCFG.w)); set("exph","value",EXPCFG.h? String(EXPCFG.h) : ""); set("fph","value",EXPCFG.h? String(EXPCFG.h) : "");
+  disp("expptrow", pr, "table-row"); disp("expcustrow", cu, "table-row"); disp("fpptwrap", pr); disp("fpcustwrap", cu);
 }
 const AXX=()=>({title:NUMERIC?FACTOR:"", tickvals:GROUPS.map(g=>GX[g]), ticktext:GROUPS.map(String)});  // categorical tick labels are self-naming; a title only repeats them and crowds the margin
 /* global figure font scaling: every render path (live plots, SVG download, summary
@@ -1228,6 +1258,34 @@ const APP_VERSION="1.0.0-rc.3 (2026-10-07)";
 document.getElementById("appver").textContent="v"+APP_VERSION;
 let FONTSCALE=1;
 let LABELCFG={angle:"auto", size:"auto", long:"wrap"};   // axis tick-label controls (header)
+// Significance brackets are placed in data units, one step apart. When the plot is short for its type size (a small
+// print panel, or large fonts), a step is smaller than a label and the labels would run into the bracket above.
+// The brackets are then re-stacked with a step of one label height (plus the tick), and the y range follows.
+// Returns the extra plot height (px) needed to keep 70% of the plot for the data (used by print-size exports).
+let BRSTYLE="line";   // significance marks: "line" (a straight line over the two groups) or "staple" (with end ticks)
+function bracketGuard(L, traces, plotH, grow){
+  const B=L&&L.meta&&L.meta.brackets; if(!B||!B.items||!B.items.length||!L.annotations||!L.shapes) return 0;
+  const line=BRSTYLE==="line";
+  B.items.forEach(it=>{ for(const j of [1,2]){ const t=L.shapes[it.sh[j]]; if(t) t.visible=!line; } });
+  if(!(plotH>30)) return 0;
+  const A=B.items.map(it=>L.annotations[it.an]); if(A.some(a=>!a)) return 0;
+  const f=Math.max(...A.map(a=>(a.font&&a.font.size)||12)), stars=A.every(a=>/^[*\s]+$/.test(String(a.text)));
+  const tickPx= line? 0 : Math.max(2, 0.3*f), need=(stars? 0.72*f : 1.05*f+3)+Math.max(tickPx, 0.25*f)+2;
+  const cmax=Math.max(...B.items.map(it=>B.first+it.lv))+B.head, bmax=Math.max(...B.items.map(it=>it.base));
+  let band=need*cmax, extra=0;
+  if(grow){ if(band>0.3*plotH){ extra=band-0.3*plotH; plotH+=extra; } }
+  const px= band>0.5*plotH? need*0.5*plotH/band : need;
+  let step=B.step, top=0, u=0;
+  for(let i=0;i<60;i++){ top=Math.max(...B.items.map(it=>it.base+step*(B.first+it.lv)))+step*B.head; u=(top-B.bottom)/plotH; const s2=Math.max(B.step, px*u); if(Math.abs(s2-step)<=1e-9*Math.abs(step)){ step=s2; break; } step=s2; }
+  top=Math.max(...B.items.map(it=>it.base+step*(B.first+it.lv)))+step*B.head; u=(top-B.bottom)/plotH;
+  const moved=step>B.step*(1+1e-6), tick= moved? Math.min(B.tick*step/B.step, tickPx*u) : B.tick;
+  B.items.forEach((it,i)=>{ const y=it.base+step*(B.first+it.lv), h=L.shapes[it.sh[0]], t1=L.shapes[it.sh[1]], t2=L.shapes[it.sh[2]]; if(!h||!t1||!t2) return;
+    h.y0=h.y1=y; t1.y0=t2.y0=y-tick; t1.y1=t2.y1=y; A[i].y=y; if(moved||step/u<1.6*need) A[i].yshift= stars? -0.3*f : 2; });
+  if(B.tr!==undefined&&traces&&traces[B.tr]&&Array.isArray(traces[B.tr].y)) traces[B.tr].y=[top];
+  if(B.axisRange&&L.yaxis&&Array.isArray(L.yaxis.range)) L.yaxis.range[1]=top;
+  return extra;
+}
+let GUARDK=null;   // scale of the axis-label size setting while a print-size export is laid out (null: screen)
 function fontWalk(o){
   if(Array.isArray(o)){ o.forEach(fontWalk); return; }
   if(!o||typeof o!=="object"||ArrayBuffer.isView(o)) return;
@@ -1243,13 +1301,16 @@ function fontWalk(o){
    margins; legends/colorbars DO; an auto-positioned title's baseline sits at the vertical
    centre of the top margin, so a legend drawn above the plot grows into the title. ---- */
 let _measCtx=null;
+// One typeface throughout: the page, every plot and every exported figure (Plotly's default is Open Sans, which is
+// not on most computers, so plots fell back to Verdana)
+const PLOT_FONT="Arial, Helvetica, sans-serif";
 function textW(s, size){
   s=String(s==null?"":s).replace(/<br>/g,"\n").replace(/<[^>]+>/g,"");
   const lines=s.split("\n");
   try{
     if(!_measCtx){ const cv=document.createElement("canvas"); _measCtx=cv&&cv.getContext? cv.getContext("2d") : null; }
     if(_measCtx&&_measCtx.measureText){
-      _measCtx.font=size+"px 'Open Sans', verdana, arial, sans-serif";
+      _measCtx.font=size+"px "+PLOT_FONT;
       const w=Math.max(...lines.map(l=>_measCtx.measureText(l).width));
       if(isFinite(w)&&w>0) return w;
     }
@@ -1330,7 +1391,9 @@ function layoutGuard(div, traces, L){
   const rawTitle=L.title? (typeof L.title==="string"? L.title : L.title.text) : "";
   const title=rawTitle? String(rawTitle) : "";
   // ---- above-plot band: horizontal legend above + unarrowed paper annotations above ----
-  const plotW=Math.max(200, ((div&&div.clientWidth)||520) - M.l - M.r);
+  // pixel floors are for screen layouts; a print-size layout (GUARDK set) can be much smaller
+  const PRN=GUARDK!==null;
+  const plotW=Math.max(PRN? 40 : 200, ((div&&div.clientWidth)||520) - M.l - M.r);
   let Lh=0;
   const lg=L.legend||{};
   const legNames=tr.filter(t=>t&&t.name&&t.showlegend!==false&&t.type!=="pie").map(t=>String(t.name));
@@ -1368,7 +1431,7 @@ function layoutGuard(div, traces, L){
     const LC=LABELCFG;
     let ys=(ya.tickfont&&ya.tickfont.size)||base;
     const Y={};
-    if(LC.size!=="auto"){ ys=+LC.size*(FONTSCALE||1); Y.tickfont=Object.assign({}, ya.tickfont||{}, {size:ys}); }
+    if(LC.size!=="auto"){ ys=+LC.size*(GUARDK!==null? GUARDK : (FONTSCALE||1)); Y.tickfont=Object.assign({}, ya.tickfont||{}, {size:ys}); }
     const authY=Array.isArray(ya.ticktext)&&ya.ticktext.length;
     let labs=null;
     if(authY) labs=ya.ticktext.map(String);
@@ -1379,7 +1442,7 @@ function layoutGuard(div, traces, L){
     const yt=ya.title? (typeof ya.title==="string"?ya.title:ya.title.text) : "";
     const extra=6+(yt? base*1.15+8 : 0);
     const divW=(div&&div.clientWidth)||620;
-    const CAPL = LC.long==="short"? 360 : Math.max(200, Math.min(520, divW-260));
+    const CAPL = LC.long==="short"? 360 : (PRN? Math.max(60, divW*0.5) : Math.max(200, Math.min(520, divW-260)));
     const widest=a=>Math.max(...a.map(v=>Math.max(...String(v).split("<br>").map(p=>textW(p,ys)))));
     let yw = labs? widest(labs) : 4.5*0.58*ys;
     if(labs && yw+extra>CAPL && LC.long!=="short"){
@@ -1405,7 +1468,7 @@ function layoutGuard(div, traces, L){
     const LC=LABELCFG;
     let xs=(xa.tickfont&&xa.tickfont.size)||base;
     const X={}; // changes to write
-    if(LC.size!=="auto"){ xs=+LC.size*(FONTSCALE||1); X.tickfont=Object.assign({}, xa.tickfont||{}, {size:xs}); }
+    if(LC.size!=="auto"){ xs=+LC.size*(GUARDK!==null? GUARDK : (FONTSCALE||1)); X.tickfont=Object.assign({}, xa.tickfont||{}, {size:xs}); }
     let xh=xs+4;
     const authTT=Array.isArray(xa.ticktext)&&xa.ticktext.length;
     const cats=[]; if(!authTT) tr.filter(onX).forEach(t=>{ if(Array.isArray(t.x)) for(const v of t.x){ if(typeof v==="string"){ cats.push(v); if(cats.length>300) break; } } });
@@ -1413,7 +1476,7 @@ function layoutGuard(div, traces, L){
     const CAP = LC.long==="short"? 320 : 640;
     if(uc.length){
       const plain=uc.map(v=>String(v).replace(/<br>/g," "));
-      const slot=Math.max(40, plotW/uc.length-18);   // leaves at least ~18 px between neighbouring labels
+      const slot= PRN? Math.max(12, plotW/uc.length-6) : Math.max(40, plotW/uc.length-18);   // leaves at least ~18 px between neighbouring labels
       let labs=uc.slice(), ang;
       const userAng = LC.angle!=="auto"? +LC.angle : (xa.tickangle!==undefined&&xa.tickangle!=="auto"? +xa.tickangle : null);
       const widest=a=>Math.max(...a.map(v=>Math.max(...String(v).split("<br>").map(p=>textW(p,xs)))));
@@ -1435,7 +1498,7 @@ function layoutGuard(div, traces, L){
       // towards the side that needs less extra margin: groups with long names at the end of the axis read upwards
       // and end at their tick, and the plot keeps its width.
       if(Math.abs(ang)===45 && (LC.angle!=="auto" || xa.tickangle===undefined || xa.tickangle==="auto") && uc.length>1){
-        const divW=(div&&div.clientWidth)||620, n=uc.length, c=Math.cos(Math.PI/4), pw=Math.max(100, divW-M.l-M.r);
+        const divW=(div&&div.clientWidth)||620, n=uc.length, c=Math.cos(Math.PI/4), pw=Math.max(PRN? 40 : 100, divW-M.l-M.r);
         const wl=labs.map(v=>Math.max(...String(v).split("<br>").map(p=>textW(p,xs))));
         let needR=0, needL=0;
         for(let i=0;i<n;i++){ const xi=M.l+(i+0.5)*pw/n, ext=wl[i]*c*1.03+xs*0.5+3;
@@ -1450,7 +1513,7 @@ function layoutGuard(div, traces, L){
         const divW=(div&&div.clientWidth)||620, n=uc.length, c=Math.cos(a);
         const wl=labs.map(v=>Math.max(...String(v).split("<br>").map(p=>textW(p,xs))));
         for(let it=0;it<3;it++){
-          const pw=Math.max(100, divW-M.l-M.r); let over=0;
+          const pw=Math.max(PRN? 40 : 100, divW-M.l-M.r); let over=0;
           for(let i=0;i<n;i++){
             const xi = ang>0? M.l+(i+0.5)*pw/n : M.l+(i+0.5)*pw/n;
             // 3% and 3 px allow for the browser's font metrics differing from the width estimate
@@ -1461,7 +1524,7 @@ function layoutGuard(div, traces, L){
           if(ang>0) M.r=Math.min(Math.round(divW*0.45), Math.ceil(M.r+over+6)); else M.l=Math.min(Math.round(divW*0.45), Math.ceil(M.l+over+6));
         }
         // margin at its cap and labels still too long: shorten each label to the room left at its position
-        const pw=Math.max(100, divW-M.l-M.r);
+        const pw=Math.max(PRN? 40 : 100, divW-M.l-M.r);
         const room=i=>{ const xi=M.l+(i+0.5)*pw/n; return ((ang>0? divW-xi : xi) - xs*0.5 - 3)/(c*1.03); };
         if(labs.some((v,i)=>wl[i]>room(i)+0.5)){
           labs=labs.map((v,i)=> wl[i]>room(i)+0.5? truncToPx(String(v).split("<br>").join(" "), xs, Math.max(xs*3, room(i))) : v);
@@ -1556,7 +1619,7 @@ function xlsxBytes(sheets){
   files.push({name:"xl/_rels/workbook.xml.rels", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
     names.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")+
     `<Relationship Id="rId${names.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`)});
-  files.push({name:"xl/styles.xml", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')});
+  files.push({name:"xl/styles.xml", data:utf8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')});
   sheets.forEach((sh,i)=>files.push({name:`xl/worksheets/sheet${i+1}.xml`, data:utf8(sheetXml(sh.rows))}));
   return zipStore(files);
 }
@@ -1701,12 +1764,18 @@ function figPreview(o){
     let fmt=fmts.includes(o.format)? o.format : fmts[0];
     const save=(url, f, name)=>{ const a=document.createElement("a"); a.href=url; a.download=name.replace(/\.(png|svg)$/i,"")+"."+f; a.style.display="none"; document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(), 60000); };
     if(!el("figprevon")||!el("figprevon").checked){ try{ save(await o.render(fmt), fmt, base); resolve(true); }catch(e){ resolve(false); } return; }
-    const show=async()=>{ el("fpnote").textContent="rendering…"; try{ FPSTATE.url=await o.render(fmt); el("fpimg").src=FPSTATE.url; el("fpnote").textContent=o.note||""; }catch(e){ el("fpnote").textContent="Could not render: "+e; } };
+    const dimTxt=()=>typeof o.dims==="function"? o.dims(fmt) : (o.dims||"");
+    const show=async()=>{ el("fpnote").textContent="rendering…"; try{ FPSTATE.url=await o.render(fmt); el("fpimg").src=FPSTATE.url; el("fpnote").textContent=o.note||""; }catch(e){ el("fpnote").textContent="Could not render: "+e; } el("fpdim").textContent=dimTxt(); };
     FPSTATE={url:null, done:(ok)=>{ el("figprev").style.display="none"; el("fpimg").src=""; document.removeEventListener("keydown", FPSTATE.key); const r=FPSTATE; FPSTATE=null; resolve(ok); return r; }};
     FPSTATE.key=e=>{ if(e.key==="Escape") FPSTATE&&FPSTATE.done(false); };
     document.addEventListener("keydown", FPSTATE.key);
     el("fptitle").textContent=o.title||"Figure preview";
-    el("fpdim").textContent=o.dims||"";
+    el("fpdim").textContent=dimTxt();
+    // size of the export, changed here or under Figure settings (the same setting)
+    el("fpsizewrap").style.display= o.sizeCtl? "" : "none";
+    if(o.sizeCtl){ syncExpUI();
+      const chg=()=>{ el("expsize").value=el("fpsize").value; EXPCFG.pt=+el("fppt").value||8; EXPCFG.w=+el("fpw").value||85; EXPCFG.h=+el("fph").value||0; applyExpSize(); show(); };
+      ["fpsize","fppt","fpw","fph"].forEach(id=>{ el(id).onchange=chg; }); }
     el("fpname").value=base;
     el("fpfmtwrap").style.display= fmts.length>1? "" : "none";
     el("fpfmt").value=fmt; el("fpfmt").onchange=()=>{ fmt=el("fpfmt").value; show(); };
@@ -1717,13 +1786,147 @@ function figPreview(o){
     await show();
   });
 }
+/* ================= figure export at print size =================
+   "As shown" and the pixel presets export the screen layout, whose type is sized for the screen. A print-size export
+   lays the figure out again at its size on the page (millimetres) with the type in points, so the proportions of
+   type, markers and plot are those of the printed panel: 1 CSS px = 1/96 in, so W mm = W*96/25.4 px and
+   t pt = t*96/72 px. SVG files state their size in mm; PNG files carry their resolution (pHYs). */
+let EXPCFG={pt:8, dpi:300, w:85, h:0};
+const PXMM=96/25.4;
+function expMode(){
+  const v=el("expsize").value||"";
+  if(!v) return {mode:"shown"};
+  const m=v.match(/^(\d+)x(\d+)$/); if(m) return {mode:"px", w:+m[1], h:+m[2]};
+  return {mode:"print", kind:v};
+}
+// sizes that scale with the type: fonts, margins, markers, line widths, error-bar caps, label offsets
+function dimWalk(o, k, kf, pk, km){
+  if(km===undefined) km=k;
+  if(Array.isArray(o)){ o.forEach(v=>dimWalk(v, k, kf, pk, km)); return; }
+  if(!o||typeof o!=="object"||ArrayBuffer.isView(o)) return;
+  for(const key in o){ const v=o[key];
+    if(typeof v==="number"){
+      if(key==="size"&&/font$/i.test(pk)) o[key]=v*kf;
+      else if(key==="size"&&pk==="marker") o[key]=v*km;
+      else if(key==="width"&&(pk==="line"||pk==="error_x"||pk==="error_y")) o[key]= v>0? Math.max(0.5, v*k) : v;
+      else if(key==="thickness"&&(pk==="error_x"||pk==="error_y"||pk==="colorbar")) o[key]= v>0? Math.max(0.5, v*k) : v;
+      else if(pk==="margin"&&/^(l|r|t|b|pad)$/.test(key)) o[key]=v*k;
+      else if(/^(xshift|yshift|standoff|ticklen|borderpad)$/.test(key)) o[key]=v*k;
+    } else if(Array.isArray(v)&&key==="size"&&pk==="marker"&&typeof v[0]==="number") o[key]=v.map(x=>x*km);
+    else if(v&&typeof v==="object") dimWalk(v, k, kf, key, km);
+  }
+}
+// number of bar, box or violin positions along x (0 when the figure is not of that kind)
+function catSlots(tr, L){
+  const bars=(tr||[]).filter(t=>t&&t.visible!==false&&t.visible!=="legendonly"&&/^(bar|box|violin)$/.test(t.type||"")&&t.orientation!=="h");
+  if(!bars.length||(tr||[]).some(t=>t&&t.type==="heatmap")||Object.keys(L).some(k=>/^[xy]axis[2-9]/.test(k))) return 0;
+  const st=new Set(); bars.forEach(t=>{ if(Array.isArray(t.x)) t.x.forEach(v=>st.add(String(v))); else st.add(String(t.x0!==undefined? t.x0 : t.name)); });
+  const n=st.size;
+  const grp=(L.barmode==="group"||L.boxmode==="group"||L.violinmode==="group")? new Set(bars.map(t=>String(t.offsetgroup!==undefined? t.offsetgroup : t.name))).size : 1;
+  return n*Math.max(1, grp);
+}
+// The figure laid out at print size: {figure:{data,layout}, W, H (CSS px), wmm, hmm, pt, fitted}
+function printSpec(gd){
+  const C=expMode(), R=PLREG.get(gd.id), fpx=EXPCFG.pt*96/72, FS=FONTSCALE||1;
+  const src=R? R.layout0 : (gd.layout||{}), k=fpx/(((src.font&&src.font.size)||12)*(R? 1 : FS));
+  const build=(W, H)=>{
+    const lay=plClone(src); dimWalk(lay, k, k, "");
+    lay.font=Object.assign({family:PLOT_FONT}, lay.font, {size:fpx});
+    // axis titles in the base size (Plotly's default is 1.2 times larger) and the figure title at most 1.15 times
+    for(const a of Object.keys(lay)){ if(!/^[xy]axis\d*$/.test(a)||!lay[a]||!lay[a].title) continue;
+      if(typeof lay[a].title==="string") lay[a].title={text:lay[a].title};
+      if(!(lay[a].title.font&&lay[a].title.font.size)) lay[a].title.font=Object.assign({}, lay[a].title.font, {size:fpx}); }
+    if(lay.title&&typeof lay.title==="object"&&lay.title.font&&lay.title.font.size>fpx*1.15) lay.title.font.size=fpx*1.15;
+    // the space above the plot holds the title only (unless a legend is drawn there)
+    const nLeg=(R? R.traces : (gd.data||[])).filter(t=>t&&t.name&&t.showlegend!==false&&t.visible!==false).length;
+    if((lay.showlegend===false||nLeg<2)&&!(lay.annotations||[]).some(a=>a&&a.yref==="paper"&&a.y>=1)){
+      const tt=lay.title&&(typeof lay.title==="string"? lay.title : lay.title.text), tf=(lay.title&&lay.title.font&&lay.title.font.size)||fpx*1.15;
+      lay.margin.t=Math.min(lay.margin.t, tt? tf*2.1 : fpx*0.9); }
+    lay.margin=Object.assign({l:80*k, r:80*k, t:100*k, b:80*k}, lay.margin||{});
+    lay.width=W; lay.height=H; lay.autosize=false;
+    // the view the user set by zooming or panning is kept
+    for(const a of Object.keys(gd.layout||{})){ const A=gd.layout[a]; if(/^[xy]axis\d*$/.test(a)&&A&&A.autorange===false&&Array.isArray(A.range)&&lay[a]){ lay[a].range=A.range.slice(); lay[a].autorange=false; } }
+    if(R){ GUARDK=k; try{ layoutGuard({clientWidth:W, clientHeight:H, id:gd.id, style:{}}, R.traces, lay); }catch(e){} finally{ GUARDK=null; } }
+    return lay;
+  };
+  const tr0=R? R.traces : (gd.data||[]);
+  // a figure with a set height (heatmaps: a height per row) keeps it in type units while its rows are labelled;
+  // without row labels it keeps its screen proportions
+  const rowLab=!(src.yaxis&&src.yaxis.showticklabels===false);
+  const slots=catSlots(tr0, src), hExp=src.height? (rowLab? src.height*k : -src.height/Math.max(200, gd.clientWidth||gd.offsetWidth||900)) : 0;
+  const legW=(()=>{ const lg=src.legend||{}; if(src.showlegend===false||lg.orientation==="h"||(lg.x!==undefined&&lg.x<1)) return 0;
+    const nm=tr0.filter(t=>t&&t.name&&t.showlegend!==false&&t.type!=="pie").map(t=>String(t.name)); if(nm.length<2) return 0;
+    return Math.max(...nm.map(n=>textW(n.replace(/<[^>]+>/g,""), fpx)))+44*k; })();
+  let W, H, lay, fitted=false, tr=plClone(tr0);
+  const brk=(plotH, grow)=>{ try{ return bracketGuard(lay, tr, plotH, grow); }catch(e){ return 0; } };
+  if(C.kind==="fit"&&slots){
+    // width from the number of positions (9 mm each up to 6, 7 mm up to 12, then 5.5 mm), plot area 38 mm high
+    const slot= slots<=6? 9 : slots<=12? 7 : 5.5, pw=Math.min(160, Math.max(28, slots*slot))*PXMM, ph=38*PXMM;
+    lay=build(pw+140*k, ph+140*k);
+    W=Math.ceil(pw+lay.margin.l+lay.margin.r+legW);
+    lay=build(W, ph+140*k); H=Math.ceil(ph+brk(ph, true)+lay.margin.t+lay.margin.b); lay.height=H; fitted=true;
+  } else {
+    const wmm= C.kind==="mm114"? 114 : C.kind==="mm174"? 174 : C.kind==="custom"? Math.min(400, Math.max(20, +EXPCFG.w||85)) : 85;
+    W=Math.round(wmm*PXMM);
+    const hmm= C.kind==="custom"&&+EXPCFG.h>0? Math.min(400, Math.max(20, +EXPCFG.h)) : 0;
+    H= hmm? Math.round(hmm*PXMM) : hExp>0? Math.ceil(hExp) : hExp<0? Math.round(Math.min(W*1.6, Math.max(W*0.5, -hExp*W))) : Math.round(W*0.75);
+    lay=build(W, H);
+    if(!hmm) H=Math.max(H, Math.ceil(lay.height||0));
+    // the margins never leave less than 20 mm of plot
+    const minP=20*PXMM; if(!hmm&&H-lay.margin.t-lay.margin.b<minP) H=Math.ceil(lay.margin.t+lay.margin.b+minP);
+    const ex=brk(H-lay.margin.t-lay.margin.b, !hmm); if(!hmm) H=Math.ceil(H+ex);
+    lay.height=H;
+  }
+  // markers shrink with the figure as well as with the type (a point cloud drawn 3 times smaller is not kept as dense)
+  const km=k*Math.min(1, Math.max(0.65, Math.sqrt(W/((gd.clientWidth||gd.offsetWidth||900)))));
+  dimWalk(tr, k, k/FS, "", km);
+  (gd.data||[]).forEach((t,i)=>{ if(tr[i]&&t&&t.visible!==undefined) tr[i].visible=t.visible; });
+  if(TH_ON){ tr=thWalk(tr,""); lay=thWalk(lay,""); }
+  const r1=x=>Math.round(x/PXMM*10)/10;
+  return {figure:{data:tr, layout:lay}, W, H, wmm:r1(W), hmm:r1(H), pt:EXPCFG.pt, k, fitted, slots};
+}
+function dataUrlBytes(url){ const b=atob(url.slice(url.indexOf(",")+1)), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
+function bytesDataUrl(u8, mime){ let t=""; for(let i=0;i<u8.length;i+=0x8000) t+=String.fromCharCode.apply(null, u8.subarray(i, i+0x8000)); return "data:"+mime+";base64,"+btoa(t); }
+// PNG with its resolution recorded (pHYs chunk, pixels per metre), so that it is placed at its print size
+function pngWithDPI(u8, dpi){
+  if(u8.length<45||u8[12]!==73||u8[13]!==72||u8[14]!==68||u8[15]!==82) return u8;
+  const ppm=Math.round(dpi/0.0254), ch=new Uint8Array(21), dv=new DataView(ch.buffer);
+  dv.setUint32(0, 9); ch.set([112,72,89,115], 4); dv.setUint32(8, ppm); dv.setUint32(12, ppm); ch[16]=1; dv.setUint32(17, crc32(ch.subarray(4, 17)));
+  const iv=new DataView(u8.buffer, u8.byteOffset, u8.byteLength); let p=33, cut=null;
+  while(p+12<=u8.length){ const len=iv.getUint32(p), ty=String.fromCharCode(u8[p+4],u8[p+5],u8[p+6],u8[p+7]);
+    if(ty==="pHYs"){ cut=[p, p+12+len]; break; } if(ty==="IDAT") break; p+=12+len; }
+  const rest= cut? [u8.subarray(33, cut[0]), u8.subarray(cut[1])] : [u8.subarray(33)];
+  const out=new Uint8Array(33+21+rest.reduce((a,x)=>a+x.length, 0)); out.set(u8.subarray(0,33), 0); out.set(ch, 33);
+  let q=54; rest.forEach(x=>{ out.set(x, q); q+=x.length; }); return out;
+}
+// SVG whose root states the size in millimetres (programs differ in how they read a size given in pixels)
+function svgWithMM(svg, wmm, hmm, W, H){
+  const m=svg.match(/<svg\b[^>]*>/); if(!m) return svg;
+  let tag=m[0].replace(/\swidth="[^"]*"/, "").replace(/\sheight="[^"]*"/, "");
+  if(!/\sviewBox=/.test(tag)) tag=tag.replace(/^<svg\b/, `<svg viewBox="0 0 ${W} ${H}"`);
+  tag=tag.replace(/^<svg\b/, `<svg width="${wmm}mm" height="${hmm}mm"`);
+  return svg.replace(m[0], tag);
+}
+function svgUrlWithMM(url, wmm, hmm, W, H){
+  try{ const i=url.indexOf(","), b64=/;base64/i.test(url.slice(0, i));
+    const svg= b64? decodeURIComponent(escape(atob(url.slice(i+1)))) : decodeURIComponent(url.slice(i+1));
+    return "data:image/svg+xml,"+encodeURIComponent(svgWithMM(svg, wmm, hmm, W, H)); }catch(e){ return url; }
+}
 function figPreviewPlot(gd){
-  // the plot's camera button: the same options as Plotly's built-in image export (Figure settings → Export size)
-  const op=PL.toImageButtonOptions||{}, w=op.width||gd.offsetWidth||900, h=op.height||gd.offsetHeight||480;
+  // the plot's camera button, with the size chosen under Figure settings > Export size (or in the preview window)
   const ttl=(gd.layout&&gd.layout.title&&(gd.layout.title.text||gd.layout.title))||"";
   const name=(String(ttl).replace(/<[^>]+>/g,"").trim()||gd.id.replace(/^p_/,"")||"benchside_plot").replace(/[^\w\-.]+/g,"_").slice(0,80);
-  return figPreview({title:"Save figure", filename:name, formats:["svg","png"], format:op.format||"svg", dims:`${w} × ${h} px${op.width?" (Export size setting)":" (as shown)"}`,
-    render:f=>Plotly.toImage(gd,{format:f, width:w, height:h, scale:f==="png"?3:1})});
+  const shown=()=>{ const C=expMode(); return {w:C.mode==="px"? C.w : (gd.offsetWidth||900), h:C.mode==="px"? C.h : (gd.offsetHeight||480), C}; };
+  let last=null;
+  return figPreview({title:"Save figure", filename:name, formats:["svg","png"], format:(PL.toImageButtonOptions||{}).format||"svg", sizeCtl:true,
+    dims:f=>{ const C=expMode();
+      if(C.mode==="print"&&last) return `${last.wmm} × ${last.hmm} mm, ${last.pt} pt type${last.fitted? `, fitted to ${last.slots} positions` : ""}${last.hmm>240? "; taller than a page: use fewer rows, a smaller type size or a custom height" : ""}${f==="png"? ` (${Math.round(last.W*EXPCFG.dpi/96)} × ${Math.round(last.H*EXPCFG.dpi/96)} px at ${EXPCFG.dpi} dpi)` : ""}`;
+      const d=shown(); return `${d.w} × ${d.h} px${C.mode==="px"? " (screen proportions)" : " (as shown on screen)"}`; },
+    render:async f=>{ const C=expMode();
+      if(C.mode!=="print"){ last=null; const d=shown(); return Plotly.toImage(gd,{format:f, width:d.w, height:d.h, scale:f==="png"?3:1}); }
+      const P=printSpec(gd); last=P;
+      const url=await Plotly.toImage(P.figure, {format:f, width:P.W, height:P.H, scale:f==="png"? EXPCFG.dpi/96 : 1});
+      return f==="png"? bytesDataUrl(pngWithDPI(dataUrlBytes(url), EXPCFG.dpi), "image/png") : svgUrlWithMM(url, P.wmm, P.hmm, P.W, P.H); }});
 }
 const IMG_BTN={name:"Save image (preview, SVG or PNG)", icon:(Plotly.Icons&&Plotly.Icons.camera)||{width:1000,height:1000,path:"M150 300h200l60-100h180l60 100h200v500H150z M500 380a150 150 0 1 0 0.1 0z"}, click:gd=>figPreviewPlot(gd)};
 const _plreact=Plotly.react.bind(Plotly);
@@ -1744,7 +1947,8 @@ function reguardPlots(force){
     const w=d.clientWidth||0;
     if(!w||(!force&&Math.abs(w-r.w)<3)) continue;
     let lay=plClone(r.layout0); if(FONTSCALE!==1) fontWalk(lay);
-    try{ layoutGuard(d, r.traces, lay); plotAreaGuard(d, lay); }catch(e){}
+    try{ layoutGuard(d, r.traces, lay); plotAreaGuard(d, lay);
+      if(lay.meta&&lay.meta.brackets) bracketGuard(lay, r.traces, (lay.height||d.clientHeight||450)-(lay.margin.t||0)-(lay.margin.b||0), false); }catch(e){}
     let tr=r.traces; if(TH_ON){ tr=thWalk(tr,""); lay=thWalk(lay,""); }
     r.w=w;
     d._lastDraw=(typeof performance!=="undefined"&&performance.now)? performance.now() : Date.now();
@@ -1762,19 +1966,32 @@ window.addEventListener("afterprint", ()=>{ setTimeout(()=>reguardPlots(true), 5
 // An axis whose ticks are category positions (integer tick values with tick labels) has no meaningful zero, and
 // Plotly's default zero line would be drawn through the first category (a line through the first group, or along
 // the bottom row of a dot plot). It is switched off unless the figure asks for it.
+// Axes drawn as lines with tick marks and no grid (Figure settings > Axes), on screen and in exports
+let AXSTYLE="grid";
+function axisStyle(layout, traces){
+  if(AXSTYLE!=="classic"||!layout||typeof layout!=="object") return;
+  const cells=Array.isArray(traces)&&traces.some(t=>t&&t.type==="heatmap");   // a heatmap has no axis lines
+  for(const k of Object.keys(layout)){ if(!/^[xy]axis\d*$/.test(k)) continue; const A=layout[k];
+    if(!A||typeof A!=="object"||A.visible===false) continue;
+    A.showgrid=false;
+    if(A.showticklabels!==false&&!cells){ A.showline=true; if(!A.linecolor) A.linecolor="#1e293b"; if(!A.linewidth) A.linewidth=1;
+      if(A.ticks===undefined) A.ticks="outside"; if(!A.ticklen) A.ticklen=4; if(!A.tickcolor) A.tickcolor="#1e293b"; } }
+}
 function noCategoryZeroline(layout){
   if(!layout||typeof layout!=="object") return;
   for(const k of Object.keys(layout)){ if(!/^[xy]axis\d*$/.test(k)) continue; const A=layout[k];
     if(A&&Array.isArray(A.tickvals)&&Array.isArray(A.ticktext)&&A.tickvals.length&&A.tickvals.every(v=>Number.isInteger(v))&&A.zeroline===undefined) A.zeroline=false; }
 }
 Plotly.react=function(div,traces,layout,cfg){
-  traces=noGL(traces); noCategoryZeroline(layout);
+  traces=noGL(traces); noCategoryZeroline(layout); axisStyle(layout, traces);
+  if(layout&&typeof layout==="object") layout.font=Object.assign({family:PLOT_FONT}, layout.font);
   const d0=typeof div==="string"? document.getElementById(div) : div; const noG=layout&&layout.__noGuard; if(noG) delete layout.__noGuard;
   const attachFull=()=>{ if(FULLPEND&&layout){ layout.meta=Object.assign({}, layout.meta, {fullLabels:Object.assign({}, layout.meta&&layout.meta.fullLabels, FULLPEND)}); } FULLPEND=null; };
   attachFull();
   const layout0= (!noG&&d0&&d0.id&&d0.id!=="p_panel_tmp"&&layout)? plClone(layout) : null;
   if(FONTSCALE!==1){ fontWalk(traces); fontWalk(layout); }
-  try{ if(!noG){ layoutGuard(d0, traces, layout); plotAreaGuard(d0, layout); } }catch(e){}
+  try{ if(!noG){ layoutGuard(d0, traces, layout); plotAreaGuard(d0, layout);
+    if(layout&&layout.meta&&layout.meta.brackets){ const M=layout.margin||{}; bracketGuard(layout, traces, (layout.height||(d0&&d0.clientHeight)||450)-(M.t||0)-(M.b||0), false); } } }catch(e){}
   attachFull();
   // a figure that only shows a message (no traces) has nothing to export: no mode bar
   if(Array.isArray(traces)&&traces.length===0) cfg=Object.assign({}, cfg||{}, {displayModeBar:false});
@@ -2590,7 +2807,7 @@ function serviceBundle(matrixText, sheetTexts, service){
   // a design file may name the samples as the matrix does (RUN_1) or as the summary table does (sample_1, 1_label)
   const alias={}; order.forEach((q,k)=>{ alias[stems[q]]=names[k]; if(sheets.length){ const e=sheets[0].entries.find(x=>x.num===nums[q]); if(e) alias[e.name]=names[k]; } });
   if(labels) labels.forEach((l,k)=>{ if(l&&labels.indexOf(l)===labels.lastIndexOf(l)&&alias[l]===undefined) alias[l]=names[k]; });
-  return {alias, pairs:mx.valuePairs, matrixText:out.join("\n")+"\n", designText:design? design.text : null, order:design? design.order : null, design, notes, warn, qc:sheets.length? qc : null, service:service||null};
+  return {labels:labels||names.slice(), alias, pairs:mx.valuePairs, matrixText:out.join("\n")+"\n", designText:design? design.text : null, order:design? design.order : null, design, notes, warn, qc:sheets.length? qc : null, service:service||null};
 }
 function csvTab(v){ return String(v).replace(/[\t\n\r]/g," "); }
 // QC flags from the service tables: fraction of reads mapped uniquely far below the other samples
@@ -2632,9 +2849,194 @@ function onServiceFiles(files){
   pending.service=B; SERVICEQC=B.qc;
   if(!B.design){ const pre=pending.matrix.sampleNames.map(n=>String(n).replace(/[_\-. ]*\d+$/,"")||"samples"); pending.groups=pre; }
   if(B.designText){ onDesignLoaded(B.designText, true); }
+  synInit();
   renderSetup();
 }
 let PENDRAW=null;
+/* ================= sample-name syntax ================= */
+// A sample name made of parts (WT_P3_+Dox: cell line, passage, treatment) is split at a separator, and the user says
+// what each part is: part of the group, a design column that is not part of the group, or not used. The design is
+// then built from the names. Offered wherever data are loaded without a design file (session and comparison data).
+const SYN_SEPS=[["_","underscore ( _ )"],["-","hyphen ( - )"],[".","dot ( . )"],[" ","space"],["|","bar ( | )"],[",","comma ( , )"],[";","semicolon ( ; )"]];
+const SYN_JOINS=[["auto","the separator (nothing before + or \u2212)"],["","nothing"],["_","_"],[" ","space"],["-","-"],[".","."]];
+function synFields(labels, sep){
+  const raw=labels.map(l=>sep? String(l).split(sep).map(x=>x.trim()) : [String(l)]);
+  const nF=Math.max(...raw.map(p=>p.length)), minF=Math.min(...raw.map(p=>p.length));
+  return {parts:raw.map(p=>{ const q=p.slice(); while(q.length<nF) q.push(""); return q; }), nF, minF, uneven:raw.filter(p=>p.length!==nF).length};
+}
+// "KO-1" -> "KO": a number after a separator at the end of a part (a clone or replicate number)
+function synTrim(v){ const t=String(v).replace(/[\-._\s]+\d+$/,""); return t!==""? t : String(v); }
+function synJoin(vals, spec){
+  const v=vals.filter(x=>x!==""); if(!v.length) return "none";
+  if(spec.join!=="auto") return v.join(spec.join);
+  let out=v[0]; for(let i=1;i<v.length;i++) out+=(/^[+\-\u2212]/.test(v[i])? "" : spec.sep)+v[i];
+  return out;
+}
+function synColumns(labels, spec){
+  const F=synFields(labels, spec.sep), used=new Set(["sample"]), cols=[], gcols=[];
+  const uniq=nm=>{ const b=String(nm||"").replace(/[\t\r\n]/g," ").trim()||"Part"; let n=b, i=2; while(used.has(n.toLowerCase())) n=b+" ("+(i++)+")"; used.add(n.toLowerCase()); return n; };
+  spec.roles.forEach((r,k)=>{ if(k>=F.nF||r.role==="skip") return;
+    const c={name:uniq(r.name||("Part "+(k+1))), vals:F.parts.map(p=>r.trim? synTrim(p[k]) : p[k]), k};
+    cols.push(c); if(r.role==="group") gcols.push(c); });
+  const group= gcols.length? labels.map((_,q)=>synJoin(gcols.map(c=>c.vals[q]), spec)) : labels.map(()=>"samples");
+  const joint=gcols.length!==1, groupCol= joint? uniq("Group") : gcols[0].name;
+  return {F, cols, gcols, group, groupCol, joint};
+}
+// design text (samples as rows): the group first, then one column per part that is used
+function synDesign(labels, spec, sampleNames){
+  const C=synColumns(labels, spec), cell=x=>String(x).replace(/[\t\r\n]/g," ");
+  const cols=C.cols.map(c=>[c.name, c.vals.map(x=>x===""? "none" : x)]);
+  if(C.joint) cols.unshift([C.groupCol, C.group]); else { const i=cols.findIndex(c=>c[0]===C.groupCol); cols.unshift(cols.splice(i,1)[0]); }
+  const text=["sample\t"+cols.map(c=>cell(c[0])).join("\t")].concat(sampleNames.map((n,q)=>cell(n)+"\t"+cols.map(c=>cell(c[1][q])).join("\t"))).join("\n")+"\n";
+  return {text, groupCol:C.groupCol, joint:C.joint, group:C.group, order:firstAppearance(C.group), factors:cols.map(c=>c[0])};
+}
+// Suggested roles for a separator. Among the sets of parts that put every sample in a group of at least 2 (a
+// trailing number may be dropped from a part), the choice prefers, in this order: parts that mark a treatment as
+// present or absent (+X, -X); more parts; larger groups; fewer dropped numbers. Parts with one value, or a
+// different value in every sample, are not used; the others are kept as design columns.
+function synSuggestRoles(labels, sep, join){
+  const F=synFields(labels, sep), n=labels.length, info=[];
+  for(let k=0;k<F.nF;k++){ const raw=F.parts.map(p=>p[k]), tr=raw.map(synTrim);
+    const ag=raw.map(v=>{ const a=String(v).match(/^[+\-]([A-Za-z][A-Za-z0-9]*)$/), b=String(v).match(/^([A-Za-z][A-Za-z0-9]*)[+\-]$/); return a? a[1] : b? b[1] : null; });
+    info.push({raw, tr, dRaw:new Set(raw).size, dTr:new Set(tr).size, canTrim:tr.some((v,i)=>v!==raw[i]), agent:ag.every(x=>x!==null&&x===ag[0])? ag[0] : null}); }
+  const elig=[]; info.forEach((f,k)=>{ if((f.dRaw>=2&&f.dRaw<n)||(f.canTrim&&f.dTr>=2&&f.dTr<n)) elig.push(k); });
+  const E=elig.slice(0,6); let best=null;
+  for(let m=1;m<(1<<E.length);m++){ const sub=E.filter((_,i)=>m&(1<<i)), tk=sub.filter(k=>info[k].canTrim);
+    for(let t=0;t<(1<<tk.length);t++){ const trim=new Set(tk.filter((_,i)=>t&(1<<i))), cnt={};
+      for(let q=0;q<n;q++){ const key=sub.map(k=>trim.has(k)? info[k].tr[q] : info[k].raw[q]).join("\u0001"); cnt[key]=(cnt[key]||0)+1; }
+      const sizes=Object.values(cnt); if(sizes.length<2||Math.min(...sizes)<2) continue;
+      const sc=[sub.filter(k=>info[k].agent).length, sub.length, Math.min(...sizes), -trim.size];
+      let better=!best; if(best) for(let i=0;i<sc.length;i++){ if(sc[i]!==best.sc[i]){ better=sc[i]>best.sc[i]; break; } }
+      if(better) best={sc, sub:new Set(sub), trim}; } }
+  const roles=info.map((f,k)=>{ const name=f.agent||("Part "+(k+1));
+    if(best&&best.sub.has(k)) return {role:"group", name, trim:best.trim.has(k)};
+    return {role:(f.dRaw<2||f.dRaw>=n)? "skip" : "col", name, trim:false}; });
+  return {spec:{sep, join:join===undefined? "auto" : join, roles}, valid:!!best, nF:F.nF, uneven:F.uneven};
+}
+// separator: the one that splits every name into the same number (at least 2) of parts
+function synSuggest(labels){
+  if(!labels||labels.length<2) return null;
+  let best=null;
+  for(const x of SYN_SEPS){ const F=synFields(labels, x[0]); if(F.minF<2) continue; const sc=(F.uneven? 0 : 100)+F.minF; if(!best||sc>best.sc) best={sep:x[0], sc}; }
+  return best? synSuggestRoles(labels, best.sep) : null;
+}
+function synDescribe(sx){
+  const C=synColumns(sx.labels, sx.spec);
+  return C.gcols.length? C.gcols.map(c=>`part ${c.k+1} (${esc(c.name)}${sx.spec.roles[c.k].trim? ", without its trailing number" : ""})`).join(" and ") : "no part";
+}
+// with groups set by the sample-name syntax, the note that the labels gave no groups no longer applies
+function svcWarnShown(warn, sx){ return sx&&sx.mode==="syn"? warn.filter(w=>!/placed in one group|listed as .* in one group/.test(w)) : warn; }
+function synPanelHTML(P, sx, ctx){
+  const syn=sx.mode==="syn", sp=sx.spec, std=SYN_SEPS.some(x=>x[0]===sp.sep);
+  const F0=synFields(sx.labels, sp.sep);
+  let h=`<details class="synbox"${syn? " open" : ""}><summary><b>Sample-name syntax</b> <span class="footer-note">${syn&&ctx.grouped? `the design columns are read from the sample names; samples are currently grouped by ${esc(ctx.grouped)}` : syn? `groups are read from ${synDescribe(sx)} of the sample names` : `the sample names have ${F0.nF} parts (for example ${esc(sx.labels[0])}); choose which parts define the groups`}</span></summary>
+    <div class="controls" style="margin:6px 0">Groups: <select id="${P}mode"><option value="auto"${syn? "" : " selected"}>${esc(ctx.autoLabel)}</option><option value="syn"${syn? " selected" : ""}>from the parts of the sample names, as set below</option></select>${syn&&sx.byDefault? ` <span class="footer-note">Selected because ${ctx.autoWhy}. Check the parts below.</span>` : ""}</div>`;
+  if(syn){
+    const C=synColumns(sx.labels, sp), F=C.F, cnt={}; C.group.forEach(g=>{ cnt[g]=(cnt[g]||0)+1; });
+    const gl=firstAppearance(C.group), one=gl.filter(g=>cnt[g]===1).length;
+    h+=`<div class="controls" style="margin:6px 0">The parts of a name are separated by <select id="${P}sep">${SYN_SEPS.map(x=>`<option value="${esc(x[0])}"${x[0]===sp.sep? " selected" : ""}>${x[1]}</option>`).join("")}<option value="custom"${std? "" : " selected"}>other:</option></select>
+      <input type="text" id="${P}custom" value="${std? "" : esc(sp.sep)}" style="width:46px" title="Any other separator, one or more characters.">
+      &nbsp; Join the group parts with <select id="${P}join" title="How the parts that define the group are written together in the group name.">${SYN_JOINS.map(x=>`<option value="${esc(x[0])}"${x[0]===sp.join? " selected" : ""}>${x[1]}</option>`).join("")}</select></div>
+      <table class="tbl" style="width:auto"><tr><th>Part</th><th>Values in the sample names</th><th>Use as</th><th>Column name</th><th></th></tr>`+
+      sp.roles.slice(0, F.nF).map((r,k)=>{ const raw=F.parts.map(p=>p[k]), dv=firstAppearance(raw), ex=raw.find(v=>synTrim(v)!==v);
+        return `<tr><td>${k+1}</td><td>${dv.slice(0,8).map(v=>v===""? "<i>(none)</i>" : esc(v)).join(", ")}${dv.length>8? `, … (${dv.length} values)` : ""}</td>
+          <td><select id="${P}role${k}"><option value="group"${r.role==="group"? " selected" : ""}>part of the group</option><option value="col"${r.role==="col"? " selected" : ""}>design column only</option><option value="skip"${r.role==="skip"? " selected" : ""}>not used</option></select></td>
+          <td><input type="text" id="${P}name${k}" value="${esc(r.name)}" style="width:110px"></td>
+          <td>${ex!==undefined? `<label><input type="checkbox" id="${P}trim${k}"${r.trim? " checked" : ""}> without the number at its end (${esc(ex)} \u2192 ${esc(synTrim(ex))})</label>` : ""}</td></tr>`; }).join("")+`</table>
+      <div style="font-size:12.5px;margin-top:6px"><b>${gl.length} group${gl.length===1? "" : "s"}:</b> ${gl.slice(0,40).map(g=>`${esc(g)} <span class="footer-note">(n = ${cnt[g]})</span>`).join(", ")}${gl.length>40? ", …" : ""}</div>`+
+      (C.cols.length>C.gcols.length? `<div class="footer-note">Design column${C.cols.length-C.gcols.length>1? "s" : ""} not in the group: ${C.cols.filter(c=>!C.gcols.includes(c)).map(c=>esc(c.name)).join(", ")}. ${ctx.colNote}</div>` : "")+
+      (gl.length<2? `<span class="warnchip">All samples are in one group. Set at least one part to \u201cpart of the group\u201d.</span>` : "")+
+      (one? `<span class="warnchip">${one} group${one>1? "s have" : " has"} a single sample, and a group needs at least 2 samples to be tested. Set the part that numbers the replicates to \u201cdesign column only\u201d or \u201cnot used\u201d, or drop the number at its end.</span>` : "")+
+      (F.uneven? `<span class="warnchip">${F.uneven} sample name${F.uneven>1? "s have" : " has"} fewer parts than the others; the missing parts read \u201cnone\u201d.</span>` : "");
+  }
+  return h+"</details>";
+}
+function synWirePanel(P, sx, onChange){
+  const on=(id, ev, f)=>{ const e=el(id); if(e) e.addEventListener(ev, f); }, setv=(id, k, v)=>{ const e=el(id); if(e) e[k]=v; };
+  setv(P+"mode","value",sx.mode==="syn"? "syn" : "auto");
+  on(P+"mode","change",()=>{ sx.mode= el(P+"mode").value==="syn"? "syn" : "auto"; sx.byDefault=false; onChange(); });
+  if(sx.mode!=="syn") return;
+  const sp=sx.spec, std=SYN_SEPS.some(x=>x[0]===sp.sep);
+  setv(P+"sep","value",std? sp.sep : "custom"); setv(P+"custom","value",std? "" : sp.sep); setv(P+"join","value",sp.join);
+  sp.roles.forEach((r,k)=>{ setv(P+"role"+k,"value",r.role); setv(P+"name"+k,"value",r.name); setv(P+"trim"+k,"checked",!!r.trim); });
+  const resep=()=>{ let v=el(P+"sep").value; if(v==="custom") v=el(P+"custom").value; if(v===""||v===undefined||v===null) return;
+    sx.spec=synSuggestRoles(sx.labels, v, sx.spec.join).spec; sx.byDefault=false; onChange(); };
+  on(P+"sep","change",resep); on(P+"custom","change",()=>{ if(el(P+"custom").value!=="") el(P+"sep").value="custom"; resep(); });
+  const read=()=>{ sx.spec.join=el(P+"join").value;
+    sx.spec.roles=sx.spec.roles.map((r,k)=>{ const ro=el(P+"role"+k), nm=el(P+"name"+k), tr=el(P+"trim"+k);
+      return {role:ro&&/^(group|col|skip)$/.test(ro.value)? ro.value : r.role, name:nm&&String(nm.value||"").trim()? String(nm.value).trim() : r.name, trim:tr? !!tr.checked : false}; });
+    sx.byDefault=false; onChange(); };
+  on(P+"join","change",read);
+  sp.roles.forEach((r,k)=>{ on(P+"role"+k,"change",read); on(P+"name"+k,"change",read); on(P+"trim"+k,"change",read); });
+}
+// ---- session data: state in pending.syntax; a choice is kept while the same sample names are loaded again
+let SYNKEEP=null;
+function synInit(){
+  const mx=pending.matrix, B=pending.service;
+  const labels= B&&B.labels? B.labels.map(String) : (mx.origNames&&mx.origNames.length===mx.sampleNames.length? mx.origNames.map(String) : mx.sampleNames.map(String));
+  const sug=synSuggest(labels);
+  if(!pending.factors) FACTOR="group";
+  const sx=pending.syntax={labels, sug, mode:"auto", spec:sug? sug.spec : null, byDefault:false,
+    auto:{designText:(B&&B.designText)||null, groups:pending.groups.slice()}};
+  if(!sug) return;
+  if(SYNKEEP&&SYNKEEP.key===labels.join("\u0001")){ sx.mode=SYNKEEP.mode; sx.spec=SYNKEEP.spec; if(sx.mode==="syn") synApplyPending(); return; }
+  // the automatic reading is replaced when it leaves every sample alone or all samples together, and the parts of
+  // the names give groups of at least 2 samples
+  const k=new Set(pending.groups).size, poor=(B&&B.design&&B.design.perSample)||k<=1||k>=labels.length;
+  if(poor&&sug.valid){ sx.mode="syn"; sx.byDefault=true; synApplyPending(); }
+}
+function synApplyPending(){
+  const sx=pending.syntax; SYNKEEP={key:sx.labels.join("\u0001"), mode:sx.mode, spec:sx.spec};
+  if(sx.mode==="syn"){ const D=synDesign(sx.labels, sx.spec, pending.matrix.sampleNames);
+    sx.groupCol=D.groupCol; sx.joint=D.joint; onDesignLoaded(D.text, true); applyFactor(D.groupCol); }
+  else if(sx.auto.designText){ sx.groupCol=null; onDesignLoaded(sx.auto.designText, true); }
+  else { sx.groupCol=null; pending.factors=null; pending.factorNames=[]; FACTOR="group"; pending.groups=sx.auto.groups.slice(); }
+}
+function renderSynBox(){
+  const box=el("synbox"); if(!box) return;
+  const sx=pending&&pending.syntax;
+  if(!sx||!sx.sug||sx.mode==="file"){ box.innerHTML=""; return; }
+  const svc=!!pending.service;
+  box.innerHTML=synPanelHTML("syn_", sx, {autoLabel:svc&&pending.service.design? "read automatically from the sample labels" : "guessed automatically from the sample names",
+    autoWhy:"the automatic reading put every sample in its own group or all samples in one group", colNote:"They can be adjusted for on the Differential Expression tab.",
+    grouped: sx.mode==="syn"&&sx.groupCol&&FACTOR!==sx.groupCol? FACTOR : null});
+  synWirePanel("syn_", sx, ()=>{ synApplyPending(); renderSetup(); });
+}
+// ---- comparison datasets: state in d.syntax; the dataset is analysed again from its files with the new design
+function synInitDataset(d, labels, perSample){
+  if(!d.srcText){ d.syntax=null; return; }
+  const lab=(labels&&labels.length===d.sampleNames.length? labels : d.sampleNames).map(String), sug=synSuggest(lab);
+  d.syntax={labels:lab, sug, mode:"auto", spec:sug? sug.spec : null, byDefault:false, auto:{srcDesign:d.srcDesign||null, gfactor:d.gfactor||null}};
+  if(!sug) return;
+  const k=new Set(d.groups).size, poor=perSample||k<=1||k>=lab.length;
+  if(poor&&sug.valid){ d.syntax.mode="syn"; d.syntax.byDefault=true; synApplyDataset(d); }
+}
+function synApplyDataset(d){
+  const sx=d.syntax; let text, gf;
+  if(sx.mode==="syn"){ const D=synDesign(sx.labels, sx.spec, d.sampleNames); text=D.text; gf=D.groupCol; sx.groupCol=gf; }
+  else { text=sx.auto.srcDesign; gf=sx.auto.gfactor; sx.groupCol=null; }
+  const keep={label:d.label, dupOf:d.dupOf, dupN:d.dupN, svc:d.svc, acceptNames:d.acceptNames, syntax:sx};
+  let nd; try{ nd=analyzeDatasetB(d.srcText, text, d.label, gf, d.species, d.acceptNames); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+'</span>'; return false; }
+  nd.srcText=d.srcText; nd.srcDesign=text;
+  for(const k of Object.keys(d)) delete d[k];
+  Object.assign(d, nd, keep); d.resKey="";
+  if(sx.mode==="syn"||(d.svc&&d.svc.design)){ const o=firstAppearance(d.groups); setDsGroupOrder(d, o); d.selA=o[0]; d.selB=o[1]||o[0]; }
+  return true;
+}
+function synDatasetNote(d){
+  const sx=d.syntax; if(!sx||!sx.sug) return "";
+  return sx.mode==="syn"&&d.gfactor===sx.groupCol? `<div class="svcbox"><b>Sample-name syntax (${esc(d.label)}).</b> Groups were read from ${synDescribe(sx)} of the sample names: ${firstAppearance(d.groups).map(esc).join(", ")}. To change which parts define the groups, open <b>Edit groups</b> in the dataset's row.</div>`
+    : `<div class="footer-note">The sample names of ${esc(d.label)} have ${synFields(sx.labels, sx.spec.sep).nF} parts; which parts define the groups can be set under <b>Edit groups</b> in the dataset's row.</div>`;
+}
+function renderSynDataset(k2, reopen){
+  const d=DSETS[k2], box=el("synB"+k2+"_box"); if(!box) return;
+  if(!d.syntax||!d.syntax.sug){ box.innerHTML=""; return; }
+  const P="synB"+k2+"_";
+  box.innerHTML=synPanelHTML(P, d.syntax, {autoLabel:d.svc&&d.svc.design? "read automatically from the sample labels" : (d.syntax.auto.srcDesign? "from the design file" : "guessed automatically from the sample names"),
+    autoWhy:"the automatic reading put every sample in its own group or all samples in one group", colNote:"They can be ticked as covariates in the dataset's row.",
+    grouped: d.syntax.mode==="syn"&&d.syntax.groupCol&&d.gfactor&&d.gfactor!==d.syntax.groupCol? d.gfactor : null});
+  synWirePanel(P, d.syntax, ()=>{ synApplyDataset(d); reopen(); });
+}
 function onMatrixLoaded(text,fname,fromService){
   if(!fromService&&serviceAllowed()&&parseServiceSheet(text)){ onServiceFiles([{text, name:fname}]); return; }
   if(!fromService) PENDRAW={text, name:fname||"matrix", sheets:[]};
@@ -2642,6 +3044,7 @@ function onMatrixLoaded(text,fname,fromService){
   if(!fromService&&mx.valuePairs&&serviceAllowed()){ onServiceFiles([{text, name:fname||"matrix"}]); return; }
   pending={matrix:mx, factors:null, factorNames:[], matrixName:fname||"matrix"};
   pending.groups=inferGroups(mx.sampleNames, mx.origNames);
+  if(!fromService) synInit();
   renderSetup();
 }
 const COMBO_SEP=" \u00d7 ";
@@ -2655,7 +3058,8 @@ function rebuildCombos(){
   const names=base.slice();
   const nS0=pending.matrix.sampleNames.length;
   const nLev=f=>new Set(Object.values(pending.factors[f]).filter(v=>v!=="NA")).size;
-  const combinable=base.filter(f=>nLev(f)>=2&&nLev(f)<Math.max(3,Math.floor(nS0/3)));
+  // with the sample-name syntax the group is already the chosen combination of parts
+  const combinable=pending.syntax&&pending.syntax.mode==="syn"? [] : base.filter(f=>nLev(f)>=2&&nLev(f)<Math.max(3,Math.floor(nS0/3)));
   if(combinable.length>=2&&combinable.length<=6){
     const base2=combinable;
     for(let a=0;a<base2.length;a++) for(let b=a+1;b<base2.length;b++){
@@ -2695,6 +3099,7 @@ function onDesignLoaded(text, fname){
   if(!pending){ throw "Load the expression matrix first."; }
   // a service's summary table names the samples: the matrix is re-read with it
   if(fname!==true&&serviceAllowed()&&parseServiceSheet(text)&&PENDRAW){ onServiceFiles([{text, name:typeof fname==="string"? fname : "summary"}]); return; }
+  if(fname!==true&&pending.syntax) pending.syntax.mode="file";   // a design file replaces the sample-name syntax
   if(fname!==true&&pending.service&&pending.service.alias){ const A=pending.service.alias;
     text=String(text).replace(/\r\n?/g,"\n").split("\n").map(l=>{ const d=l.indexOf("\t")>=0? "\t" : ","; return l.split(d).map(c=>{ let t=c.trim().replace(/^"(.*)"$/,"$1"); if(A[t]===undefined){ const m=t.match(VALCOL_RE); if(m&&A[m[1].trim()]!==undefined) t=m[1].trim(); } return A[t]!==undefined&&A[t]!==t? A[t] : c; }).join(d); }).join("\n"); }
   pending.factors=parseDesignText(text,pending.matrix.sampleNames);
@@ -2709,6 +3114,7 @@ function applyFactor(fname){
 }
 function renderSetup(){
   el("setupcard").style.display="block";
+  renderSynBox();
   const mx=pending.matrix;
   const colsums=mx.sampleNames.map((_,q)=>{ let s=0; for(const row of mx.vals)s+=row[q]; return s; });
   const maxv=Math.max(...mx.vals.slice(0,2000).map(r=>Math.max(...r)));
@@ -2717,8 +3123,8 @@ function renderSetup(){
   else { const dev=colsums.map(s=>Math.abs(s-1e6)/1e6); if(Math.max(...dev)<0.15) mode="column sums ≈ 10⁶: already CPM/TPM"; }
   el("parseinfo").innerHTML=`<b>${mx.ids.length.toLocaleString()}</b> genes × <b>${mx.sampleNames.length}</b> samples · normalization: <b>${mode}</b>`+
     (mx.valuePairs&&!pending.service? `<div class="warn" style="margin:6px 0 0">The matrix has ${mx.valuePairs.dropped.length+1} columns per sample (${[mx.valuePairs.keep].concat(mx.valuePairs.dropped).map(esc).join(", ")}); the <b>${esc(mx.valuePairs.keep)}</b> columns are used and the ${mx.valuePairs.dropped.map(esc).join(", ")} columns are ignored. If the delivery includes a summary table that names the samples (for Plasmidsaurus: the mapping-statistics or gene-biotype CSV), add it with the matrix to name and group the samples.</div>` : "")+
-    (pending.service? `<div class="svcbox"><b>${esc(pending.service.service||"Sequencing service")} delivery.</b> ${pending.service.notes.join(" ")}${pending.service.design? ` A design was built from the sample labels: ${pending.service.design.factors.map(f=>`<b>${esc(f)}</b> (${[...new Set(pending.factors&&pending.factors[f]? Object.values(pending.factors[f]) : [])].map(esc).join(", ")})`).join("; ")}.${pending.service.design.agents.length? ` The labels were read as the presence (+) or absence (−) of ${pending.service.design.agents.map(esc).join(", ")}.` : ""} Check the groups below before analysing.` : ""}${pending.service.warn.length? `<div class="warnchip" style="display:block;margin-top:4px">${pending.service.warn.join(" ")}</div>` : ""}${serviceQCTable(pending.service.qc)}</div>` : "")+
-    (pending.factors?` · design factors: <b>${pending.factorNames.join(", ")}</b>`:" · no design file; groups guessed from sample names (edit below)")+
+    (pending.service? `<div class="svcbox"><b>${esc(pending.service.service||"Sequencing service")} delivery.</b> ${pending.service.notes.join(" ")}${pending.syntax&&pending.syntax.mode==="syn"? ` The groups are read from the parts of the sample labels chosen under <b>Sample-name syntax</b> above: ${firstAppearance(pending.groups).map(esc).join(", ")}. Check the groups below before analysing.` : pending.service.design? ` A design was built from the sample labels: ${pending.service.design.factors.map(f=>`<b>${esc(f)}</b> (${[...new Set(pending.factors&&pending.factors[f]? Object.values(pending.factors[f]) : [])].map(esc).join(", ")})`).join("; ")}.${pending.service.design.agents.length? ` The labels were read as the presence (+) or absence (−) of ${pending.service.design.agents.map(esc).join(", ")}.` : ""} Check the groups below before analysing.` : ""}${svcWarnShown(pending.service.warn, pending.syntax).length? `<div class="warnchip" style="display:block;margin-top:4px">${svcWarnShown(pending.service.warn, pending.syntax).join(" ")}</div>` : ""}${serviceQCTable(pending.service.qc)}</div>` : "")+
+    (pending.syntax&&pending.syntax.mode==="syn"? ` · groups from the sample-name syntax: <b>${synDescribe(pending.syntax)}</b>; design columns: <b>${pending.factorNames.map(esc).join(", ")}</b>` : pending.factors?` · design factors: <b>${pending.factorNames.join(", ")}</b>`:" · no design file; groups guessed from sample names (edit below)")+
     (mx.dupLabels? `<div class="warn" style="margin:6px 0 0">Column names occur more than once: ${Object.entries(mx.dupLabels).map(([k,v])=>`<b>${esc(k)}</b> (${v})`).join(", ")}. Each sample needs its own name, so the repeated names were numbered in file order (${esc(mx.sampleNames[mx.origNames.indexOf(Object.keys(mx.dupLabels)[0])])}, …)${pending.factors? "" : ", and samples with the same name were put in one group"}. Check the groups below. A design file may repeat the names in the same order, or use the numbered names.</div>` : "")+
     (pending.factors&&pending.factorNames.length>1? (()=>{ const tf=timeFactorOf(pending.factors, pending.factorNames), others=baseFactorNames().filter(f=>f!==FACTOR&&!(isCombo(FACTOR)&&FACTOR.split(COMBO_SEP).includes(f)));
       return `<div class="footer-note" style="margin-top:4px">Samples are grouped by <b>${esc(FACTOR)}</b>${FACTOR===tf? " (a time factor: groups are ordered by time and analysed as a time course)" : (isCombo(FACTOR)&&tf&&FACTOR.split(COMBO_SEP).includes(tf)? ` (each combination is one group; plots show ${esc(tf)} on the x axis with one line per ${esc(FACTOR.split(COMBO_SEP).find(f=>f!==tf))}, and the Differential Expression tab compares them at each ${esc(tf)})` : "")}. ${others.length? `The other design column${others.length>1?"s":""} (${others.map(esc).join(", ")}) can be adjusted for on the Differential Expression tab. ` : ""}${(()=>{ const cn=tf&&others.length? pending.factorNames.find(f=>isCombo(f)&&f.split(COMBO_SEP).includes(tf)&&f.split(COMBO_SEP).includes(others[0])) : null;
@@ -3059,7 +3465,7 @@ el("analyze").addEventListener("click",()=>{
   if(inputs.length===pending.matrix.sampleNames.length)
     inputs.forEach(inp=>{ pending.groups[+inp.dataset.q]=inp.value.trim()||"NA"; });
   GROUPTYPE=el("grouptype").value;
-  GROUPORDER=pending.service&&pending.service.design? firstAppearance(pending.groups) : null;
+  GROUPORDER=(pending.service&&pending.service.design)||(pending.syntax&&pending.syntax.mode==="syn")? firstAppearance(pending.groups) : null;
   const tA=performance.now();
   Promise.resolve(runProgress("Analyzing "+pending.matrix.sampleNames.length+" samples \u00d7 "+pending.matrix.vals.length.toLocaleString()+" genes", analyzeGen()))
     .then(()=>nextFrame()).then(()=>{ LOADTIME.analyze={ms:performance.now()-tA, nS, nG}; renderLoadTiming(); });
@@ -3162,7 +3568,16 @@ function detectUnits(vals){
   return {max:mx, min:mn, nonInteger:nonInt>0};
 }
 let LOGP1=false, NOLABEL=0;
+let SYNNOTE="";
+// methods sentence for groups read from the sample names (empty when the groups were edited afterwards)
+function synNoteNow(){
+  const sx=pending&&pending.syntax; if(!sx||sx.mode!=="syn"||!pending.groups) return "";
+  const C=synColumns(sx.labels, sx.spec); if(C.group.some((g,i)=>g!==pending.groups[i])) return "";
+  const sepName=(SYN_SEPS.find(x=>x[0]===sx.spec.sep)||[null,'"'+sx.spec.sep+'"'])[1].replace(/ \(.*\)$/,"");
+  return `Sample groups were read from the sample ${pending.service&&pending.service.labels? "labels of the sequencing service" : "names"}: each was split at the ${sepName} and the group was formed from ${C.gcols.map(c=>`part ${c.k+1}${sx.spec.roles[c.k].trim? " without its trailing number" : ""}`).join(" and ")}.`;
+}
 function* analyzeGen(){
+  SYNNOTE=synNoteNow();
   const mx=pending.matrix, groups=pending.groups;
   const ns=mx.sampleNames.length, ng0=mx.vals.length;
   yield {stage:"Filtering genes", frac:0};
@@ -3832,11 +4247,11 @@ function buildGenePlot(g){
       error_y:{type:"data",array:merr,visible:true,color:"#334155",thickness:1.2}});
   // pairwise comparison brackets
   const pw=pairwiseStats(g);
-  const shapes=[], pAnnos=[];
+  const shapes=[], pAnnos=[], brItems=[]; let brStep=0;
   let pwShown=[];
   if(pw){
     pwShown = el("pwsel").value==="all"? pw.filter(r=>r.padj!=null&&r.padj<0.05).slice(0,8) : pw.filter(r=>!r.untestable);
-    const step=(ymax-ymin)*0.11 || 1;
+    const step=(ymax-ymin)*0.11 || 1; brStep=step;
     pwShown.forEach((r,k)=>{
       const y=ymax+step*(k+1), x1=GX[r.a], x2=GX[r.b];
       shapes.push({type:"line",x0:x1,x1:x2,y0:y,y1:y,line:{color:"#475569",width:1.2}},
@@ -3844,6 +4259,7 @@ function buildGenePlot(g){
                   {type:"line",x0:x2,x1:x2,y0:y,y1:y-step*0.35,line:{color:"#475569",width:1.2}});
       pAnnos.push({x:(x1+x2)/2,y:y,yanchor:"bottom",yshift:3,text:starOf(r.padj),showarrow:false,
         font:{size:r.padj<0.05?12:9.5,color:"#334155"}});
+      brItems.push({base:ymax, lv:k, sh:[3*k, 3*k+1, 3*k+2], an:k});
     });
     if(pwShown.length) // invisible point so autorange includes the top bracket
       ptTraces.push({x:[mx[0]],y:[ymax+step*(pwShown.length+0.9)],mode:"markers",
@@ -3856,6 +4272,7 @@ function buildGenePlot(g){
     shapes,annotations:pAnnos,
     // data export: every pairwise test, with whether it is drawn as a bracket
     meta: pw&&pw.length? {statsRows:[["gene","group A","group B","Welch p","Holm-adjusted p","label","drawn as bracket"]].concat(pw.map(r=>[geneTitle(g), r.a, r.b, r.untestable? "not testable" : r.p, r.untestable? "not testable" : r.padj, r.untestable? "" : starOf(r.padj), pwShown.includes(r)? "yes" : "no"]))} : undefined};
+  if(brItems.length) layout.meta=Object.assign({}, layout.meta, {brackets:{items:brItems, step:brStep, first:1, head:0.9, tick:0.35*brStep, bottom:Math.min(0, ymin), tr:barTraces.length+ptTraces.length-1}});
   return {data:barTraces.concat(ptTraces), layout, testGroups, testNames, pw, pwShown, gi, raw, lg:lgU};
 }
 function genePlotNote(){
@@ -4381,7 +4798,7 @@ function drawCompare(){
           // data extent per gene (points and bar + error), and the bracket step
           let lo=Infinity, hi=-Infinity; const topG=compareList.map((g,i)=>{ let t=-Infinity; gs.forEach(d=>{ const v=vals[i][d]; v.forEach(x=>{ if(x>t) t=x; if(x<lo) lo=x; if(x>hi) hi=x; });
             if(chart==="bar"&&v.length){ const m=mean(v), sd=v.length>1?Math.sqrt(variance(v,m)):0, e=errType==="sd"? sd : (v.length>1? sd/Math.sqrt(v.length) : 0); if(m+e>t) t=m+e; } }); return t; });
-          const span=Math.max(1e-9, hi-Math.min(lo, useZ? lo : 0)), step=span*0.085, tick=span*0.018;
+          const span=Math.max(1e-9, hi-Math.min(lo, useZ? lo : 0)), step=span*0.085, tick=span*0.018, brItemsC=[];
           const idxOf=d=>inner.findIndex(s2=>s2.d===d);
           const statRows=[["gene","group A","group B","log2FC (B - A)","p","adjusted p","adjustment","label"]];
           compareList.forEach((g,k)=>{
@@ -4397,6 +4814,7 @@ function drawCompare(){
                               {type:"line", x0:x1, x1:x2, y0:y, y1:y, line:{color:"#334155", width:1}},
                               {type:"line", x0:x2, x1:x2, y0:y-tick, y1:y, line:{color:"#334155", width:1}});
               statAnn.push({x:(x1+x2)/2, y, text:lab, showarrow:false, yanchor:"bottom", font:{size:stFmt==="stars"?12:9.5, color:"#1e293b"}, yshift:-1});
+              brItemsC.push({base:topG[k], lv, sh:[statShapes.length-2, statShapes.length-3, statShapes.length-1], an:statAnn.length-1});
               statTop=Math.max(statTop??-Infinity, y+step*0.75);
               statRows.push([GENES[g].split(" (")[0], r.A, r.B, r.err? null : r.lfc, r.err? null : r.p, r.err? null : r.adj,
                 stTest==="de"? "Benjamini-Hochberg across all "+nG+" genes" : "Holm across the "+rows.length+" pair(s) shown for this gene", r.err? r.err : lab]);
@@ -4404,6 +4822,7 @@ function drawCompare(){
           });
           statBottom= useZ? lo-span*0.04 : Math.min(0, lo-span*0.04);
           prismMeta.statsRows=statRows;
+          if(brItemsC.length) prismMeta.brackets={items:brItemsC, step, first:0.7, head:0.75, tick, bottom:statBottom, axisRange:true};
           const tdesc= stTest==="de"? (()=>{ const pr=(deCache&&deCache.prior)||{}; return `${deMethodLabel()}${DETREAT&&deMethod!=="welch"? ", TREAT test of |log₂FC| > "+(Math.abs(parseFloat(el("fcthr").value))||0) : ""}${DEFIT==="all"&&deMethod!=="welch"? ", variance from all groups" : ""}${DECOVSEL.filter(v=>COVARS[v]).length? ", adjusted for "+DECOVSEL.filter(v=>COVARS[v]).join(", ") : ""}; FDR by Benjamini–Hochberg across all ${nG.toLocaleString()} genes`; })()
             : `Welch t-test per gene on log₂ expression; p adjusted by Holm across the pairs shown for each gene`;
           note+=` Brackets: ${stMode==="de"? "the DE contrast" : stMode==="first"? "each group against "+esc(ok[0]) : "all pairs of groups"}; ${tdesc}${stFmt==="stars"? "; * ≤ 0.05, ** ≤ 0.01, *** ≤ 0.001, **** ≤ 0.0001, ns > 0.05" : ""}${useZ? "; tests use log₂ expression, not the z-scores shown" : ""}.`;
@@ -6105,7 +6524,7 @@ function genMethods(){
   const nInc=included.filter(Boolean).length;
   const kGroups=GROUPS.filter(g=>S.filter((s,i)=>included[i]&&s.group===g).length>0).length;
   const txt=
-`Expression data (${FILTER.ng0.toLocaleString()} features × ${nS} samples) were analyzed with benchsiDE version ${APP_VERSION} (client-side, in-browser; https://www.benchside.org, source at https://github.com/jyaron/benchsiDE). ${NORMNOTE} ${FILTER.mode==="fbe"?`Genes were filtered with edgeR filterByExpr at default settings (Chen Y, Lun ATL & Smyth GK, F1000Research 5:1438, 2016), retaining ${nG.toLocaleString()} genes.`:`Genes with expression ≥ ${FILTER.thr} in at least ${FILTER.minS} samples were retained (${nG.toLocaleString()} genes).`} Expression values were ${HASCOUNTS?`log₂ counts per million with a library-size-scaled prior count of 2 (edgeR cpm, log = TRUE)`:DATALOG?`the supplied log₂ values`:`log₂(x + 1)-transformed values`}${HASCOUNTS&&deMethod==="voom"?` (voom used its own transform, below)`:``}. The design comprised ${nInc} included samples in ${kGroups} groups (factor: ${FACTOR}, treated as ${NUMERIC?"an ordered numeric variable (time course / dose–response)":"unordered categorical conditions"}).${nInc<nS?` Gene filtering and normalization used all ${nS} loaded samples; the ${nS-nInc} excluded sample${nS-nInc===1?"":"s"} (${S.filter((x,q)=>!included[q]).map(x=>x.id).join(", ")}) ${nS-nInc===1?"was":"were"} left out of every model fit and comparison.`:``} Principal component analysis used the 2,000 most variable genes, gene-centered. Multidimensional scaling used pairwise leading-logFC distances (root-mean of the top 500 per-pair squared log₂ differences) with classical scaling, as in limma plotMDS (Ritchie ME et al., Nucleic Acids Res 43:e47, 2015). ${deMethodsText()}${kGroups>2&&curGene!=null?`In Gene Explorer, differences across all groups for a single gene were assessed by one-way ANOVA and Kruskal–Wallis tests${NUMERIC?", and monotonic trends by Spearman correlation with the numeric group value":""}. `:``}${patState?`Group patterns were identified by k-means clustering (k-means++ initialization) of per-group mean z-score profiles of the most variable genes. `:``}${BATCHDISP?`For display, PCA/heatmap/gene plots show values adjusted for ${BATCHDISP} with the removeBatchEffect procedure (group effects retained; limma); all statistics were computed on unadjusted values. `:``}${MODF?`Genome-wide differences across all groups were tested per gene with a moderated one-way F-statistic (between-group mean square over the empirical-Bayes posterior variance; limma eBayes; Smyth GK, Stat Appl Genet Mol Biol 3:Article3, 2004), with BH correction. `:``}${DSETS.length?`${DSETS.length===1?`A second dataset was`:`${DSETS.length} additional datasets were`} analyzed with independent pipelines (filterByExpr, TMM, log₂ CPM as above, and a limma-trend moderated t for the chosen contrast${DEFIT==="all"?", fitted to all groups of that dataset":""}${DSETS.some(d=>(d.covSel||[]).length)?`, adjusted within each dataset for ${DSETS.filter(d=>(d.covSel||[]).length).map(d=>{ const r=d.res&&!d.res.err? d.res : null; const fit=r? (r.cov||"none") : d.covSel.join(" + "); const out=r&&r.covNotEstimable&&r.covNotEstimable.length? ` (${r.covNotEstimable.join(", ")} not estimable, left out)` : ""; return d.label+": "+fit+out; }).join("; ")}`:``}); raw expression values were never merged or renormalized across datasets. Cross-dataset comparisons used genes matched by case-normalized symbol (same-species) or ${orthoMethodsText()}${DSETS.some(d=>d.nCust)?`, supplemented by a user-supplied identifier mapping (${DSETS.filter(d=>d.nCust).map(d=>`${d.custName}: ${d.nCust.toLocaleString()} pairs for ${d.label}`).join("; ")}) applied before the built-in matching`:``}${DSETS.some(d=>d.nViaName)?`; in addition, ${DSETS.filter(d=>d.nViaName).map(d=>`${d.nViaName.toLocaleString()} genes for ${d.label}`).join(" and ")} were matched one to one through gene names used as given, that is, names in a matrix that are human gene symbols but not symbols of that dataset's species (provider annotation by sequence similarity), each treated as that human gene; these pairings are not recorded orthology`:``} and operated on within-dataset statistics only, restricted to genes present in the session dataset${CMPLAST?`: Pearson correlation of log₂ fold changes and moderated t-statistics, one-sided hypergeometric tests of directional hit-set overlap, and rank-rank hypergeometric overlap maps computed as in the Bioconductor RRHO package (Plaisier SB, Taschereau R, Wong JA, Graeber TG, Nucleic Acids Res 38:e169, 2010; descriptive, as these p-values assume independent genes)`:``}${CONSENSUS?`${CMPLAST?"; ":": "}across all datasets, a consensus vote count of within-dataset significance (no pooled p-values)`:``}. ${FAMROWS&&FAMROWS.length?`Many-to-many homology families (MGI classes merged by shared membership${famLoadedPairs().has("hp")||famLoadedPairs().has("mp")||famLoadedPairs().has("rp")? ", and for pig connected components of the Ensembl 116 Compara ortholog graph" : ""}; the families the strict 1:1 table excludes) were analyzed as modules: each family scored as the mean z of its member genes within each dataset separately, group effects tested by Welch t within each dataset with BH correction across tested families, and cross-species agreement reported as direction concordance - no one-to-one gene assignment is made for these families. `:``}${SIGRAN&&SIGRES?`Signature transfer scored each sample of each comparison dataset as the mean, over the signature's genes, of the z-score computed entirely within that dataset${SIGRES.spec.sign.some(x=>x<0)? " (genes down-regulated in the session with reversed sign)" : ""}${SIGRES.useFam&&SIGRES.maps.some(m=>m.M.cross)? (SIGRES.maps.every(m=>!m.M.cross||[el("species").value, m.d.species].sort().join("|")==="human|mouse")? "; between human and mouse, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI human–mouse homology graph), each family scored once as the mean z of its members present in the dataset" : "; between species, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI homology graph, or of the Ensembl 116 Compara ortholog graph for pig), each family scored once as the mean z of its members present in the dataset") : ""}. Separation of each dataset's contrast groups was summarized by the Mann-Whitney AUC (descriptive) and by Hedges' g (bias-corrected standardized mean difference of the score), and tested in two ways: by the Welch t-test of the scores between the groups (self-contained), and by the Welch t statistic against ${SIGRES.NNULL} seeded random signatures (gene sets of the same size and numbers of up- and down-regulated genes drawn from the session's genes, transferred and scored in the same way, the same random gene set in every dataset) (empirical p; a competitive random-set null, cf. Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012); replication required both p-values ≤ 0.05 and the separation in the direction of the signature (the self-contained test alone is not calibrated when the contrast changes many genes, and the competitive test alone is not calibrated for a co-regulated signature when the groups do not differ). ${SIGRES.pooled? `Hedges' g was pooled over the ${SIGRES.pooled.k} independent comparison datasets (the discovery dataset excluded) with a ${({REML:"REML random-effects",REM:"DerSimonian-Laird random-effects",FEM:"fixed-effect"})[SIGRES.pooled.method]} model${SIGRES.pooled.hk? " and the Hartung-Knapp-Sidik-Jonkman test" : ""} (as metafor::rma on escalc(measure = "SMD") values; Viechtbauer W, J Stat Softw 36(3), 2010), and the pooled effect was also compared with the pooled effects of the random signatures, pooled the same way (empirical p); pooled replication likewise required both p-values ≤ 0.05. ` : ""}`:``}`:``}${ALLPAIRS?`All pairwise group contrasts were computed with the same per-contrast statistics as the primary comparison; no joint model was fitted, and FDR control is within-contrast. `:``}${HUBS?`Network hub genes were ranked by soft connectivity, defined as the sum over all gene pairs of ${HUBS.signed?"signed":"unsigned"} correlation adjacencies (|r| raised to β = ${HUBS.beta}) among the ${HUBS.M.toLocaleString()} most variable genes, following the WGCNA connectivity definition (Zhang B & Horvath S, Stat Appl Genet Mol Biol 4:Article17, 2005; Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008); connectivity rankings at small sample sizes were treated as screening output. ${HUBNET?`The network view showed the ${HUBNET.H} most connected genes${HUBNET.nb?` and their ${HUBNET.nb} most strongly correlated partners`:``}, with edges for gene pairs with |r| ≥ ${HUBNET.rmin}${HUBNET.m?`, each gene keeping its ${HUBNET.m} strongest`:``} (${HUBNET.layout==="circle"?"circular layout ordered by average-linkage clustering on 1 − |r|":"seeded force-directed layout (Fruchterman TMJ & Reingold EM, Softw Pract Exp 21:1129, 1991)"}). `:``}${HUBNB?`The neighbourhood of ${geneTitle(HUBNB.hub)} was defined as its ${HUBNB.N} most strongly correlated genes (largest |r|) among the same ${HUBNB.M.toLocaleString()} genes, using ${HUBNB.mode==="within"?`the partial correlation given group, computed as the Pearson correlation of the residuals after removing each group's mean (Baba K, Shibata R & Sibuya M, Aust N Z J Stat 46:657, 2004), so that correlation produced only by shared group differences was not counted as co-expression (cf. Parsana P et al., Genome Biol 20:94, 2019); p-values used a t test on n − G − 1 = ${HUBNB.df} degrees of freedom`:`Pearson correlation across all ${HUBNB.n} included samples; p-values used a t test on n − 2 = ${HUBNB.df} degrees of freedom`}. It was displayed as an ego network centred on the hub (Everett M & Borgatti SP, Soc Netw 27:31, 2005), as a heatmap of per-sample z-scores with samples grouped by condition (Eisen MB, Spellman PT, Brown PO & Botstein D, Proc Natl Acad Sci USA 95:14863, 1998), and as a per-sample neighbourhood score, the mean of the members' z-scores with negatively correlated members sign-reversed (cf. Lee E, Chuang HY, Kim JW, Ideker T & Lee D, PLoS Comput Biol 4:e1000217, 2008); the score was used descriptively because the members were selected from the same samples. Its gene-set enrichment was tested by the hypergeometric test against the screened genes annotated in the library, with BH correction, and the node and edge tables were exported for Cytoscape (Shannon P et al., Genome Res 13:2498, 2003). `:``}${HUBX?`Its preservation in each independent comparison dataset (contrast samples only) was quantified by the WGCNA module-preservation statistic Zsummary (Langfelder P, Luo R, Oldham MC & Horvath S, PLoS Comput Biol 7:e1001057, 2011), computed as in WGCNA 1.74 (unsigned adjacency |r|^6; Zdensity from the proportion of variance explained, mean sign-aware kME, mean sign-aware correlation and mean adjacency; Zconnectivity from the correlations of intramodular connectivity, kME and pairwise correlations), each Z against 100 random gene sets of the same size in the test dataset${HUBX.mode==="within"?", with correlations computed after removing each group's mean":""}. Because random gene sets, and random sets of differentially expressed genes, also exceeded the published thresholds in calibration on psoriasis datasets, Zsummary was compared empirically, in the same dataset, with 100 random gene sets of the same size, with 100 random sets whose members came from the same log₂FC deciles of the discovery contrast (DE-matched), and with 100 neighbourhoods of random seed genes built by the same procedure; preservation beyond its shared differential expression required an empirical p ≤ 0.05 against the DE-matched sets. Rewiring was tested per dataset by Fisher's z test of the hub–partner correlation between the two contrast groups (Fisher RA, Biometrika 10:507, 1915; cf. Fukushima A, Gene 518:209, 2013), calibrated against 1,000 random gene pairs from the same log₂FC deciles as the hub and the partner (two-sided empirical p), with BH correction across partners; datasets were not pooled, and replication was counted across the independent comparison datasets (the discovery dataset excluded). `:``}${HUBXCONS?`Consensus hubs were identified by robust rank aggregation (Kolde R, Laur S, Adler P & Vilo J, Bioinformatics 28:573, 2012; RRA score, BH-adjusted) of soft-connectivity ranks (|r|^${HUBXCONS.beta}) computed in each of ${HUBXCONS.nLists} datasets over one common universe of ${HUBXCONS.N.toLocaleString()} genes matched in every dataset, chosen by median variance rank. `:``}`:``}${META?`Effect sizes were combined across datasets (${META.idxs.map((i,a)=>dsLabel(i)+": "+META.clabels[a]+(META.nInfo?`, ${META.nInfo[a].nB} vs ${META.nInfo[a].nA} samples${META.nInfo[a].subj?` from ${META.nInfo[a].subj.n} ${META.nInfo[a].subj.col} levels`:""}`:"")).join("; ")}${META.nInfo?`; ${META.nInfo.reduce((x,m)=>x+m.n,0)} samples in total`:""}) by ${metaModelText(META,"adj")} meta-analysis of each dataset's own log₂ fold change and its standard error (${META.method==="REML"? "between-dataset variance by restricted maximum likelihood; Viechtbauer W, J Educ Behav Stat 30:261, 2005" : META.method==="REM"? "DerSimonian R & Laird N, Control Clin Trials 7:177, 1986" : "inverse-variance weights"}${META.hk? `; ${META.hk==="adhoc"?"truncated ":""}Hartung-Knapp-Sidik-Jonkman standard error and t test on k−1 degrees of freedom: Hartung J & Knapp G, Stat Med 20:3875, 2001; Sidik K & Jonkman JN, Stat Med 21:3153, 2002${META.hk==="adhoc"?"; Knapp G & Hartung J, Stat Med 22:2693, 2003":""}` : "; Wald z test"}; computed as metafor::rma, Viechtbauer W, J Stat Softw 36(3), 2010)${META_DFADJ?`; because each standard error is estimated from few residual degrees of freedom, it was replaced by |log₂FC|/|z|, where z is the normal quantile with the same two-sided tail probability as the dataset's moderated t on its own degrees of freedom`:``}, with Cochran's Q and I² as heterogeneity measures (Higgins JPT & Thompson SG, Stat Med 21:1539, 2002${META.method==="REML"?"; I² computed from the REML estimate of τ², as in metafor":""}), ${META.hk? `a Hartung-Knapp t test on k − 1 degrees of freedom` : `a Wald z test`} and Benjamini-Hochberg correction across the ${META.nTested.toLocaleString()} genes matched in at least ${META.minK} datasets; raw expression values were not combined. The shared signature comprised genes with meta FDR ≤ ${META.fdr}, |pooled log₂FC| ≥ ${META.lfcMin} and the same direction of change in every contributing dataset${META.usePI?`, whose 95% prediction interval for a new study (t distribution with k − 2 df; Riley RD, Higgins JPT & Deeks JJ, BMJ 342:d549, 2011) excluded 0`:``}${META.i2Max<100?`, and I² ≤ ${META.i2Max}%`:``} (${META.sig.length.toLocaleString()} genes)${META.loo.length?`; its robustness was assessed by recomputing it with each dataset omitted`:``}. `:``}${DISCO?`Discovery screening scored gene families (symbol-prefix heuristic) and library gene sets as modules (mean z-score of member genes per sample) and tested group effects with ${DISCO.rows.length&&DISCO.rows[0].camera?"the CAMERA competitive gene-set test accounting for inter-gene correlation (Wu MD & Smyth GK, Nucleic Acids Res 40:e133, 2012)":"a competitive null of "+DISCO.B+" size-matched random gene sets (seeded permutations)"}, BH-FDR across ${DISCO.rows.length} modules (overlapping modules: BH under positive dependence). This is a descriptive screen for coordinated regulation. `:``}${enrResults&&enrResults.mode==="fry"?`${ENRMAT?`The enrichment-across-contrasts matrix ran the same FRY test for each pairwise contrast${DEFIT==="all"?", each within the model fitted to all groups,":", each fitted on its two groups only,"} with BH correction within each contrast. `:``}Self-contained gene-set testing used the FRY fast-rotation test at default settings (posterior-sd standardization; Wu D et al., Bioinformatics 26:2176-2182, 2010 [ROAST], as implemented in limma), BH-corrected, on the unweighted log₂-CPM values${HASCOUNTS?"":" (the log₂ expression values used for differential expression)"} with the linear model of the differential-expression contrast (${DEFIT==="all"?"all groups":"the two compared groups"}${enrResults.covUsed&&enrResults.covUsed.length?", adjusted for "+enrResults.covUsed.join(", "):""}${enrResults.covOut&&enrResults.covOut.length?"; "+enrResults.covOut.join(", ")+" not estimable and left out":""}; ${enrResults.nFit||""} samples)${deMethod==="voom"?"; voom precision weights are not used by FRY":""}. `:``}${enrResults&&enrResults.mode==="gsea"?(GSEAMODE==="samples"?`Gene-set enrichment analysis (Subramanian A et al., PNAS 102:15545-15550, 2005) ranked genes by moderated t and assessed each set with ${GSEAB} sample-label permutations; FDR was estimated from the pooled normalized enrichment scores of the permutations. `:`Preranked gene-set enrichment analysis (gene-set permutation) was used for ranking only; its p-values do not account for correlation between genes. `):``}${enrResults&&(enrResults.mode==="fry"||enrResults.mode==="gsea")&&GMT?`Gene sets were taken from ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library (${enrResults.lib||GMTname})`}. `:``}${enrResults&&(!enrResults.mode||enrResults.mode==="ora")&&GMT?`Gene-set over-representation used one-sided hypergeometric tests against ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library`} with all retained genes as universe, BH-corrected.`:``}${heatClusters&&GMT?` Enrichment of k-means heatmap clusters uses the same test but is reported descriptively: the clusters are data-derived (selected from top DE or most-variable genes), so cluster-level FDR values should not be read as confirmatory hypothesis tests.`:``}${TRAITRES?` Association of gene expression with the sample trait ${TRAITRES.o.trait}${TRAITRES.o.transform!=="none"?` (${TRAITRES.D.trLab}-transformed)`:""} was tested with limma linear models (${traitModelText(TRAITRES).replace("log₂ expression","log₂-CPM")}; the trait standardized, effects reported per unit and per SD) and empirical Bayes moderation with an intensity trend (eBayes(trend = TRUE)) over ${TRAITRES.mode==="means"?`${TRAITRES.n} ${TRAITRES.o.block} means of ${TRAITRES.D.cols.length} samples: because the trait is constant within ${TRAITRES.o.block}, each ${TRAITRES.o.block} was summarized by the mean of its samples${TRAITRES.agg.withinG?", after removing the group effect estimated within blocks,":""} and the means were analysed as independent observations`:`${TRAITRES.n} samples${TRAITRES.blockMode==="dupcor"?`, with ${TRAITRES.o.block} as a random block: the intra-block correlation (${TRAITRES.rho.toFixed(3)}) was estimated by duplicateCorrelation and used in generalized least squares (lmFit with block and correlation; Smyth GK, Michaud J & Scott HS, Bioinformatics 21:2067, 2005)`:""}`}; BH-adjusted p-values. Influential observations were flagged by Cook's distance > 1 (Cook RD, Technometrics 19:15, 1977). `:``}${TRAITCAM?`Gene sets (${TRAITCAM.lib}, 5–500 genes) were tested against the trait coefficient by CAMERA with the inter-gene correlation estimated from the data (Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012). `:``}${TRAITMOD?`Module–trait relationships were tested as in WGCNA (Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008): the eigengene of each module (first principal component of its scaled genes) was tested in the same linear model, reported as the partial correlation t/√(t² + df), with BH correction over the module × trait matrix. `:``}${ANNO?` ${ACCEPTNAMES&&aliasCount(sessAliasesAll())? `Gene names in the expression matrix were used as given: ${acceptNamesNote(aliasCount(sessAliasesAll()), el("species").value)}, and each was treated as that human gene for cross-dataset matching, homology families and built-in gene-set libraries; these assignments rest on the provider's annotation, not on recorded orthology. ` : ``}Gene identifiers were mapped to ${({human:"official HGNC", mouse:"official MGI", rat:"official RGD", pig:"NCBI Gene"})[el("species").value]||"official"} symbols using ${ANNO.source} (${ANNO.name}; ${ANNO.n.toLocaleString()} mappings). Reference: ${ANNO.citation}.`:""}${IXRES?" "+ixMethodsText():""}`;
+`Expression data (${FILTER.ng0.toLocaleString()} features × ${nS} samples) were analyzed with benchsiDE version ${APP_VERSION} (client-side, in-browser; https://www.benchside.org, source at https://github.com/jyaron/benchsiDE). ${SYNNOTE? SYNNOTE+" " : ""}${NORMNOTE} ${FILTER.mode==="fbe"?`Genes were filtered with edgeR filterByExpr at default settings (Chen Y, Lun ATL & Smyth GK, F1000Research 5:1438, 2016), retaining ${nG.toLocaleString()} genes.`:`Genes with expression ≥ ${FILTER.thr} in at least ${FILTER.minS} samples were retained (${nG.toLocaleString()} genes).`} Expression values were ${HASCOUNTS?`log₂ counts per million with a library-size-scaled prior count of 2 (edgeR cpm, log = TRUE)`:DATALOG?`the supplied log₂ values`:`log₂(x + 1)-transformed values`}${HASCOUNTS&&deMethod==="voom"?` (voom used its own transform, below)`:``}. The design comprised ${nInc} included samples in ${kGroups} groups (factor: ${FACTOR}, treated as ${NUMERIC?"an ordered numeric variable (time course / dose–response)":"unordered categorical conditions"}).${nInc<nS?` Gene filtering and normalization used all ${nS} loaded samples; the ${nS-nInc} excluded sample${nS-nInc===1?"":"s"} (${S.filter((x,q)=>!included[q]).map(x=>x.id).join(", ")}) ${nS-nInc===1?"was":"were"} left out of every model fit and comparison.`:``} Principal component analysis used the 2,000 most variable genes, gene-centered. Multidimensional scaling used pairwise leading-logFC distances (root-mean of the top 500 per-pair squared log₂ differences) with classical scaling, as in limma plotMDS (Ritchie ME et al., Nucleic Acids Res 43:e47, 2015). ${deMethodsText()}${kGroups>2&&curGene!=null?`In Gene Explorer, differences across all groups for a single gene were assessed by one-way ANOVA and Kruskal–Wallis tests${NUMERIC?", and monotonic trends by Spearman correlation with the numeric group value":""}. `:``}${patState?`Group patterns were identified by k-means clustering (k-means++ initialization) of per-group mean z-score profiles of the most variable genes. `:``}${BATCHDISP?`For display, PCA/heatmap/gene plots show values adjusted for ${BATCHDISP} with the removeBatchEffect procedure (group effects retained; limma); all statistics were computed on unadjusted values. `:``}${MODF?`Genome-wide differences across all groups were tested per gene with a moderated one-way F-statistic (between-group mean square over the empirical-Bayes posterior variance; limma eBayes; Smyth GK, Stat Appl Genet Mol Biol 3:Article3, 2004), with BH correction. `:``}${DSETS.length?`${DSETS.length===1?`A second dataset was`:`${DSETS.length} additional datasets were`} analyzed with independent pipelines (filterByExpr, TMM, log₂ CPM as above, and a limma-trend moderated t for the chosen contrast${DEFIT==="all"?", fitted to all groups of that dataset":""}${DSETS.some(d=>(d.covSel||[]).length)?`, adjusted within each dataset for ${DSETS.filter(d=>(d.covSel||[]).length).map(d=>{ const r=d.res&&!d.res.err? d.res : null; const fit=r? (r.cov||"none") : d.covSel.join(" + "); const out=r&&r.covNotEstimable&&r.covNotEstimable.length? ` (${r.covNotEstimable.join(", ")} not estimable, left out)` : ""; return d.label+": "+fit+out; }).join("; ")}`:``}); raw expression values were never merged or renormalized across datasets. Cross-dataset comparisons used genes matched by case-normalized symbol (same-species) or ${orthoMethodsText()}${DSETS.some(d=>d.nCust)?`, supplemented by a user-supplied identifier mapping (${DSETS.filter(d=>d.nCust).map(d=>`${d.custName}: ${d.nCust.toLocaleString()} pairs for ${d.label}`).join("; ")}) applied before the built-in matching`:``}${DSETS.some(d=>d.nViaName)?`; in addition, ${DSETS.filter(d=>d.nViaName).map(d=>`${d.nViaName.toLocaleString()} genes for ${d.label}`).join(" and ")} were matched one to one through gene names used as given, that is, names in a matrix that are human gene symbols but not symbols of that dataset's species (provider annotation by sequence similarity), each treated as that human gene; these pairings are not recorded orthology`:``} and operated on within-dataset statistics only, restricted to genes present in the session dataset${CMPLAST?`: Pearson correlation of log₂ fold changes and moderated t-statistics, one-sided hypergeometric tests of directional hit-set overlap, and rank-rank hypergeometric overlap maps computed as in the Bioconductor RRHO package (Plaisier SB, Taschereau R, Wong JA, Graeber TG, Nucleic Acids Res 38:e169, 2010; descriptive, as these p-values assume independent genes)`:``}${CONSENSUS?`${CMPLAST?"; ":": "}across all datasets, a consensus vote count of within-dataset significance (no pooled p-values)`:``}. ${FAMROWS&&FAMROWS.length?`Many-to-many homology families (MGI classes merged by shared membership${famLoadedPairs().has("hp")||famLoadedPairs().has("mp")||famLoadedPairs().has("rp")? ", and for pig connected components of the Ensembl 116 Compara ortholog graph" : ""}; the families the strict 1:1 table excludes) were analyzed as modules: each family scored as the mean z of its member genes within each dataset separately, group effects tested by Welch t within each dataset with BH correction across tested families, and cross-species agreement reported as direction concordance - no one-to-one gene assignment is made for these families. `:``}${SIGRAN&&SIGRES?`Signature transfer scored each sample of each comparison dataset as the mean, over the signature's genes, of the z-score computed entirely within that dataset${SIGRES.spec.sign.some(x=>x<0)? " (genes down-regulated in the session with reversed sign)" : ""}${SIGRES.useFam&&SIGRES.maps.some(m=>m.M.cross)? (SIGRES.maps.every(m=>!m.M.cross||[el("species").value, m.d.species].sort().join("|")==="human|mouse")? "; between human and mouse, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI human–mouse homology graph), each family scored once as the mean z of its members present in the dataset" : "; between species, genes were matched through one-to-one orthologs, and genes without one were carried through their homology family (connected component of the MGI homology graph, or of the Ensembl 116 Compara ortholog graph for pig), each family scored once as the mean z of its members present in the dataset") : ""}. Separation of each dataset's contrast groups was summarized by the Mann-Whitney AUC (descriptive) and by Hedges' g (bias-corrected standardized mean difference of the score), and tested in two ways: by the Welch t-test of the scores between the groups (self-contained), and by the Welch t statistic against ${SIGRES.NNULL} seeded random signatures (gene sets of the same size and numbers of up- and down-regulated genes drawn from the session's genes, transferred and scored in the same way, the same random gene set in every dataset) (empirical p; a competitive random-set null, cf. Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012); replication required both p-values ≤ 0.05 and the separation in the direction of the signature (the self-contained test alone is not calibrated when the contrast changes many genes, and the competitive test alone is not calibrated for a co-regulated signature when the groups do not differ). ${SIGRES.pooled? `Hedges' g was pooled over the ${SIGRES.pooled.k} independent comparison datasets (the discovery dataset excluded) with a ${({REML:"REML random-effects",REM:"DerSimonian-Laird random-effects",FEM:"fixed-effect"})[SIGRES.pooled.method]} model${SIGRES.pooled.hk? " and the Hartung-Knapp-Sidik-Jonkman test" : ""} (as metafor::rma on escalc(measure = "SMD") values; Viechtbauer W, J Stat Softw 36(3), 2010), and the pooled effect was also compared with the pooled effects of the random signatures, pooled the same way (empirical p); pooled replication likewise required both p-values ≤ 0.05. ` : ""}`:``}`:``}${ALLPAIRS?`All pairwise group contrasts were computed with the same per-contrast statistics as the primary comparison; no joint model was fitted, and FDR control is within-contrast. `:``}${HUBS?`Network hub genes were ranked by soft connectivity, defined as the sum over all gene pairs of ${HUBS.signed?"signed":"unsigned"} correlation adjacencies (|r| raised to β = ${HUBS.beta}) among the ${HUBS.M.toLocaleString()} most variable genes, following the WGCNA connectivity definition (Zhang B & Horvath S, Stat Appl Genet Mol Biol 4:Article17, 2005; Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008); connectivity rankings at small sample sizes were treated as screening output. ${HUBNET?`The network view showed the ${HUBNET.H} most connected genes${HUBNET.nb?` and their ${HUBNET.nb} most strongly correlated partners`:``}, with edges for gene pairs with |r| ≥ ${HUBNET.rmin}${HUBNET.m?`, each gene keeping its ${HUBNET.m} strongest`:``} (${HUBNET.layout==="circle"?"circular layout ordered by average-linkage clustering on 1 − |r|":"seeded force-directed layout (Fruchterman TMJ & Reingold EM, Softw Pract Exp 21:1129, 1991)"}). `:``}${HUBNB?`The neighbourhood of ${geneTitle(HUBNB.hub)} was defined as its ${HUBNB.N} most strongly correlated genes (largest |r|) among the same ${HUBNB.M.toLocaleString()} genes, using ${HUBNB.mode==="within"?`the partial correlation given group, computed as the Pearson correlation of the residuals after removing each group's mean (Baba K, Shibata R & Sibuya M, Aust N Z J Stat 46:657, 2004), so that correlation produced only by shared group differences was not counted as co-expression (cf. Parsana P et al., Genome Biol 20:94, 2019); p-values used a t test on n − G − 1 = ${HUBNB.df} degrees of freedom`:`Pearson correlation across all ${HUBNB.n} included samples; p-values used a t test on n − 2 = ${HUBNB.df} degrees of freedom`}. It was displayed as an ego network centred on the hub (Everett M & Borgatti SP, Soc Netw 27:31, 2005), as a heatmap of per-sample z-scores with samples grouped by condition (Eisen MB, Spellman PT, Brown PO & Botstein D, Proc Natl Acad Sci USA 95:14863, 1998), and as a per-sample neighbourhood score, the mean of the members' z-scores with negatively correlated members sign-reversed (cf. Lee E, Chuang HY, Kim JW, Ideker T & Lee D, PLoS Comput Biol 4:e1000217, 2008); the score was used descriptively because the members were selected from the same samples. Its gene-set enrichment was tested by the hypergeometric test against the screened genes annotated in the library, with BH correction, and the node and edge tables were exported for Cytoscape (Shannon P et al., Genome Res 13:2498, 2003). `:``}${HUBX?`Its preservation in each independent comparison dataset (contrast samples only) was quantified by the WGCNA module-preservation statistic Zsummary (Langfelder P, Luo R, Oldham MC & Horvath S, PLoS Comput Biol 7:e1001057, 2011), computed as in WGCNA 1.74 (unsigned adjacency |r|^6; Zdensity from the proportion of variance explained, mean sign-aware kME, mean sign-aware correlation and mean adjacency; Zconnectivity from the correlations of intramodular connectivity, kME and pairwise correlations), each Z against 100 random gene sets of the same size in the test dataset${HUBX.mode==="within"?", with correlations computed after removing each group's mean":""}. Because random gene sets, and random sets of differentially expressed genes, also exceeded the published thresholds in calibration on psoriasis datasets, Zsummary was compared empirically, in the same dataset, with 100 random gene sets of the same size, with 100 random sets whose members came from the same log₂FC deciles of the discovery contrast (DE-matched), and with 100 neighbourhoods of random seed genes built by the same procedure; preservation beyond its shared differential expression required an empirical p ≤ 0.05 against the DE-matched sets. Rewiring was tested per dataset by Fisher's z test of the hub–partner correlation between the two contrast groups (Fisher RA, Biometrika 10:507, 1915; cf. Fukushima A, Gene 518:209, 2013), calibrated against 1,000 random gene pairs from the same log₂FC deciles as the hub and the partner (two-sided empirical p), with BH correction across partners; datasets were not pooled, and replication was counted across the independent comparison datasets (the discovery dataset excluded). `:``}${HUBXCONS?`Consensus hubs were identified by robust rank aggregation (Kolde R, Laur S, Adler P & Vilo J, Bioinformatics 28:573, 2012; RRA score, BH-adjusted) of soft-connectivity ranks (|r|^${HUBXCONS.beta}) computed in each of ${HUBXCONS.nLists} datasets over one common universe of ${HUBXCONS.N.toLocaleString()} genes matched in every dataset, chosen by median variance rank. `:``}`:``}${META?`Effect sizes were combined across datasets (${META.idxs.map((i,a)=>dsLabel(i)+": "+META.clabels[a]+(META.nInfo?`, ${META.nInfo[a].nB} vs ${META.nInfo[a].nA} samples${META.nInfo[a].subj?` from ${META.nInfo[a].subj.n} ${META.nInfo[a].subj.col} levels`:""}`:"")).join("; ")}${META.nInfo?`; ${META.nInfo.reduce((x,m)=>x+m.n,0)} samples in total`:""}) by ${metaModelText(META,"adj")} meta-analysis of each dataset's own log₂ fold change and its standard error (${META.method==="REML"? "between-dataset variance by restricted maximum likelihood; Viechtbauer W, J Educ Behav Stat 30:261, 2005" : META.method==="REM"? "DerSimonian R & Laird N, Control Clin Trials 7:177, 1986" : "inverse-variance weights"}${META.hk? `; ${META.hk==="adhoc"?"truncated ":""}Hartung-Knapp-Sidik-Jonkman standard error and t test on k−1 degrees of freedom: Hartung J & Knapp G, Stat Med 20:3875, 2001; Sidik K & Jonkman JN, Stat Med 21:3153, 2002${META.hk==="adhoc"?"; Knapp G & Hartung J, Stat Med 22:2693, 2003":""}` : "; Wald z test"}; computed as metafor::rma, Viechtbauer W, J Stat Softw 36(3), 2010)${META_DFADJ?`; because each standard error is estimated from few residual degrees of freedom, it was replaced by |log₂FC|/|z|, where z is the normal quantile with the same two-sided tail probability as the dataset's moderated t on its own degrees of freedom`:``}, with Cochran's Q and I² as heterogeneity measures (Higgins JPT & Thompson SG, Stat Med 21:1539, 2002${META.method==="REML"?"; I² computed from the REML estimate of τ², as in metafor":""}), ${META.hk? `a Hartung-Knapp t test on k − 1 degrees of freedom` : `a Wald z test`} and Benjamini-Hochberg correction across the ${META.nTested.toLocaleString()} genes matched in at least ${META.minK} datasets; raw expression values were not combined. The shared signature comprised genes with meta FDR ≤ ${META.fdr}, |pooled log₂FC| ≥ ${META.lfcMin} and the same direction of change in every contributing dataset${META.usePI?`, whose 95% prediction interval for a new study (t distribution with k − 2 df; Riley RD, Higgins JPT & Deeks JJ, BMJ 342:d549, 2011) excluded 0`:``}${META.i2Max<100?`, and I² ≤ ${META.i2Max}%`:``} (${META.sig.length.toLocaleString()} genes)${META.loo.length?`; its robustness was assessed by recomputing it with each dataset omitted`:``}. `:``}${DISCO?`Discovery screening scored gene families (symbol-prefix heuristic) and library gene sets as modules (mean z-score of member genes per sample) and tested group effects with ${DISCO.rows.length&&DISCO.rows[0].camera?"the CAMERA competitive gene-set test accounting for inter-gene correlation (Wu MD & Smyth GK, Nucleic Acids Res 40:e133, 2012)":"a competitive null of "+DISCO.B+" size-matched random gene sets (seeded permutations)"}, BH-FDR across ${DISCO.rows.length} modules (overlapping modules: BH under positive dependence). This is a descriptive screen for coordinated regulation. `:``}${enrResults&&enrResults.mode==="fry"?`${ENRMAT?`The enrichment-across-contrasts matrix ran the same FRY test for each pairwise contrast${DEFIT==="all"?", each within the model fitted to all groups,":", each fitted on its two groups only,"} with BH correction within each contrast. `:``}Self-contained gene-set testing used the FRY fast-rotation test at default settings (posterior-sd standardization; Wu D et al., Bioinformatics 26:2176-2182, 2010 [ROAST], as implemented in limma), BH-corrected, on the unweighted log₂-CPM values${HASCOUNTS?"":" (the log₂ expression values used for differential expression)"} with the linear model of the differential-expression contrast (${DEFIT==="all"?"all groups":"the two compared groups"}${enrResults.covUsed&&enrResults.covUsed.length?", adjusted for "+enrResults.covUsed.join(", "):""}${enrResults.covOut&&enrResults.covOut.length?"; "+enrResults.covOut.join(", ")+" not estimable and left out":""}; ${enrResults.nFit||""} samples)${deMethod==="voom"?"; voom precision weights are not used by FRY":""}. `:``}${enrResults&&enrResults.mode==="gsea"?(GSEAMODE==="samples"?`Gene-set enrichment analysis (Subramanian A et al., PNAS 102:15545-15550, 2005) ranked genes by moderated t and assessed each set with ${GSEAB} sample-label permutations; FDR was estimated from the pooled normalized enrichment scores of the permutations. `:`Preranked gene-set enrichment analysis (gene-set permutation) was used for ranking only; its p-values do not account for correlation between genes. `):``}${enrResults&&(enrResults.mode==="fry"||enrResults.mode==="gsea")&&GMT?`Gene sets were taken from ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library (${enrResults.lib||GMTname})`}. `:``}${enrResults&&(!enrResults.mode||enrResults.mode==="ora")&&GMT?`Gene-set over-representation used one-sided hypergeometric tests against ${(enrResults.libCite||GMTCITE)?`the built-in ${enrResults.lib||GMTname} library (${enrResults.libCite||GMTCITE})`:`a user-supplied GMT library`} with all retained genes as universe, BH-corrected.`:``}${heatClusters&&GMT?` Enrichment of k-means heatmap clusters uses the same test but is reported descriptively: the clusters are data-derived (selected from top DE or most-variable genes), so cluster-level FDR values should not be read as confirmatory hypothesis tests.`:``}${TRAITRES?` Association of gene expression with the sample trait ${TRAITRES.o.trait}${TRAITRES.o.transform!=="none"?` (${TRAITRES.D.trLab}-transformed)`:""} was tested with limma linear models (${traitModelText(TRAITRES).replace("log₂ expression","log₂-CPM")}; the trait standardized, effects reported per unit and per SD) and empirical Bayes moderation with an intensity trend (eBayes(trend = TRUE)) over ${TRAITRES.mode==="means"?`${TRAITRES.n} ${TRAITRES.o.block} means of ${TRAITRES.D.cols.length} samples: because the trait is constant within ${TRAITRES.o.block}, each ${TRAITRES.o.block} was summarized by the mean of its samples${TRAITRES.agg.withinG?", after removing the group effect estimated within blocks,":""} and the means were analysed as independent observations`:`${TRAITRES.n} samples${TRAITRES.blockMode==="dupcor"?`, with ${TRAITRES.o.block} as a random block: the intra-block correlation (${TRAITRES.rho.toFixed(3)}) was estimated by duplicateCorrelation and used in generalized least squares (lmFit with block and correlation; Smyth GK, Michaud J & Scott HS, Bioinformatics 21:2067, 2005)`:""}`}; BH-adjusted p-values. Influential observations were flagged by Cook's distance > 1 (Cook RD, Technometrics 19:15, 1977). `:``}${TRAITCAM?`Gene sets (${TRAITCAM.lib}, 5–500 genes) were tested against the trait coefficient by CAMERA with the inter-gene correlation estimated from the data (Wu D & Smyth GK, Nucleic Acids Res 40:e133, 2012). `:``}${TRAITMOD?`Module–trait relationships were tested as in WGCNA (Langfelder P & Horvath S, BMC Bioinformatics 9:559, 2008): the eigengene of each module (first principal component of its scaled genes) was tested in the same linear model, reported as the partial correlation t/√(t² + df), with BH correction over the module × trait matrix. `:``}${ANNO?` ${ACCEPTNAMES&&aliasCount(sessAliasesAll())? `Gene names in the expression matrix were used as given: ${acceptNamesNote(aliasCount(sessAliasesAll()), el("species").value)}, and each was treated as that human gene for cross-dataset matching, homology families and built-in gene-set libraries; these assignments rest on the provider's annotation, not on recorded orthology. ` : ``}Gene identifiers were mapped to ${({human:"official HGNC", mouse:"official MGI", rat:"official RGD", pig:"NCBI Gene"})[el("species").value]||"official"} symbols using ${ANNO.source} (${ANNO.name}; ${ANNO.n.toLocaleString()} mappings). Reference: ${ANNO.citation}.`:""}${IXRES?" "+ixMethodsText():""}`;
   el("methodstext").textContent=txt;
 }
 el("copymethods").addEventListener("click",()=>{
@@ -6319,6 +6738,10 @@ el("heatexport").addEventListener("click",()=>{
 /* ================= tabs ================= */
 el("fontsel").addEventListener("change",()=>{ FONTSCALE=parseFloat(el("fontsel").value)||1; refreshTab(curTab); });
 el("expsize").addEventListener("change",()=>{ applyExpSize(); refreshTab(curTab); });
+["exppt","expdpi","expw","exph"].forEach(id=>el(id).addEventListener("change",()=>{ EXPCFG.pt=+el("exppt").value||8; EXPCFG.dpi=+el("expdpi").value||300; EXPCFG.w=+el("expw").value||85; EXPCFG.h=+el("exph").value||0; syncExpUI(); }));
+const restyleShown=()=>{ refreshTab(curTab); if(curTab==="gene"&&compareList.length) drawCompare(); };
+el("axstyle").addEventListener("change",()=>{ AXSTYLE=el("axstyle").value==="classic"? "classic" : "grid"; restyleShown(); });
+el("brstyle").addEventListener("change",()=>{ BRSTYLE=el("brstyle").value==="staple"? "staple" : "line"; restyleShown(); });
 function switchTab(t){
   curTab=t;
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
@@ -6882,13 +7305,13 @@ function matchedGenes(list){
 // re-read a comparison dataset from its files with the current matching settings (accepted gene names)
 function rematchDataset(d){
   if(!d.srcText) return false;
-  const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:d.covSel||[], dupOf:d.dupOf, dupN:d.dupN, svc:d.svc, acceptNames:d.acceptNames};
+  const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:d.covSel||[], dupOf:d.dupOf, dupN:d.dupN, svc:d.svc, acceptNames:d.acceptNames, syntax:d.syntax};
   let nd; try{ nd=analyzeDatasetB(d.srcText, d.srcDesign, d.label, d.gfactor, d.species, d.acceptNames); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+'</span>'; return false; }
   nd.srcText=d.srcText; nd.srcDesign=d.srcDesign;
   const order=d.groups? firstAppearance(d.groups) : null;
   for(const k of Object.keys(d)) delete d[k];
   Object.assign(d, nd, keep); d.resKey="";
-  if(d.svc&&d.svc.design) setDsGroupOrder(d, firstAppearance(d.groups));
+  if((d.svc&&d.svc.design)||(d.syntax&&d.syntax.mode==="syn")) setDsGroupOrder(d, firstAppearance(d.groups));
   if(!d.gi[d.selA]) d.selA=null; if(!d.gi[d.selB]) d.selB=null;
   return true;
 }
@@ -6906,12 +7329,12 @@ function setDsFactor(d, f){
   if(!d.factors||!d.factors[f]) return;
   // regrouping changes filterByExpr's group sizes, so filter, TMM and log-CPM are recomputed from the original files
   if(d.srcText){
-    const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:(d.covSel||[]).filter(x=>x!==f), dupOf:d.dupOf, svc:d.svc, acceptNames:d.acceptNames};
+    const keep={label:d.label, selA:d.selA, selB:d.selB, covSel:(d.covSel||[]).filter(x=>x!==f), dupOf:d.dupOf, svc:d.svc, acceptNames:d.acceptNames, syntax:d.syntax};
     let nd; try{ nd=analyzeDatasetB(d.srcText, d.srcDesign, d.label, f, d.species, d.acceptNames); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+'</span>'; return; }
     nd.srcText=d.srcText; nd.srcDesign=d.srcDesign;
     for(const k of Object.keys(d)) delete d[k];
     Object.assign(d, nd, keep); d.resKey="";
-    if(d.svc&&d.svc.design){ const o=firstAppearance(d.groups); setDsGroupOrder(d, o); }
+    if((d.svc&&d.svc.design)||(d.syntax&&d.syntax.mode==="syn")){ const o=firstAppearance(d.groups); setDsGroupOrder(d, o); }
     if(!d.gi[d.selA]) d.selA=null; if(!d.gi[d.selB]) d.selB=null;
     return;
   }
@@ -6959,7 +7382,7 @@ function renderCmpSlots(){
 function renderSlotGroupEditor(k2){
   const d=DSETS[k2], box=el("slotge_"+k2);
   const ord=d.gorder||Object.keys(d.gi);
-  box.innerHTML=`
+  box.innerHTML=`<div id="synB${k2}_box"></div>
     <div class="controls" style="margin-bottom:6px">Group names and order: ${ord.map((g,i)=>`<span class="grp" data-g="${esc(g)}" style="padding:2px 6px">
       <span class="ghandle" title="drag to move this group" aria-hidden="true">&#10303;</span>
       <span class="sgmv" data-g="${esc(g)}" data-d="-1" title="move group left" style="cursor:pointer;color:${i===0?'#d1d5db':'#64748b'}">&#9664;</span>
@@ -6994,6 +7417,7 @@ function renderSlotGroupEditor(k2){
     inp.addEventListener("change",ap); inp.addEventListener("keydown",e=>{ if(e.key==="Enter") ap(); }); });
   box.querySelectorAll(".sgmv").forEach(sp=>sp.addEventListener("click",()=>{ moveDsGroup(d, sp.dataset.g, +sp.dataset.d); reopen(); }));
   makeGroupsDraggable(box, ".grp", (from,to,after)=>{ if(setDsGroupOrder(d, orderAfterDrop(d.gorder||Object.keys(d.gi), from, to, after))) reopen(); });
+  renderSynDataset(k2, ()=>{ refreshCmpUI(); const b2=el("slotge_"+k2); if(b2){ b2.style.display="block"; renderSlotGroupEditor(k2); } });
 }
 function renameDsGroup(d, oldG, newG){
   // renames a group of a comparison dataset; samples and grouping are unchanged
@@ -7077,11 +7501,13 @@ function refreshCmpUI(){
 }
 function onAddDataset(){
   if(!CMPB_TXT) return;
-  let svcB=null; try{ svcB=prepCmpService(); }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+"</span>"; CMPB_TXT=null; CMPB_DES=null; CMPB_SHEETS=[]; return; }
+  let svcB=null, ownDes=!!CMPB_DES; try{ svcB=prepCmpService(); if(svcB) ownDes=svcB.ownDes; }catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+"</span>"; CMPB_TXT=null; CMPB_DES=null; CMPB_SHEETS=[]; return; }
   let d;
   try{ d=analyzeDatasetB(CMPB_TXT, CMPB_DES, uniqueDsLabel(defaultDsLabel(CMPB_NAME||("dataset "+(DSETS.length+1))), -1), null, null, !!(el("cmpaccept")&&el("cmpaccept").checked)); }
   catch(e){ el("cmpinfo").innerHTML='<span class="warnchip">'+e+"</span>"; return; }
   d.srcText=CMPB_TXT; d.srcDesign=CMPB_DES;
+  // sample-name syntax (no design file of the user's): may replace the automatic groups before they are reported
+  if(!ownDes) synInitDataset(d, svcB? svcB.labels : null, !!(svcB&&svcB.design&&svcB.design.perSample));
   // the same data loaded twice (for example the session's own file), in full or in part, under the same or
   // renamed sample IDs, would be counted as independent evidence. Shared samples are detected by sample ID
   // and by identical raw library size (column sum of counts).
@@ -7098,6 +7524,7 @@ function onAddDataset(){
   el("cmpinfo").innerHTML=esc(`${d.label}: ${d.nG.toLocaleString()} genes × ${d.nS} samples; groups ${Object.keys(d.gi).map(g=>g+"(n="+d.gi[g].length+")").join(", ")}. ${d.matched.toLocaleString()} of ${nG.toLocaleString()} session genes matched by symbol.`)
     + (d.dupOf? `<div class="alertbox"><span class="alerthead">\u26a0 Same data loaded twice</span>${d.dupN&&d.dupN<d.nS? `${d.dupN} of the ${d.nS} samples` : `All ${d.nS} samples`} of ${esc(d.label)} are also in ${esc(d.dupOf==="session"? (/session/i.test(dsLabel(0))? dsLabel(0) : dsLabel(0)+" (the session data)") : d.dupOf.label)}. See the dataset list below.</div>` : "");
   if(svcB){ serviceDatasetSetup(d, svcB); el("cmpinfo").innerHTML+=serviceDatasetNote(d); }
+  el("cmpinfo").innerHTML+=synDatasetNote(d);
   CMPB_TXT=null; CMPB_DES=null; CMPB_NAME=null; CMPB_RAW=null;
   refreshCmpUI();
 }
@@ -7115,12 +7542,13 @@ function prepCmpService(){
   if(!serviceAllowed()||!CMPB_TXT) return null;
   const sheets=CMPB_SHEETS.slice(); CMPB_SHEETS=[];
   if(CMPB_DES){ const sh=parseServiceSheet(CMPB_DES); if(sh){ sheets.push(sh); CMPB_DES=null; } }
+  const ownDes=!!CMPB_DES;   // a design file of the user's
   const head=splitFields(CMPB_TXT.slice(0, CMPB_TXT.indexOf("\n")), sniffDelim(CMPB_TXT.slice(0, CMPB_TXT.indexOf("\n")))).map(x=>x.trim());
   if(!sheets.length && !pairedValueColumns(head.filter(h=>VALCOL_RE.test(h)))) return null;
   const B=serviceBundle(CMPB_TXT, sheets, serviceName([CMPB_NAME].concat(sheets.map(x=>x.fname||""))));
   CMPB_RAW=CMPB_TXT; CMPB_TXT=B.matrixText;
   if(!CMPB_DES) CMPB_DES= B.designText || ("sample\tgroup\n"+parseMatrixText(B.matrixText).sampleNames.map(n=>n+"\t"+(String(n).replace(/[_\-. ]*\d+$/,"")||"samples")).join("\n")+"\n");
-  B.sheets=sheets; return B;
+  B.sheets=sheets; B.ownDes=ownDes; return B;
 }
 function serviceDatasetSetup(d, B){
   d.svc={service:B.service, notes:B.notes, warn:B.warn, qc:B.qc, raw:CMPB_RAW, sheets:B.sheets, design:!!B.design};
@@ -7128,7 +7556,7 @@ function serviceDatasetSetup(d, B){
 }
 function serviceDatasetNote(d){
   if(!d.svc) return "";
-  return `<div class="svcbox"><b>${esc(d.svc.service||"Sequencing service")} delivery (${esc(d.label)}).</b> ${d.svc.notes.join(" ")}${d.svc.design? " Groups were built from the sample labels and ordered by sample number; check them in the dataset's group editor." : ""}${d.svc.warn.length? `<div class="warnchip" style="display:block;margin-top:4px">${d.svc.warn.join(" ")}</div>` : ""}${serviceQCTable(d.svc.qc)}${serviceQCFlags(d.svc.qc).map(f=>`<div class="warnchip" style="display:block;margin-top:4px">${f}</div>`).join("")}</div>`;
+  return `<div class="svcbox"><b>${esc(d.svc.service||"Sequencing service")} delivery (${esc(d.label)}).</b> ${d.svc.notes.join(" ")}${d.svc.design? " Groups were built from the sample labels and ordered by sample number; check them in the dataset's group editor." : ""}${svcWarnShown(d.svc.warn, d.syntax).length? `<div class="warnchip" style="display:block;margin-top:4px">${svcWarnShown(d.svc.warn, d.syntax).join(" ")}</div>` : ""}${serviceQCTable(d.svc.qc)}${serviceQCFlags(d.svc.qc).map(f=>`<div class="warnchip" style="display:block;margin-top:4px">${f}</div>`).join("")}</div>`;
 }
 // summary table for the dataset added last: the dataset is re-read with it
 function applySheetToLastDataset(sheet){
@@ -7140,7 +7568,8 @@ function applySheetToLastDataset(sheet){
   const keep={label:d.label, dupOf:d.dupOf, dupN:d.dupN, acceptNames:d.acceptNames};
   for(const k of Object.keys(d)) delete d[k]; Object.assign(d, nd, keep);
   CMPB_RAW=raw; serviceDatasetSetup(d, B);
-  refreshCmpUI(); el("cmpinfo").innerHTML=serviceDatasetNote(d);
+  synInitDataset(d, B.labels, !!(B.design&&B.design.perSample));
+  refreshCmpUI(); el("cmpinfo").innerHTML=serviceDatasetNote(d)+synDatasetNote(d);
 }
 function hookCmpFile(inputId, isDesign){
   el(inputId).addEventListener("change",e=>{
@@ -12040,7 +12469,7 @@ el("reportbtn").addEventListener("click",async()=>{
     ["p_enrlolli","Gene-set enrichment"],["p_pat","Expression patterns"],["p_gs","Module score"],["p_heat","Heatmap"],["p_compare","Multi-gene comparison"]];
   const now=new Date();
   let h=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>benchsiDE report</title>
-<style>body{font-family:'Segoe UI',system-ui,sans-serif;max-width:960px;margin:24px auto;padding:0 20px;color:#1e293b;line-height:1.5}
+<style>body{font-family:Arial,Helvetica,sans-serif;max-width:960px;margin:24px auto;padding:0 20px;color:#1e293b;line-height:1.5}
 h1{font-size:22px}h2{font-size:16px;border-bottom:1px solid #e3e6ee;padding-bottom:4px;margin-top:28px}
 table{border-collapse:collapse;font-size:12px;width:100%}th,td{padding:4px 8px;border-bottom:1px solid #eef1f6;text-align:right}
 th{text-align:right;background:#f6f7fb}td:first-child,th:first-child{text-align:left}
@@ -12127,7 +12556,7 @@ async function makeSummaryFigure(){
 
 /* ================= session save / restore ================= */
 function sessionState(){
-  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, deTreat:DETREAT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, g2f:{lay:G2FLAY, stat:G2FSTAT}, sampleBar:{hide:SBHIDE, coll:SBCOLL}, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
+  return {app:"benchside", version:6, appVersion:APP_VERSION, groupType:GROUPTYPE, groupOrder:GROUPORDER, norm:el("normsel").value, fMode:el("fmode").value, unitSel:el("unitsel").value, fThr:el("fthr").value, fMin:el("fmin").value, enrMin:el("enrmin").value, enrMax:el("enrmax").value, nGAtSave:nG, fontScale:FONTSCALE, labelCfg:LABELCFG, deFit:DEFIT, deTreat:DETREAT, covType:COVTYPE, theme:THEME, groupColours:GCUSTOM, sessLabel:SESSLABEL, g2f:{lay:G2FLAY, stat:G2FSTAT}, sampleBar:{hide:SBHIDE, coll:SBCOLL}, gPlot:GPLOT, mforest:{genes:el("mfgenes").value, n:el("mfn").value}, famdot:{fams:el("fdfams").value, n:el("fdn").value}, dendro:{col:el("dendrocol").value, k:el("dendrok").value}, trait:(typeof traitCfg==='function'&&el("trsel").value)? traitCfg() : null, cmpChart:CMPCHART, cmpArr:CMPARR, cmpPts:el("cmppts").checked, deSel:DESEL?[...DESEL]:null, expSize:el("expsize").value, expCfg:EXPCFG, axStyle:AXSTYLE, brStyle:BRSTYLE, deCov:DECOVSEL.slice(), batchDisp:BATCHDISP,
     disco:{fam:el("dscfam").checked, cur:el("dsccur").checked, gmt:el("dscgmt").checked, mn:el("dscmin").value, mx:el("dscmax").value, B:el("dscperm").value},
     matrixName:pending&&pending.matrixName||"", nG0:FILTER.ng0, factor:FACTOR,
     factors:(pending&&pending.factors)? Object.fromEntries(baseFactorNames().map(f=>[f,pending.factors[f]])) : null,
@@ -12136,7 +12565,7 @@ function sessionState(){
     de:{A:el("selA").value, B:el("selB").value, fdr:el("selFDR").value, thr:el("fcthr").value, method:deMethod},
     gene:curGene!==null?GENES[curGene]:null, compare:compareList.map(g=>GENES[g]),
     gmt:GMT?(GMTBUILTIN?{builtin:GMTBUILTIN}:{name:GMTname, sets:GMT}):null, enrMethod,
-    anno:ANNO?(ANNO.builtin?{builtin:ANNO.builtin}:ANNO):null, species:el("species").value, acceptNames:ACCEPTNAMES,
+    anno:ANNO?(ANNO.builtin?{builtin:ANNO.builtin}:ANNO):null, species:el("species").value, acceptNames:ACCEPTNAMES, synNote:SYNNOTE,
     pat:{N:el("patN").value, K:el("patK").value}, heatN:el("heatN").value, heat:{ord:el("heatord").value, K:el("heatK").value}, ix:{A1:el("ixA1").value, B1:el("ixB1").value, A2:el("ixA2").value, B2:el("ixB2").value, meth:el("ixmeth").value, fit:el("ixfit").value, fdr:el("ixfdr").value, lfc:el("ixlfc").value, cov:[...el("ixcov").querySelectorAll("input:checked")].map(x=>x.dataset.c)}, sig:{fam:el("sigfam").checked}, meta:{method:el("metamethod").value, hk:el("metahk").value, mink:el("metamink").value, fdr:el("metafdr").value, lfc:el("metalfc").value, pi:el("metapi").checked}};
 }
 el("savesess").addEventListener("click",()=>{
@@ -12251,6 +12680,9 @@ function applySession(ss){
   THEME=Object.assign({pal:"default", ud:"redblue", div:"rdbu", seq:"viridis"}, ss.theme||{}); GCUSTOM=Object.assign({}, ss.groupColours||{}); rebuildTheme();
   DESEL=ss.deSel&&ss.deSel.length? new Set(ss.deSel) : null;
   if(ss.labelCfg){ LABELCFG=Object.assign({angle:"auto",size:"auto",long:"wrap"}, ss.labelCfg); el("lblang").value=LABELCFG.angle; el("lblsize").value=LABELCFG.size; el("lbllong").value=LABELCFG.long; }
+  if(ss.expCfg) EXPCFG=Object.assign({pt:8, dpi:300, w:85, h:0}, ss.expCfg);
+  AXSTYLE= ss.axStyle==="classic"? "classic" : "grid"; el("axstyle").value=AXSTYLE;
+  BRSTYLE= ss.brStyle==="staple"? "staple" : "line"; el("brstyle").value=BRSTYLE;
   if(ss.expSize!==undefined){ el("expsize").value=ss.expSize; applyExpSize(); }
   if(ss.deCov!==undefined){
     DECOVSEL=Array.isArray(ss.deCov)? ss.deCov.slice() : (ss.deCov? [ss.deCov] : []);
@@ -12263,6 +12695,7 @@ function applySession(ss){
   if(ss.norm!==undefined) el("normsel").value=ss.norm;
   // analysis inputs differ from the current analysis: re-run it so the restored state is computed on the same genes
   if(pending&&[el("normsel").value, el("fmode").value, el("unitsel").value, el("fthr").value, el("fmin").value].join("|")!==inpBefore){ try{ analyzeNow(); }catch(e){} }
+  SYNNOTE=ss.synNote||"";
   if(ss.disco){ el("dscfam").checked=!!ss.disco.fam; el("dsccur").checked=ss.disco.cur!==false; el("dscgmt").checked=!!ss.disco.gmt;
     el("dscmin").value=ss.disco.mn||"3"; el("dscmax").value=ss.disco.mx||"100"; el("dscperm").value=ss.disco.B||"1000"; }
   if(ss.ix){ ixRefreshUI(); ["A1","B1","A2","B2"].forEach(k=>{ if(ss.ix[k]) el("ix"+k).value=ss.ix[k]; }); el("ixmeth").value=ss.ix.meth||"mod"; el("ixfit").value=ss.ix.fit||"all"; el("ixfdr").value=ss.ix.fdr||"0.05"; el("ixlfc").value=ss.ix.lfc||"1"; el("ixcov").querySelectorAll("input").forEach(x=>{ x.checked=(ss.ix.cov||[]).includes(x.dataset.c); }); }

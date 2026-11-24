@@ -128,7 +128,7 @@ def convert(md):
 
 
 CSS = """
-body{margin:0;font-family:-apple-system,'Segoe UI',system-ui,sans-serif;color:#1e293b;background:#f8fafc;line-height:1.55}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#1e293b;background:#f8fafc;line-height:1.55}
 header{background:#0f172a;color:#fff;padding:14px 28px;display:flex;gap:18px;align-items:baseline;flex-wrap:wrap}
 header h1{margin:0;font-size:19px;font-weight:400;color:#fff}header h1 b{color:#60a5fa;font-weight:800}
 header a{color:#94a3b8;font-size:13px;text-decoration:none}

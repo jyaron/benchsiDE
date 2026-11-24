@@ -1161,6 +1161,201 @@ def accept_gene_names():
     return ok, r
 
 
+def _syntax_files():
+    # synthetic data (no user data): names made of line, passage and treatment; a delivery in the sequencing-service
+    # layout whose summary table labels every sample differently; plain matrices with other name layouts
+    import random
+    rnd = random.Random(20261118)
+    labs = [f"{l}_P{p}_{t}" for l, ps in [("WT", [3, 4, 5]), ("KO-1", [3, 4]), ("KO-2", [3])] for p in ps for t in ("+Dox", "-Dox")]
+    ng = 1200
+    mu = [rnd.lognormvariate(3.5, 1.3) for _ in range(ng)]
+    def counts(names, up):
+        return [[int(rnd.gammavariate(8, mu[g] * (4.0 if (up(c) and g < 80) else 1.0) / 8)) for c in names] for g in range(ng)]
+    def plain(names, up):
+        C = counts(names, up)
+        return "Geneid\t" + "\t".join(names) + "\n" + "\n".join(f"g{g+1}\t" + "\t".join(map(str, C[g])) for g in range(ng)) + "\n"
+    C = counts(labs, lambda c: "+Dox" in c)
+    order = list(range(9, 12)) + list(range(0, 9))          # delivered matrices list samples 10-12 before 1-9
+    head = ["gene_id", "gene_name", "gene_biotype"] + [x for n in order for x in (f"RUNQ_{n+1}_cpm", f"RUNQ_{n+1}_count")]
+    tot = [sum(C[g][n] for g in range(ng)) for n in range(len(labs))]
+    rows = ["\t".join(head)]
+    for g in range(ng):
+        rows.append("\t".join([f"g{g+1}", f"g{g+1}", "protein_coding"] + [x for n in order for x in ("%.4f" % (C[g][n] / tot[n] * 1e6), "%.1f" % C[g][n])]))
+    biot = ",protein_coding,lncRNA,Other\n" + "\n".join(f"{l},{9000+i},{2000+i},{100+i}" for i, l in enumerate(labs)) + "\n"
+    design = "sample\tgrp\n" + "\n".join(l + "\t" + l.split("_")[0].split("-")[0] + l.split("_")[2] for l in labs) + "\n"
+    n2 = ["ctrl_rep1", "ctrl_rep2", "ctrl_rep3", "LPS_rep1", "LPS_rep2", "LPS_rep3"]
+    n3 = ["GSM1", "GSM2", "GSM3", "GSM4", "GSM5", "GSM6"]
+    n4 = ["liver.young.a", "liver.young.b", "liver.old.a", "liver.old.b", "lung.young.a", "lung.young.b", "lung.old.a", "lung.old.b"]
+    return dict(labs=labs, mtx="\n".join(rows) + "\n", biot=biot, design=design, plain=plain(labs, lambda c: "+Dox" in c),
+                n2=plain(n2, lambda c: "LPS" in c), n3=plain(n3, lambda c: False), n4=plain(n4, lambda c: "old" in c))
+
+
+SYNTAX_JS = r"""
+  const F=@F@; el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  const R={}, uq=a=>[...new Set(a)], st=()=>({mode:pending.syntax.mode, groups:uq(pending.groups), factor:FACTOR, panel:(el("synbox")._c||"").length>0});
+  const de=(A,B)=>{ GROUPTYPE="auto"; GROUPORDER=(pending.service&&pending.service.design)||(pending.syntax&&pending.syntax.mode==="syn")? firstAppearance(pending.groups) : null; analyzeNow(); __drain();
+    el("selA").value=A; el("selB").value=B; el("selFDR").value="0.05"; el("fcthr").value="1"; deMethod="mod"; DEFIT="all"; DETREAT=false; DECOVSEL=[]; deKey=""; const r=computeDE();
+    let k=0, h=0; for(let g=0;g<nG;g++){ h+=r.lfc[g]*(g%97+1); if(r.q[g]<=0.05&&Math.abs(r.lfc[g])>=1) k++; } return {GROUPS:GROUPS.slice(), nG, k, h, err:r.err||null}; };
+  // 1 delivery whose summary table labels every sample differently: the syntax is applied, and says so
+  SYNKEEP=null; onServiceFiles([{text:F.mtx, name:"RUNQ-expression-matrix.tsv"},{text:F.biot, name:"RUNQ-gene-biotype-5plus_reads-summary.csv"}]);
+  R.svc=Object.assign(st(), {byDef:pending.syntax.byDefault, roles:pending.syntax.spec.roles.map(r=>r.role+(r.trim?"*":"")+":"+r.name), names:pending.matrix.sampleNames.slice(0,2),
+    said:/Selected because/.test(el("synbox")._c), stale:/placed in one group/.test(el("parseinfo")._c)});
+  R.svcDE=de("WT-Dox","WT+Dox"); genMethods(); R.meth=/Sample groups were read from the sample labels of the sequencing service: each was split at the underscore and the group was formed from part 1 without its trailing number and part 3\./.test(el("methodstext").textContent);
+  R.sess=sessionState().synNote.length>0;
+  // 2 the same grouping from a design file gives the same analysis
+  onServiceFiles([{text:F.mtx, name:"RUNQ-expression-matrix.tsv"},{text:F.biot, name:"RUNQ-gene-biotype-5plus_reads-summary.csv"}]); onDesignLoaded(F.design, "design.tsv");
+  R.file={mode:pending.syntax.mode, panel:(el("synbox")._c||"").length>0}; R.fileDE=de("WT-Dox","WT+Dox"); genMethods(); R.methFile=/Sample groups were read/.test(el("methodstext").textContent);
+  // 3 the user changes the parts: passage into the group (single-sample groups are reported), then back; join; switch off and on
+  SYNKEEP=null; onMatrixLoaded(F.plain, "plain.tsv"); R.plain=st();
+  el("syn_role1").value="group"; el("syn_role1")._h.change(); R.p3={n:uq(pending.groups).length, warn:/single sample/.test(el("synbox")._c)};
+  el("syn_role1").value="col"; el("syn_name1").value="Passage"; el("syn_trim0").checked=false; el("syn_role1")._h.change(); R.noTrim={groups:uq(pending.groups), factors:pending.factorNames.slice()};
+  el("syn_trim0").checked=true; el("syn_join").value=" "; el("syn_join")._h.change(); R.join=uq(pending.groups);
+  el("syn_join").value="auto"; el("syn_role0").value="col"; el("syn_role0")._h.change(); R.one={groups:uq(pending.groups), factor:FACTOR};
+  el("syn_mode").value="auto"; el("syn_mode")._h.change(); R.off={mode:pending.syntax.mode, n:uq(pending.groups).length, factors:pending.factorNames.length};
+  el("syn_mode").value="syn"; el("syn_mode")._h.change(); R.on=uq(pending.groups);
+  onMatrixLoaded(F.plain, "plain.tsv"); R.kept={mode:pending.syntax.mode, groups:uq(pending.groups)};     // same names loaded again: the choice is kept
+  // 4 other layouts: inference already right (offered, not applied); no parts (not offered); dot separator
+  SYNKEEP=null; onMatrixLoaded(F.n2, "n2.tsv"); R.n2=st(); onMatrixLoaded(F.n3, "n3.tsv"); R.n3={sug:!!pending.syntax.sug, panel:(el("synbox")._c||"").length>0, factor:FACTOR};
+  onMatrixLoaded(F.n4, "n4.tsv"); R.n4=Object.assign(st(), {sep:pending.syntax.spec.sep});
+  el("syn_sep").value="_"; el("syn_sep")._h.change(); R.n4sep={nF:pending.syntax.spec.roles.length, n:uq(pending.groups).length};
+  // 5 comparison datasets: plain matrix, delivery, and a matrix with the user's design file (not offered)
+  onMatrixLoaded(F.n2, "n2.tsv"); GROUPTYPE="auto"; GROUPORDER=null; analyzeNow(); __drain(); el("cmpspecies").value="human";
+  const sn=d=>({mode:d.syntax&&d.syntax.mode, groups:firstAppearance(d.groups), order:d.gorder||Object.keys(d.gi), A:d.selA, B:d.selB, gf:d.gfactor});
+  CMPB_TXT=F.plain; CMPB_DES=null; CMPB_NAME="plainB"; onAddDataset(); __drain(); R.cmp=sn(DSETS[0]);
+  R.cmpInfo=[/groups WT\+Dox\(n=3\)/.test(el("cmpinfo")._c||el("cmpinfo").textContent||""), /Sample-name syntax \(plainB\)/.test(el("cmpinfo")._c)];
+  { const r=dsResult(1); R.cmpDE={err:r.err||null, n:r.lfc? r.lfc.length : 0}; }
+  renderSlotGroupEditor(0); R.cmpPanel=(el("synB0_box")._c||"").length>200;
+  el("synB0_role0").value="skip"; el("synB0_role0")._h.change(); R.cmpChanged=sn(DSETS[0]);
+  el("synB0_mode").value="auto"; el("synB0_mode")._h.change(); R.cmpOff={mode:DSETS[0].syntax.mode, n:firstAppearance(DSETS[0].groups).length};
+  CMPB_SHEETS=[Object.assign(parseServiceSheet(F.biot), {fname:"RUNQ-gene-biotype-5plus_reads-summary.csv"})]; CMPB_TXT=F.mtx; CMPB_DES=null; CMPB_NAME="RUNQ-expression-matrix"; onAddDataset(); __drain(); R.cmpSvc=sn(DSETS[1]);
+  CMPB_TXT=F.plain; CMPB_DES=F.design; CMPB_NAME="own"; onAddDataset(); __drain(); R.cmpOwn={syn:DSETS[2].syntax||null, groups:firstAppearance(DSETS[2].groups)};
+  print("R " + JSON.stringify(R));
+"""
+
+
+@check
+def sample_name_syntax():
+    # sample names made of parts: the user chooses which parts define the groups, at data loading and for comparison
+    # datasets; applied by default only when the automatic reading gives no usable groups; a design file takes over
+    F = _syntax_files()
+    o = run(APP, SYNTAX_JS.replace("@F@", J(F)), timeout=2400)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-800:]}
+    r = R[0]; G4 = ["WT+Dox", "WT-Dox", "KO+Dox", "KO-Dox"]
+    ok = (r["svc"]["mode"] == "syn" and r["svc"]["byDef"] and r["svc"]["groups"] == G4 and r["svc"]["factor"] == "Group" and r["svc"]["said"] and not r["svc"]["stale"]
+          and r["svc"]["roles"] == ["group*:Part 1", "col:Part 2", "group:Dox"] and r["svc"]["names"] == ["WT_P3_+Dox", "WT_P3_-Dox"]
+          and r["svcDE"]["GROUPS"] == G4 and r["svcDE"]["err"] is None and r["svcDE"]["k"] > 20 and r["meth"] and r["sess"]
+          and r["file"] == {"mode": "file", "panel": False} and not r["methFile"]
+          and r["fileDE"]["nG"] == r["svcDE"]["nG"] and r["fileDE"]["k"] == r["svcDE"]["k"] and abs(r["fileDE"]["h"] - r["svcDE"]["h"]) < 1e-9
+          and r["plain"]["mode"] == "syn" and r["plain"]["groups"] == G4
+          and r["p3"] == {"n": 10, "warn": True}      # WT x 3 passages and KO x 2 passages, each +/-; 8 of them have one sample
+          and r["noTrim"]["groups"] == ["WT+Dox", "WT-Dox", "KO-1+Dox", "KO-1-Dox", "KO-2+Dox", "KO-2-Dox"] and "Passage" in r["noTrim"]["factors"]
+          and r["join"] == ["WT +Dox", "WT -Dox", "KO +Dox", "KO -Dox"]
+          and r["one"] == {"groups": ["+Dox", "-Dox"], "factor": "Dox"}
+          and r["off"]["mode"] == "auto" and r["off"]["factors"] == 0 and r["on"] == ["+Dox", "-Dox"]
+          and r["kept"] == {"mode": "syn", "groups": ["+Dox", "-Dox"]}
+          and r["n2"]["mode"] == "auto" and r["n2"]["groups"] == ["ctrl", "LPS"] and r["n2"]["panel"] and r["n2"]["factor"] == "group"
+          and r["n3"] == {"sug": False, "panel": False, "factor": "group"}
+          and r["n4"]["mode"] == "syn" and r["n4"]["sep"] == "." and r["n4"]["groups"] == ["liver.young", "liver.old", "lung.young", "lung.old"]
+          and r["cmp"]["mode"] == "syn" and r["cmp"]["groups"] == G4 and r["cmp"]["order"] == G4 and r["cmp"]["A"] == "WT+Dox" and r["cmp"]["gf"] == "Group"
+          and r["cmpInfo"] == [True, True] and r["cmpDE"]["err"] is None and r["cmpDE"]["n"] > 0 and r["cmpPanel"]
+          and r["cmpChanged"]["groups"] == ["+Dox", "-Dox"] and r["cmpOff"]["mode"] == "auto" and r["cmpOff"]["n"] == 12
+          and r["cmpSvc"]["mode"] == "syn" and r["cmpSvc"]["groups"] == G4
+          and r["cmpOwn"]["syn"] is None and r["cmpOwn"]["groups"] == G4)
+    return ok, r
+
+
+PRINT_JS = r"""
+  const R={}; const PXMM_=96/25.4; R.brDefault=BRSTYLE; BRSTYLE="staple";
+  const sp=(id, kind, pt)=>{ el("expsize").value=kind; EXPCFG.pt=pt||8; const P=printSpec(el(id)), L=P.figure.layout, M=L.margin;
+    const br=L.meta&&L.meta.brackets, ph=P.H-M.t-M.b;
+    let stepPx=null, annOnLine=null, f=null, top=null;
+    if(br&&br.items.length>1){ const ys=br.items.map(it=>L.shapes[it.sh[0]].y0), tr=P.figure.data[br.tr]; top=tr? tr.y[0] : L.yaxis.range[1];
+      const u=(top-br.bottom)/ph; stepPx=(ys[1]-ys[0])/u; f=L.annotations[br.items[0].an].font.size; annOnLine=br.items.every(it=>L.annotations[it.an].y===L.shapes[it.sh[0]].y0)&&top>Math.max(...ys); }
+    return {mm:[P.wmm,P.hmm], px:[P.W,P.H], fitted:P.fitted, slots:P.slots, font:L.font.size, plotMM:[(P.W-M.l-M.r)/PXMM_, ph/PXMM_], ytitle:L.yaxis&&L.yaxis.title&&L.yaxis.title.font&&L.yaxis.title.font.size,
+      title:L.title&&L.title.font&&L.title.font.size, xt:L.xaxis&&L.xaxis.tickfont? L.xaxis.tickfont.size : null, mk:P.figure.data.map(t=>t.marker&&t.marker.size).filter(x=>typeof x==="number")[0], stepPx, f, annOnLine,
+      wh:[L.width,L.height], grid:L.yaxis&&L.yaxis.showgrid, line:L.yaxis&&L.yaxis.showline}; };
+  R.modes=[["",expMode], ["1050x788",expMode], ["fit",expMode], ["mm174",expMode]].map(([v,f])=>{ el("expsize").value=v; return f(); });
+  el("p_gene").clientWidth=780; el("p_gene").clientHeight=560; curGene=nameToIdx["s100a9"]; el("pwsel").value="ref"; scale="linear"; switchTab("gene"); __drain(); drawGene();
+  const c0=plotlyCalls.filter(x=>x.id==="p_gene").pop(), m0=JSON.stringify(PLREG.get("p_gene").layout0), sh0=JSON.stringify(c0.layout.shapes.slice(0,3));
+  R.fam=[c0.layout.font.family, PLREG.get("p_gene").layout0.font.family, (()=>{ el("expsize").value="fit"; return printSpec(el("p_gene")).figure.layout.font.family; })(), PLOT_FONT];
+  R.nGroups=GROUPS.length; R.screenFont=c0.layout.font.size; R.screenMk=c0.traces.map(t=>t.marker&&t.marker.size).filter(x=>typeof x==="number")[0];
+  R.fit8=sp("p_gene","fit",8); R.fit6=sp("p_gene","fit",6); R.c85=sp("p_gene","mm85",8); R.c114=sp("p_gene","mm114",8); R.c174=sp("p_gene","mm174",8);
+  EXPCFG.w=60; EXPCFG.h=50; R.cust=sp("p_gene","custom",8); EXPCFG.h=0; R.custAuto=sp("p_gene","custom",8); EXPCFG.w=85;
+  R.untouched= m0===JSON.stringify(PLREG.get("p_gene").layout0) && sh0===JSON.stringify(plotlyCalls.filter(x=>x.id==="p_gene").pop().layout.shapes.slice(0,3));
+  // the screen font scale does not change a print-size export
+  FONTSCALE=2; drawGene(); R.fs2=sp("p_gene","fit",8); R.fs2same=JSON.stringify([R.fs2.mm, R.fs2.font, R.fs2.ytitle])===JSON.stringify([R.fit8.mm, R.fit8.font, R.fit8.ytitle]);
+  // large fonts on a short plot: brackets are re-stacked on screen as well
+  el("p_gene").clientHeight=260; drawGene(); { const c=plotlyCalls.filter(x=>x.id==="p_gene").pop(), L=c.layout, br=L.meta.brackets, ph=260-L.margin.t-L.margin.b, ys=br.items.map(it=>L.shapes[it.sh[0]].y0), top=c.traces[br.tr].y[0];
+    R.screenStack={stepPx:(ys[1]-ys[0])/((top-br.bottom)/ph), f:L.annotations[0].font.size, orig:br.step/((top-br.bottom)/ph)}; }
+  FONTSCALE=1; el("p_gene").clientHeight=560;
+  // axis style
+  AXSTYLE="classic"; drawGene(); R.classic=sp("p_gene","fit",8); { const c=plotlyCalls.filter(x=>x.id==="p_gene").pop(); R.classicScreen=[c.layout.yaxis.showgrid, c.layout.yaxis.showline, c.layout.xaxis.ticks]; }
+  el("p_heat").clientWidth=900; switchTab("heat"); __drain(); { const c=plotlyCalls.filter(x=>x.id==="p_heat").pop(); R.heatAxes=[c.layout.xaxis.showgrid, c.layout.xaxis.showline===true]; }
+  AXSTYLE="grid"; drawGene(); R.gridBack=plotlyCalls.filter(x=>x.id==="p_gene").pop().layout.yaxis.showline===true;
+  // a scatter plot is not fitted to positions: single-column size
+  el("p_volcano").clientWidth=1000; el("selA").value=GROUPS[0]; el("selB").value=GROUPS[1]; deKey=""; switchTab("de"); __drain(); R.vol=sp("p_volcano","fit",8); R.volScreenMk=plotlyCalls.filter(x=>x.id==="p_volcano").pop().traces.map(t=>t.marker&&t.marker.size).filter(x=>typeof x==="number")[0];
+  // multi-gene comparison with brackets
+  compareList=["s100a9","pi3","defb4a"].map(n=>nameToIdx[n]); el("p_compare").clientWidth=1000; CMPCHART="bar"; CMPARR="cond_in_gene"; el("cmpstat").value="first"; el("cmptest").value="welch"; el("cmpstatfmt").value="stars"; switchTab("gene"); __drain(); drawCompare(); R.cmp=sp("p_compare","fit",8);
+  // straight significance lines (the default): end ticks hidden, lines kept, a smaller step, a panel no taller
+  BRSTYLE="line"; el("p_gene").clientHeight=560; drawGene(); { const c=plotlyCalls.filter(x=>x.id==="p_gene").pop(), br=c.layout.meta.brackets;
+    R.lineScreen=[br.items.every(it=>c.layout.shapes[it.sh[1]].visible===false&&c.layout.shapes[it.sh[2]].visible===false), br.items.every(it=>c.layout.shapes[it.sh[0]].visible!==false)]; }
+  R.lineFit=sp("p_gene","fit",8); { el("expsize").value="fit"; const P=printSpec(el("p_gene")), br=P.figure.layout.meta.brackets; R.linePrint=br.items.every(it=>P.figure.layout.shapes[it.sh[1]].visible===false&&P.figure.layout.shapes[it.sh[0]].visible!==false); }
+  drawCompare(); { const c=plotlyCalls.filter(x=>x.id==="p_compare").pop(), br=c.layout.meta.brackets; R.lineCmp=br.items.every(it=>c.layout.shapes[it.sh[1]].visible===false&&c.layout.shapes[it.sh[2]].visible===false&&c.layout.shapes[it.sh[0]].visible!==false&&c.layout.shapes[it.sh[0]].x0!==c.layout.shapes[it.sh[0]].x1); }
+  BRSTYLE="staple"; drawGene(); R.stapleBack=plotlyCalls.filter(x=>x.id==="p_gene").pop().layout.shapes[1].visible===true;
+  // file helpers: PNG resolution and SVG size
+  const png=new Uint8Array([137,80,78,71,13,10,26,10, 0,0,0,13, 73,72,68,82, 0,0,0,1, 0,0,0,1, 8,2,0,0,0, 0x90,0x77,0x53,0xDE, 0,0,0,0, 73,68,65,84, 0,0,0,0, 0,0,0,0, 73,69,78,68, 0xAE,0x42,0x60,0x82]);
+  const o=pngWithDPI(png, 300); R.png=Array.from(o); R.png2=Array.from(pngWithDPI(o, 600)).length===o.length;
+  R.rt=Array.from(dataUrlBytes(bytesDataUrl(png, "image/png"))).join()===Array.from(png).join();
+  R.svg=svgWithMM('<svg class="main-svg" xmlns="http://www.w3.org/2000/svg" width="200" height="230" style="" viewBox="0 0 200 230"><g/></svg>', 52.9, 60.9, 200, 230).slice(0,150);
+  R.svg2=svgWithMM('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="230"><g/></svg>', 52.9, 60.9, 200, 230).slice(0,120);
+  // session
+  el("expsize").value="custom"; EXPCFG={pt:7, dpi:600, w:70, h:55}; AXSTYLE="classic"; const ss=sessionState(); R.sess=[ss.expSize, ss.expCfg, ss.axStyle, ss.brStyle];
+  print("R " + JSON.stringify(R));
+"""
+
+
+@check
+def print_size_export():
+    # figure export at print size: size in mm, type in points, panel fitted to the number of groups, brackets
+    # re-stacked, screen figure unchanged, PNG resolution and SVG size recorded in the file
+    import struct, zlib
+    body = r"""
+  el("species").value="human"; useBuiltinAnno(); el("normsel").value="tmm"; el("fmode").value="fbe";
+  loadFromText(""" + J(mat("GSE121212")) + ", " + J(des("GSE121212")) + r"""); GROUPTYPE="auto"; analyzeNow(); __drain();
+""" + PRINT_JS
+    o = run(APP, body, timeout=1500)
+    R = lines_with(o, "R ")
+    if not R: return False, {"error": o[-900:]}
+    r = R[0]; px = 96 / 72.0; near = lambda a, b, t=0.02: abs(a - b) <= t * abs(b)
+    f8, c85 = r["fit8"], r["c85"]
+    b = bytes(r["png"]); ppm = struct.unpack(">II", b[41:49]); crc = struct.unpack(">I", b[50:54])[0]
+    png_ok = b[37:41] == b"pHYs" and ppm == (11811, 11811) and b[49] == 1 and crc == (zlib.crc32(b[37:50]) & 0xffffffff) and b[58:62] == b"IDAT" and r["png2"] and r["rt"]
+    def stacked(x):   # labels one above the other do not touch: a step holds a label (0.72 f for asterisks) and the tick
+        return x["stepPx"] is not None and x["annOnLine"] and x["stepPx"] >= 0.72 * x["f"] + 0.3 * x["f"] + 1.9
+    ok = (r["modes"][0] == {"mode": "shown"} and r["modes"][1] == {"mode": "px", "w": 1050, "h": 788} and r["modes"][2] == {"mode": "print", "kind": "fit"}
+          and r["nGroups"] == 6 and f8["fitted"] and f8["slots"] == 6
+          and near(f8["font"], 8 * px, 1e-6) and near(f8["ytitle"], 8 * px, 1e-6) and f8["title"] <= 8 * px * 1.15 + 1e-6 and near(r["fit6"]["font"], 6 * px, 1e-6)
+          and near(f8["plotMM"][0], 54, 0.03) and f8["mm"][0] < 90 and f8["mm"][0] < c85["mm"][0] and r["fit6"]["mm"][0] < f8["mm"][0]
+          and f8["wh"] == f8["px"] and f8["mk"] < r["screenMk"] and stacked(f8) and stacked(c85) and stacked(r["fit6"])
+          and c85["px"][0] == 321 and near(c85["mm"][0], 85, 0.005) and r["c114"]["px"][0] == 431 and r["c174"]["px"][0] == 658 and not c85["fitted"]
+          and r["cust"]["px"] == [227, 189] and r["custAuto"]["px"][0] == 227 and r["custAuto"]["px"][1] != 189
+          and r["untouched"] and r["fs2same"]
+          and r["screenStack"]["orig"] < r["screenStack"]["f"] * 0.5 and r["screenStack"]["stepPx"] >= r["screenStack"]["orig"] * 1.4   # five labels cannot all fit in 260 px: the step is as large as half the plot allows
+          and r["classic"]["grid"] is False and r["classic"]["line"] is True and r["classicScreen"] == [False, True, "outside"] and r["heatAxes"] == [False, False] and r["gridBack"] is False
+          and f8.get("line") is not True
+          and not r["vol"]["fitted"] and r["vol"]["px"][0] == 321 and r["vol"]["mk"] < r["volScreenMk"]
+          and r["cmp"]["fitted"] and r["cmp"]["slots"] == 18 and stacked(r["cmp"])
+          and r["fam"] == ["Arial, Helvetica, sans-serif"] * 4
+          and r["brDefault"] == "line" and r["lineScreen"] == [True, True] and r["linePrint"] and r["lineCmp"] and r["stapleBack"]
+          and r["lineFit"]["annOnLine"] and r["lineFit"]["stepPx"] >= 0.97 * r["lineFit"]["f"] + 1.9 and r["lineFit"]["stepPx"] < f8["stepPx"] and r["lineFit"]["px"][1] <= f8["px"][1]
+          and png_ok and 'width="52.9mm" height="60.9mm"' in r["svg"] and 'viewBox="0 0 200 230"' in r["svg"] and r["svg"].count("width=") == 1
+          and 'width="52.9mm"' in r["svg2"] and 'viewBox="0 0 200 230"' in r["svg2"]
+          and r["sess"] == ["custom", {"pt": 7, "dpi": 600, "w": 70, "h": 55}, "classic", "staple"])
+    r["png"] = png_ok
+    return ok, r
+
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     fails = 0

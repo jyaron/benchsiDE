@@ -108,6 +108,21 @@ Which files are needed: the matrix is required. One summary table is enough to n
 
 The same files can be added as a comparison dataset in the Compare tab: select the matrix and a summary table together under **Add dataset (matrix)**, or add the table afterwards with **Design for last added**.
 
+### 2.2b Sample names made of parts (sample-name syntax)
+
+Sample names often carry several pieces of information, for example `WT_P3_+Dox` (cell line, passage, treatment). When no design file is loaded and the names can be split into parts, step 3 shows a **Sample-name syntax** panel:
+
+1. **Groups.** Choose between the automatic reading and "from the parts of the sample names, as set below".
+2. **Separator.** The character that separates the parts (underscore, hyphen, dot, space, bar, comma, semicolon, or any other text).
+3. **Parts.** The table lists each part with the values it takes. Set each part to *part of the group*, *design column only* (kept for adjustment as a covariate, not part of the group) or *not used*, and give it a column name. For a part such as `KO-1`, `KO-2`, tick "without the number at its end" to treat the clones as one group (`KO`).
+4. **Join.** How the group parts are written together in the group name (`WT+Dox`, `WT_+Dox`, `WT +Dox`).
+
+The groups and their sizes are shown under the table and update with every change. A group with a single sample cannot be tested; the panel says so and names the remedy.
+
+The syntax is selected automatically only when the automatic reading gives no usable groups (every sample alone, or all samples together) and the parts of the names give groups of at least two samples; the panel then says so. The suggestion puts a part that marks a treatment as present or absent (`+X`, `-X`) in the group, with as many other parts as still leave at least two samples per group. Check it before analysing. Loading a design file replaces the syntax. The choice is kept while the same sample names are loaded again, and the methods text states how the groups were read.
+
+For a sequencing-service delivery the parts are those of the sample labels in the summary table. For a comparison dataset (Compare tab), the same panel is at the top of **Edit groups** in the dataset's row; it is offered when the dataset was added without a design file of your own.
+
 ### 2.3 Gene-set libraries (optional)
 
 Built-in libraries (from MSigDB v2024.1, CC BY 4.0): Hallmark, GO Biological Process, GO Cellular Component, GO Molecular Function and Reactome, each for human and mouse. The same five libraries are offered for rat and pig. MSigDB has no rat or pig collections, so these are the human sets with each gene replaced by its rat orthologs (MGI) or pig orthologs (Ensembl Compara). They are not curated for those species, rat or pig genes without a human ortholog are in no set, and the app says so wherever such a library is used. Choose the library of your data's species; a warning appears if they differ. You can also load any `.gmt` file.
@@ -505,7 +520,13 @@ To use such names in all analyses, tick **Use the gene names in the matrix as gi
 ### 10.1 Figure exports
 
 - Saving a figure opens a preview first: check it, choose SVG or PNG and the file name, then click **Save** (or **Close** to cancel). Untick **Figure settings → Preview** to save at once.
-- Open **Figure settings** in the header. **Export size** sets the shape of exported figures (as shown; single column 4:3 or 1:1; double column 7:4 or wide).
+- Open **Figure settings** in the header. **Export size** sets the size of exported figures; the same choice is in the preview window, where the figure is redrawn as you change it.
+  - **As shown on screen** exports the figure as it is laid out in the browser window. Its type is sized for the screen, so in a column of a page it becomes small and the plot large.
+  - **Print size** lays the figure out again at its size on the page, with the type in points (6 to 12 pt; 8 pt by default). Markers, lines and margins follow the type size. *Panel fitted to the data* sets the width from the number of bars, boxes or violins (9 mm each up to 6, 7 mm up to 12, 5.5 mm beyond) and gives the plot a height of 38 mm, more when significance brackets need it; figures of other kinds are given the single-column size. *Single column* (85 mm), *1.5 columns* (114 mm) and *double column* (174 mm) set the width, and *custom* sets width and height in millimetres (leave the height empty for an automatic height). The preview states the size in millimetres. SVG files state their size in millimetres, and PNG files (300 or 600 dpi) record their resolution, so both are placed at that size in Illustrator, Inkscape, Word or PowerPoint. The screen **Fonts** setting does not change a print-size export.
+  - **Screen proportions (pixels)** are the earlier fixed shapes (single column 4:3 or 1:1; double column 7:4 or wide), with screen type.
+- **Axes** chooses between grid lines and axis lines with tick marks and no grid, for every plot and export.
+- **Significance** chooses how a significant comparison is marked: a straight line over the two groups (default) or a line with a tick at each end.
+- All text is set in Arial, on screen and in exported figures.
 - **Fonts** sets the type size: screen, paper (1.5×) or poster (2×). Margins adjust automatically.
 - **Axis labels**, **Label size** and **Long labels** set the tick labels: orientation (auto, horizontal, 45°, vertical), label size, and long-label handling (wrap, full length, or shortened). With wrap or full length, labels are never cut off; the figure margin grows instead.
 - The camera icon on any plot saves it as SVG, the recommended format for publication.
